@@ -1,10 +1,11 @@
+
 import React, { useState } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
-import { useExpenseStore, Member } from '@/stores/expenseStore';
+import { useExpenseStore, Member, Group } from '@/stores/expenseStore';
 import { Users, Plus, X } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 

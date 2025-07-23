@@ -10,7 +10,7 @@ import { useExpenseStore, Member } from '@/stores/expenseStore';
 import { Upload, FileText, CheckCircle, AlertTriangle, X } from 'lucide-react';
 import Papa from 'papaparse';
 import { useToast } from '@/hooks/use-toast';
-import { useAuth } from '@/hooks/use-auth';
+import { useAuth } from '@/contexts/AuthContext';
 
 interface ImportDialogProps {
   children: React.ReactNode;
