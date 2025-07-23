@@ -10,6 +10,8 @@ import { RecentExpenses } from '@/components/RecentExpenses';
 import { ExpenseChart } from '@/components/ExpenseChart';
 import { GroupList } from '@/components/GroupList';
 import { SettlementHistory } from '@/components/SettlementHistory';
+import { ExportDialog } from '@/components/ExportDialog';
+import { ImportDialog } from '@/components/ImportDialog';
 import { useExpenseStore } from '@/stores/expenseStore';
 
 const Index = () => {
@@ -48,6 +50,18 @@ const Index = () => {
                 <Users className="w-4 h-4 mr-2" />
                 New Group
               </Button>
+              <ExportDialog>
+                <Button variant="outline" className="border-green-200 text-green-600 hover:bg-green-50">
+                  <Receipt className="w-4 h-4 mr-2" />
+                  Export
+                </Button>
+              </ExportDialog>
+              <ImportDialog>
+                <Button variant="outline" className="border-purple-200 text-purple-600 hover:bg-purple-50">
+                  <Plus className="w-4 h-4 mr-2" />
+                  Import
+                </Button>
+              </ImportDialog>
             </div>
           </div>
         </div>
