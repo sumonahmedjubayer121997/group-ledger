@@ -24,7 +24,7 @@ export const GroupSettings: React.FC<GroupSettingsProps> = ({ group }) => {
   const [simplifyDebts, setSimplifyDebts] = useState(group.settings?.simplifyDebts ?? true);
   const [notifications, setNotifications] = useState(group.settings?.notifications ?? true);
   const [recurringBills, setRecurringBills] = useState(group.settings?.recurringBills ?? false);
-  const [groupType, setGroupType] = useState(group.groupType || 'private');
+  const [groupType, setGroupType] = useState<'private' | 'public'>(group.groupType || 'private');
 
   const { updateGroup } = useExpenseStore();
   const { toast } = useToast();
@@ -123,7 +123,7 @@ export const GroupSettings: React.FC<GroupSettingsProps> = ({ group }) => {
 
             <div>
               <Label htmlFor="group-type">Group Type</Label>
-              <Select value={groupType} onValueChange={(value) => setGroupType(value)}>
+              <Select value={groupType} onValueChange={(value) => setGroupType(value as 'private' | 'public')}>
                 <SelectTrigger>
                   <SelectValue placeholder="Select group type" />
                 </SelectTrigger>
