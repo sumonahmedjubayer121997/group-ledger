@@ -9,6 +9,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { useExpenseStore, Group, Member } from '@/stores/expenseStore';
 import { Users, Crown, Eye, User, UserPlus, UserMinus, MoreVertical, Mail } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
+import { useAuth } from '@/contexts/AuthContext';
 
 interface GroupMemberManagementProps {
   group: Group;
@@ -20,6 +21,7 @@ export const GroupMemberManagement: React.FC<GroupMemberManagementProps> = ({ gr
   const [newMemberEmail, setNewMemberEmail] = useState('');
   
   const { addMemberToGroup, removeMemberFromGroup, updateMemberRole } = useExpenseStore();
+  const { user } = useAuth();
   const { toast } = useToast();
 
   const getRoleIcon = (role?: string) => {
@@ -39,7 +41,7 @@ export const GroupMemberManagement: React.FC<GroupMemberManagementProps> = ({ gr
   };
 
   const handleAddMember = () => {
-    if (!newMemberName.trim() || !newMemberEmail.trim()) {
+    if (!newMemberName.trim() || !newMemberEmail.trim() || !user) {
       toast({
         title: "Missing Information",
         description: "Please enter both name and email.",
@@ -54,7 +56,7 @@ export const GroupMemberManagement: React.FC<GroupMemberManagementProps> = ({ gr
       email: newMemberEmail.trim(),
     };
 
-    addMemberToGroup(group.id, newMember);
+    addMemberToGroup(group.id, newMember, user.uid);
     
     toast({
       title: "Member Added",

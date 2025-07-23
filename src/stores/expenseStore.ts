@@ -112,7 +112,7 @@ interface ExpenseStore {
   
   // Updated methods for Firebase
   addExpense: (expense: Omit<Expense, 'id'>, userId: string) => Promise<void>;
-  addGroup: (group: Omit<Group, 'id' | 'inviteCode' | 'settings' | 'isArchived'>, userId: string) => Promise<void>;
+  addGroup: (group: Omit<Group, 'id'>, userId: string) => Promise<void>;
   updateGroup: (id: string, updates: Partial<Group>) => Promise<void>;
   addMemberToGroup: (groupId: string, member: Omit<Member, 'joinedAt' | 'role'>, userId: string) => Promise<void>;
   removeMemberFromGroup: (groupId: string, memberId: string) => Promise<void>;
@@ -196,7 +196,21 @@ export const useExpenseStore = create<ExpenseStore>()(
         addGroup: async (group, userId) => {
           try {
             set({ loading: true, error: null });
-            await createGroupFirebase(group, userId);
+            
+            // Create a complete group object with default values
+            const completeGroup: Omit<Group, 'id'> = {
+              ...group,
+              inviteCode: crypto.randomUUID(),
+              settings: {
+                currency: 'USD',
+                simplifyDebts: true,
+                notifications: true,
+                recurringBills: false,
+              },
+              isArchived: false,
+            };
+            
+            await createGroupFirebase(completeGroup, userId);
             // Firebase listener will update the state
             
             get().addActivity({

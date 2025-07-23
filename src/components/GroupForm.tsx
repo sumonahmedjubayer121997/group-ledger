@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
@@ -7,6 +6,7 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { useExpenseStore, Member } from '@/stores/expenseStore';
 import { Users, Plus, X } from 'lucide-react';
+import { useAuth } from '@/contexts/AuthContext';
 
 interface GroupFormProps {
   isOpen: boolean;
@@ -15,6 +15,7 @@ interface GroupFormProps {
 
 export const GroupForm: React.FC<GroupFormProps> = ({ isOpen, onClose }) => {
   const { addGroup } = useExpenseStore();
+  const { user } = useAuth();
   const [formData, setFormData] = useState({
     name: '',
     description: '',
@@ -41,6 +42,8 @@ export const GroupForm: React.FC<GroupFormProps> = ({ isOpen, onClose }) => {
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     
+    if (!user) return;
+    
     const validMembers = members.filter(m => m.name.trim() && m.email.trim());
     if (validMembers.length === 0) return;
     
@@ -55,7 +58,7 @@ export const GroupForm: React.FC<GroupFormProps> = ({ isOpen, onClose }) => {
       members: membersWithIds,
       createdAt: new Date(),
       groupType: 'private',
-    });
+    }, user.uid);
     
     // Reset form
     setFormData({ name: '', description: '' });
