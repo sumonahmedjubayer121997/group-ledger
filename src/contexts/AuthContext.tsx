@@ -1,4 +1,3 @@
-
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { 
   User,
@@ -71,18 +70,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       
       if (firebaseUser) {
         try {
-          // Try to update last login time, but don't fail if it doesn't work
-          await updateDoc(doc(db, 'users', firebaseUser.uid), {
-            lastLoginAt: new Date()
-          }).catch(error => {
-            console.log('Could not update last login time:', error);
-          });
-          
-          // Fetch user profile
           await fetchUserProfile(firebaseUser.uid);
         } catch (error) {
-          console.log('Error updating user data:', error);
-          // Continue without user profile if there's an error
+          console.log('Error fetching user profile:', error);
         }
       } else {
         setUserProfile(null);
@@ -107,7 +97,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       }
     } catch (error) {
       console.error('Error fetching user profile:', error);
-      // Don't throw error, just continue without profile
     }
   };
 
@@ -135,7 +124,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       setUserProfile(userProfile);
     } catch (error) {
       console.error('Error creating user profile:', error);
-      // Don't throw error, just continue without profile
     }
   };
 
@@ -153,13 +141,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     try {
       const { user: firebaseUser } = await createUserWithEmailAndPassword(auth, email, password);
       
-      // Update display name
       await updateProfile(firebaseUser, { displayName });
-      
-      // Send verification email
       await sendEmailVerification(firebaseUser);
-      
-      // Create user profile in Firestore
       await createUserProfile(firebaseUser, { displayName });
     } finally {
       setLoading(false);
@@ -172,7 +155,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       const provider = new GoogleAuthProvider();
       const { user: firebaseUser } = await signInWithPopup(auth, provider);
       
-      // Check if user profile exists, create if not
       try {
         const userDoc = await getDoc(doc(db, 'users', firebaseUser.uid));
         if (!userDoc.exists()) {
@@ -215,11 +197,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const updateUserPassword = async (currentPassword: string, newPassword: string) => {
     if (!user || !user.email) throw new Error('No user logged in');
     
-    // Reauthenticate user
     const credential = EmailAuthProvider.credential(user.email, currentPassword);
     await reauthenticateWithCredential(user, credential);
-    
-    // Update password
     await updatePassword(user, newPassword);
   };
 

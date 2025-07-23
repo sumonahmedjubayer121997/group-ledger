@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
@@ -9,7 +8,9 @@ import { Textarea } from '@/components/ui/textarea';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Slider } from '@/components/ui/slider';
 import { useExpenseStore, Member } from '@/stores/expenseStore';
+import { useAuth } from '@/contexts/AuthContext';
 import { Calendar, DollarSign, Users, Tag, Percent, Calculator } from 'lucide-react';
+import { useToast } from '@/hooks/use-toast';
 
 interface ExpenseFormProps {
   isOpen: boolean;
@@ -27,7 +28,10 @@ const categories = [
 ];
 
 export const ExpenseForm: React.FC<ExpenseFormProps> = ({ isOpen, onClose }) => {
-  const { groups, addExpense } = useExpenseStore();
+  const { groups, addExpense, loading } = useExpenseStore();
+  const { user } = useAuth();
+  const { toast } = useToast();
+  
   const [formData, setFormData] = useState({
     description: '',
     amount: '',
@@ -47,7 +51,6 @@ export const ExpenseForm: React.FC<ExpenseFormProps> = ({ isOpen, onClose }) => 
     includeSelf ? true : m.id !== formData.paidBy
   ) || [];
 
-  // Initialize split data when group or split type changes
   useEffect(() => {
     if (selectedGroup && formData.splitType !== 'equal') {
       const initialSplitData: { [memberId: string]: number } = {};
@@ -86,37 +89,56 @@ export const ExpenseForm: React.FC<ExpenseFormProps> = ({ isOpen, onClose }) => 
     return total - getTotalSplit();
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    if (!selectedGroup || !selectedPayer) return;
+    if (!selectedGroup || !selectedPayer || !user) {
+      toast({
+        title: "Error",
+        description: "Please fill in all required fields",
+        variant: "destructive",
+      });
+      return;
+    }
     
-    addExpense({
-      description: formData.description,
-      amount: parseFloat(formData.amount),
-      paidBy: selectedPayer,
-      splitAmong: splitAmong,
-      groupId: formData.groupId,
-      category: formData.category,
-      date: new Date(formData.date),
-      splitType: formData.splitType,
-      splitData: formData.splitType !== 'equal' ? splitData : undefined,
-    });
-    
-    // Reset form
-    setFormData({
-      description: '',
-      amount: '',
-      paidBy: '',
-      groupId: '',
-      category: '',
-      date: new Date().toISOString().split('T')[0],
-      splitType: 'equal',
-    });
-    setSplitData({});
-    setIncludeSelf(true);
-    
-    onClose();
+    try {
+      await addExpense({
+        description: formData.description,
+        amount: parseFloat(formData.amount),
+        paidBy: selectedPayer,
+        splitAmong: splitAmong,
+        groupId: formData.groupId,
+        category: formData.category,
+        date: new Date(formData.date),
+        splitType: formData.splitType,
+        splitData: formData.splitType !== 'equal' ? splitData : undefined,
+      }, user.uid);
+      
+      toast({
+        title: "Success",
+        description: "Expense added successfully",
+      });
+      
+      setFormData({
+        description: '',
+        amount: '',
+        paidBy: '',
+        groupId: '',
+        category: '',
+        date: new Date().toISOString().split('T')[0],
+        splitType: 'equal',
+      });
+      setSplitData({});
+      setIncludeSelf(true);
+      
+      onClose();
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to add expense",
+        variant: "destructive",
+      });
+    }
   };
 
   return (
@@ -222,7 +244,6 @@ export const ExpenseForm: React.FC<ExpenseFormProps> = ({ isOpen, onClose }) => 
             </div>
           </div>
 
-          {/* Split Type Selection */}
           <div className="space-y-4">
             <Label>How should this be split?</Label>
             <RadioGroup 
@@ -255,7 +276,6 @@ export const ExpenseForm: React.FC<ExpenseFormProps> = ({ isOpen, onClose }) => 
               </div>
             </RadioGroup>
 
-            {/* Include/Exclude Self Toggle */}
             {selectedGroup && formData.paidBy && (
               <div className="flex items-center space-x-2">
                 <input
@@ -271,7 +291,6 @@ export const ExpenseForm: React.FC<ExpenseFormProps> = ({ isOpen, onClose }) => 
               </div>
             )}
 
-            {/* Advanced Split UI */}
             {formData.splitType !== 'equal' && splitAmong.length > 0 && formData.amount && (
               <div className="space-y-4 border rounded-lg p-4 bg-secondary/20">
                 <div className="flex justify-between items-center">
@@ -338,8 +357,12 @@ export const ExpenseForm: React.FC<ExpenseFormProps> = ({ isOpen, onClose }) => 
             <Button type="button" variant="outline" onClick={onClose}>
               Cancel
             </Button>
-            <Button type="submit" className="bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700">
-              Add Expense
+            <Button 
+              type="submit" 
+              disabled={loading}
+              className="bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700"
+            >
+              {loading ? 'Adding...' : 'Add Expense'}
             </Button>
           </div>
         </form>
