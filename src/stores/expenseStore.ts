@@ -13,6 +13,7 @@ import {
   addMemberToGroup as addMemberToGroupFirebase,
   removeMemberFromGroup as removeMemberFromGroupFirebase,
   linkPendingInvitationsToUser,
+  backfillExistingUserInvitations,
 } from '@/services/firebaseService';
 
 export interface Member {
@@ -144,6 +145,9 @@ interface ExpenseStore {
   simplifyDebts: () => void;
   archiveGroup: (groupId: string) => void;
   unarchiveGroup: (groupId: string) => void;
+  
+  // Backfill utility
+  runBackfillInvitations: () => Promise<void>;
 }
 
 export const useExpenseStore = create<ExpenseStore>()(
@@ -676,6 +680,18 @@ export const useExpenseStore = create<ExpenseStore>()(
               group.id === groupId ? { ...group, isArchived: false } : group
             ),
           }));
+        },
+        
+        runBackfillInvitations: async () => {
+          try {
+            set({ loading: true, error: null });
+            await backfillExistingUserInvitations();
+            console.log('Backfill process completed successfully');
+            set({ loading: false });
+          } catch (error) {
+            console.error('Error running backfill:', error);
+            set({ error: 'Failed to run backfill process', loading: false });
+          }
         },
       };
     },
