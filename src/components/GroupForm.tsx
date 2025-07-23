@@ -63,6 +63,7 @@ export const GroupForm: React.FC<GroupFormProps> = ({ isOpen, onClose }) => {
     );
 
     const currentUserName =
+      userProfile?.name?.trim() ||
       userProfile?.displayName?.trim() ||
       user?.displayName?.trim() ||
       'Unnamed User';
@@ -82,7 +83,7 @@ export const GroupForm: React.FC<GroupFormProps> = ({ isOpen, onClose }) => {
           id: crypto.randomUUID(),
           name: m.name.trim(),
           email: m.email.trim(),
-          role: 'member',
+          role: 'member' as const,
         })),
     ];
 
@@ -176,7 +177,7 @@ export const GroupForm: React.FC<GroupFormProps> = ({ isOpen, onClose }) => {
               <div className="flex items-center space-x-3 p-3 bg-green-50 rounded-lg border border-green-200">
                 <div className="flex-1 grid grid-cols-2 gap-3">
                   <Input
-                    value={userProfile?.displayName || 'Current User'}
+                    value={userProfile?.name || userProfile?.displayName || 'Current User'}
                     disabled
                     className="bg-green-100"
                   />

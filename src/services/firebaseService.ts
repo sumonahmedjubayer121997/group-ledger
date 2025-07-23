@@ -163,8 +163,10 @@ console.log("🔍 groupData.members", groupData.members);
 console.log("📌 Type:", typeof groupData.members);
 console.log("📌 IsArray?", Array.isArray(groupData.members));
 
-    // Process members from object map: { uid: role }
-    for (const member of groupData.members) {
+    // Process members - ensure it's an array
+    const membersArray = Array.isArray(groupData.members) ? groupData.members : [];
+    
+    for (const member of membersArray) {
   const memberId = member.id;
   const existingUser = await getUserProfile(memberId);
   console.log("👤 Checking user profile for memberId:", memberId);
@@ -232,7 +234,7 @@ console.log("📌 IsArray?", Array.isArray(groupData.members));
   });
 
 
-    const membersArray = Object.entries(users).map(([id, userData]) => ({
+    const membersReturnArray = Object.entries(users).map(([id, userData]) => ({
       id,
       name: userData.name,
       email: userData.email,
@@ -243,7 +245,7 @@ console.log("📌 IsArray?", Array.isArray(groupData.members));
     return {
       id: groupId,
       ...groupData,
-      members: membersArray,
+      members: membersReturnArray,
       createdAt: new Date(),
     };
   } catch (error) {
