@@ -101,9 +101,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           createdAt: data.createdAt?.toDate() || new Date(),
           lastLoginAt: data.lastLoginAt?.toDate() || new Date(),
         } as UserProfile);
+      } else {
+        // Profile doesn't exist, throw error to trigger creation
+        throw new Error('User profile does not exist');
       }
     } catch (error) {
       console.error('Error fetching user profile:', error);
+      throw error; // Re-throw to trigger profile creation
     }
   };
 
