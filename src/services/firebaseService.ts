@@ -1,4 +1,3 @@
-
 import { 
   collection, 
   doc, 
@@ -39,12 +38,11 @@ export interface UserProfile {
     totalPaid: number;
     totalOwed: number;
   };
-  // Compatibility properties for existing components
-  displayName?: string; // Alias for name
-  emailVerified?: boolean; // Alias for verified
-  role?: 'user' | 'admin'; // Default role
-  createdAt?: Date; // Alias for joinedAt
-  lastLoginAt?: Date; // Alias for lastActivity
+  displayName?: string;
+  emailVerified?: boolean;
+  role?: 'user' | 'admin';
+  createdAt?: Date;
+  lastLoginAt?: Date;
 }
 
 // User Operations
@@ -94,18 +92,27 @@ export const getUserProfile = async (uid: string): Promise<UserProfile | null> =
     
     if (userDoc.exists()) {
       const data = userDoc.data();
-    const profile = {
-      uid: userDoc.id,
-      ...data,
-      joinedAt: data.joinedAt?.toDate() || new Date(),
-      lastActivity: data.lastActivity?.toDate() || new Date(),
-      // Add compatibility properties
-      displayName: data.name,
-      emailVerified: data.verified,
-      role: 'user' as const,
-      createdAt: data.joinedAt?.toDate() || new Date(),
-      lastLoginAt: data.lastActivity?.toDate() || new Date(),
-    } as UserProfile;
+  const profile = {
+  uid: userDoc.id,
+  ...data,
+  joinedAt: data.joinedAt?.toDate() || new Date(),
+  lastActivity: data.lastActivity?.toDate() || new Date(),
+
+  // Ensure defaults
+  stats: {
+    groupsJoined: data.stats?.groupsJoined || 0,
+    totalPaid: data.stats?.totalPaid || 0,
+    totalOwed: data.stats?.totalOwed || 0,
+  },
+
+  // Add compatibility properties
+  displayName: data.name,
+  emailVerified: data.verified,
+  role: 'user' as const,
+  createdAt: data.joinedAt?.toDate() || new Date(),
+  lastLoginAt: data.lastActivity?.toDate() || new Date(),
+} as UserProfile;
+
     
     return profile;
     }
@@ -131,58 +138,53 @@ export const updateUserProfile = async (uid: string, updates: Partial<UserProfil
 };
 
 // Group Operations
+// ✅ Full working createGroup() function fixed with safe fallbacks
 export const createGroup = async (groupData: Omit<Group, 'id'>, userId: string) => {
   try {
     console.log('Creating group with userId:', userId);
-    
+
     // Get current user's profile
     const currentUserProfile = await getUserProfile(userId);
     if (!currentUserProfile) {
       throw new Error('User profile not found');
     }
-    
-    // Create users object with the new structure
+
+    // Create users object with safe structure
     const users: Record<string, any> = {};
-    
-    // Add current user as admin
+
+    // Add current user as admin using profile fallback
     users[userId] = {
-      name: currentUserProfile.name,
-      email: currentUserProfile.email,
+      name: currentUserProfile.name || 'Unknown',
+      email: currentUserProfile.email || 'unknown@example.com',
       role: 'admin',
       joinedAt: serverTimestamp(),
     };
-    
-    // Add other members from the form
+console.log("🔍 groupData.members", groupData.members);
+console.log("📌 Type:", typeof groupData.members);
+console.log("📌 IsArray?", Array.isArray(groupData.members));
+
+    // Process members from object map: { uid: role }
     for (const member of groupData.members) {
-      if (member.id !== userId && member.email && member.name) {
-        // Check if user exists in users collection
-        const existingUser = await getUserProfile(member.id);
-        if (existingUser) {
-          users[member.id] = {
-            name: existingUser.name,
-            email: existingUser.email,
-            role: 'member',
-            joinedAt: serverTimestamp(),
-          };
-        } else {
-          // For new users not yet in system, use placeholder ID
-          // This will be updated when they actually join
-          const tempId = `temp_${crypto.randomUUID()}`;
-          users[tempId] = {
-            name: member.name,
-            email: member.email,
-            role: 'member',
-            joinedAt: serverTimestamp(),
-            isTemporary: true, // Flag to indicate this is a placeholder
-          };
-        }
-      }
-    }
+  const memberId = member.id;
+  const existingUser = await getUserProfile(memberId);
+  console.log("👤 Checking user profile for memberId:", memberId);
+
+  const name = (member.name || existingUser?.name || 'Unknown').trim();
+  const email = (member.email || existingUser?.email || '').trim(); 
+
+  users[memberId] = {
+    name,
+    email,
+    role: member.role,
+    joinedAt: serverTimestamp(),
+    isTemporary: !existingUser
+  };
+}
 
     const firestoreGroup = {
-      name: groupData.name,
-      description: groupData.description || '',
-      users, // New embedded users structure
+      name: groupData.name.trim(),
+      description: groupData.description?.trim() || '',
+      users,
       createdBy: userId,
       createdAt: serverTimestamp(),
       groupType: groupData.groupType || 'private',
@@ -197,23 +199,19 @@ export const createGroup = async (groupData: Omit<Group, 'id'>, userId: string) 
     };
 
     console.log('Creating group with new structure:', firestoreGroup);
-    
-    // Create the group document
+
     const docRef = await addDoc(collection(db, 'groups'), firestoreGroup);
     const groupId = docRef.id;
-    
-    // Create members subcollection entries for all real users
+
     const batch = [];
     for (const [uid, userData] of Object.entries(users)) {
       if (!userData.isTemporary) {
-        // Add to members subcollection
         const memberRef = doc(db, 'groups', groupId, 'members', uid);
         batch.push(setDoc(memberRef, {
           role: userData.role,
           joinedAt: serverTimestamp(),
         }));
-        
-        // Add to user's groups subcollection
+
         const userGroupRef = doc(db, 'users', uid, 'groups', groupId);
         batch.push(setDoc(userGroupRef, {
           groupId,
@@ -222,19 +220,18 @@ export const createGroup = async (groupData: Omit<Group, 'id'>, userId: string) 
         }));
       }
     }
-    
-    // Execute all operations
+
     await Promise.all(batch);
-    
-    // Update user stats
-    await updateUserProfile(userId, {
-      stats: {
-        ...currentUserProfile.stats,
-        groupsJoined: currentUserProfile.stats.groupsJoined + 1,
-      },
-    });
-    
-    // Convert back to expected format for return
+
+      await updateUserProfile(userId, {
+    stats: {
+      groupsJoined: (currentUserProfile.stats?.groupsJoined || 0) + 1,
+      totalPaid: currentUserProfile.stats?.totalPaid || 0,
+      totalOwed: currentUserProfile.stats?.totalOwed || 0,
+    },
+  });
+
+
     const membersArray = Object.entries(users).map(([id, userData]) => ({
       id,
       name: userData.name,
@@ -242,7 +239,7 @@ export const createGroup = async (groupData: Omit<Group, 'id'>, userId: string) 
       role: userData.role,
       joinedAt: new Date(),
     }));
-    
+
     return {
       id: groupId,
       ...groupData,

@@ -268,41 +268,78 @@ export const useExpenseStore = create<ExpenseStore>()(
             throw error;
           }
         },
-        
         addGroup: async (group, userId) => {
-          try {
-            set({ loading: true, error: null });
-            
-            // Create a complete group object with default values
-            const completeGroup: Omit<Group, 'id'> = {
-              ...group,
-              inviteCode: crypto.randomUUID(),
-              settings: {
-                currency: 'USD',
-                simplifyDebts: true,
-                notifications: true,
-                recurringBills: false,
-              },
-              isArchived: false,
-            };
-            
-            const newGroup = await createGroupFirebase(completeGroup, userId);
-            console.log('Group created successfully:', newGroup);
-            
-            set({ loading: false });
-            
-            get().addActivity({
-              type: 'group_updated',
-              userId: userId,
-              userName: group.members[0]?.name || 'Unknown',
-              description: `Created group "${group.name}"`,
-            });
-          } catch (error) {
-            console.error('Error adding group:', error);
-            set({ error: 'Failed to create group', loading: false });
-            throw error;
-          }
-        },
+  try {
+    set({ loading: true, error: null });
+
+    // ✅ Defensive check to ensure members is an array
+    if (!Array.isArray(group.members)) {
+      console.error('❌ group.members must be an array but got:', group.members);
+      throw new Error('Invalid group data: "members" must be an array.');
+    }
+
+    // ✅ Prepare safe parallel maps for Firebase document
+    const membersMap: Record<string, string> = {};
+    const memberNames: Record<string, string> = {};
+    const memberEmails: Record<string, string> = {};
+    const joinedAt: Record<string, any> = {};
+
+    group.members.forEach((member) => {
+      const id = member.id?.trim() || crypto.randomUUID();
+      const name = member.name?.trim() || 'Unnamed';
+      const email = member.email?.trim() || 'unknown@example.com';
+      const role = member.role || 'member';
+
+      membersMap[id] = role;
+      memberNames[id] = name;
+      memberEmails[id] = email;
+      joinedAt[id] = new Date(); // optionally use serverTimestamp() here
+    });
+
+    // ✅ Construct the Firestore-friendly group document
+    const groupDoc = {
+      name: group.name.trim(),
+      description: group.description?.trim() || '',
+      groupType: group.groupType || 'private',
+      inviteCode: group.inviteCode || crypto.randomUUID(),
+      createdAt: new Date(),
+      createdBy: userId,
+      isArchived: false,
+      settings: {
+        currency: 'USD',
+        simplifyDebts: true,
+        notifications: true,
+        recurringBills: false,
+        ...group.settings,
+      },
+      members: membersMap,
+      memberNames,
+      memberEmails,
+      joinedAt,
+    };
+
+    // ✅ Call Firebase function to create group
+    const newGroup = await createGroupFirebase(groupDoc, userId);
+    console.log('✅ Group created:', newGroup);
+
+    set({ loading: false });
+
+    // ✅ Record group creation activity
+    get().addActivity({
+      type: 'group_updated',
+      userId,
+      userName: group.members[0]?.name || 'Unknown',
+      description: `Created group "${group.name}"`,
+    });
+  } catch (error) {
+    console.error('❌ Failed to create group:', error);
+    set({ error: 'Failed to create group', loading: false });
+    throw error;
+  }
+}
+
+       ,
+
 
         updateGroup: async (id, updates) => {
           try {

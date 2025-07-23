@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
@@ -17,10 +16,12 @@ interface GroupFormProps {
 export const GroupForm: React.FC<GroupFormProps> = ({ isOpen, onClose }) => {
   const { addGroup } = useExpenseStore();
   const { user, userProfile } = useAuth();
+
   const [formData, setFormData] = useState({
     name: '',
     description: '',
   });
+
   const [members, setMembers] = useState<Omit<Member, 'id'>[]>([
     { name: '', email: '' },
   ]);
@@ -33,8 +34,12 @@ export const GroupForm: React.FC<GroupFormProps> = ({ isOpen, onClose }) => {
     setMembers(members.filter((_, i) => i !== index));
   };
 
-  const handleMemberChange = (index: number, field: keyof Omit<Member, 'id'>, value: string) => {
-    const updatedMembers = members.map((member, i) => 
+  const handleMemberChange = (
+    index: number,
+    field: keyof Omit<Member, 'id'>,
+    value: string
+  ) => {
+    const updatedMembers = members.map((member, i) =>
       i === index ? { ...member, [field]: value } : member
     );
     setMembers(updatedMembers);
@@ -42,56 +47,53 @@ export const GroupForm: React.FC<GroupFormProps> = ({ isOpen, onClose }) => {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    console.log('🚀 Form submitted!');
-    console.log('📋 Form data:', formData);
-    console.log('👥 Members:', members);
-    console.log('🔐 User:', user?.uid);
-    console.log('👤 User profile:', userProfile);
-    
+
     if (!user || !userProfile) {
-      console.error('❌ No user or userProfile available');
-      alert('Error: User not authenticated');
+      alert('User not authenticated');
       return;
     }
 
     if (!formData.name.trim()) {
-      console.error('❌ Group name is required');
-      alert('Error: Group name is required');
+      alert('Group name is required');
       return;
     }
 
-    console.log('✅ Validation passed, creating group...');
-    
-    const validMembers = members.filter(m => m.name.trim() && m.email.trim());
-    
-    // Create members array with Firebase Auth UIDs
-    const membersWithIds: Member[] = [];
-    
-    // Add the current user as admin using their Firebase Auth UID
-    membersWithIds.push({
-      id: user.uid, // Use Firebase Auth UID
-      name: userProfile.name || 'Current User',
-      email: user.email || '',
-      role: 'admin',
-    });
-    
-    // Add other members with generated IDs (these would be replaced with actual UIDs when they join)
-    validMembers.forEach(member => {
-      // Only add if not the current user (to avoid duplicates)
-      if (member.email !== user.email) {
-        membersWithIds.push({
-          id: crypto.randomUUID(), // This will be replaced when they actually join
-          name: member.name,
-          email: member.email,
+    const validMembers = members.filter(
+      (m) => m.name.trim() && m.email.trim()
+    );
+
+    const currentUserName =
+      userProfile?.displayName?.trim() ||
+      user?.displayName?.trim() ||
+      'Unnamed User';
+
+    const currentUserEmail = user?.email?.trim() || 'unknown@example.com';
+
+    const membersWithIds: Member[] = [
+      {
+        id: user.uid,
+        name: currentUserName,
+        email: currentUserEmail,
+        role: 'admin',
+      },
+      ...validMembers
+        .filter((m) => m.email !== user.email)
+        .map((m) => ({
+          id: crypto.randomUUID(),
+          name: m.name.trim(),
+          email: m.email.trim(),
           role: 'member',
-        });
-      }
-    });
-    
-    // Create complete group object with all required properties
+        })),
+    ];
+
+    if (!Array.isArray(membersWithIds) || membersWithIds.length === 0) {
+      alert('At least one valid member is required');
+      return;
+    }
+
     const completeGroup: Omit<Group, 'id'> = {
-      name: formData.name,
-      description: formData.description || '',
+      name: formData.name.trim(),
+      description: formData.description?.trim() || '',
       members: membersWithIds,
       createdAt: new Date(),
       groupType: 'private',
@@ -103,26 +105,16 @@ export const GroupForm: React.FC<GroupFormProps> = ({ isOpen, onClose }) => {
         recurringBills: false,
       },
       isArchived: false,
-      // Explicitly exclude undefined optional fields
     };
-    
-    console.log('🏗️ Creating group with current user UID:', user.uid);
-    console.log('👥 Group members:', membersWithIds);
-    console.log('📝 Complete group object:', completeGroup);
-    
+
     try {
-      console.log('🔄 Calling addGroup...');
       await addGroup(completeGroup, user.uid);
-      console.log('✅ Group created successfully!');
-      
-      // Reset form
       setFormData({ name: '', description: '' });
       setMembers([{ name: '', email: '' }]);
       onClose();
-    } catch (error) {
+    } catch (error: any) {
       console.error('❌ Failed to create group:', error);
       alert(`Failed to create group: ${error.message || error}`);
-      // Keep the form open so user can try again
     }
   };
 
@@ -135,7 +127,7 @@ export const GroupForm: React.FC<GroupFormProps> = ({ isOpen, onClose }) => {
             <span>Create New Group</span>
           </DialogTitle>
         </DialogHeader>
-        
+
         <form onSubmit={handleSubmit} className="space-y-6">
           <div className="space-y-4">
             <div>
@@ -143,18 +135,22 @@ export const GroupForm: React.FC<GroupFormProps> = ({ isOpen, onClose }) => {
               <Input
                 id="name"
                 value={formData.name}
-                onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                onChange={(e) =>
+                  setFormData({ ...formData, name: e.target.value })
+                }
                 placeholder="e.g., Trip to Paris, Flatmates, Office Lunch"
                 required
               />
             </div>
-            
+
             <div>
               <Label htmlFor="description">Description</Label>
               <Textarea
                 id="description"
                 value={formData.description}
-                onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+                onChange={(e) =>
+                  setFormData({ ...formData, description: e.target.value })
+                }
                 placeholder="What's this group for?"
                 rows={3}
               />
@@ -175,13 +171,12 @@ export const GroupForm: React.FC<GroupFormProps> = ({ isOpen, onClose }) => {
                 Add Member
               </Button>
             </div>
-            
+
             <div className="space-y-3 max-h-60 overflow-y-auto">
-              {/* Show current user info */}
               <div className="flex items-center space-x-3 p-3 bg-green-50 rounded-lg border border-green-200">
                 <div className="flex-1 grid grid-cols-2 gap-3">
                   <Input
-                    value={userProfile?.name || 'Current User'}
+                    value={userProfile?.displayName || 'Current User'}
                     disabled
                     className="bg-green-100"
                   />
@@ -191,20 +186,29 @@ export const GroupForm: React.FC<GroupFormProps> = ({ isOpen, onClose }) => {
                     className="bg-green-100"
                   />
                 </div>
-                <span className="text-sm text-green-600 font-medium">Admin</span>
+                <span className="text-sm text-green-600 font-medium">
+                  Admin
+                </span>
               </div>
-              
+
               {members.map((member, index) => (
-                <div key={index} className="flex items-center space-x-3 p-3 bg-gray-50 rounded-lg">
+                <div
+                  key={index}
+                  className="flex items-center space-x-3 p-3 bg-gray-50 rounded-lg"
+                >
                   <div className="flex-1 grid grid-cols-2 gap-3">
                     <Input
                       value={member.name}
-                      onChange={(e) => handleMemberChange(index, 'name', e.target.value)}
+                      onChange={(e) =>
+                        handleMemberChange(index, 'name', e.target.value)
+                      }
                       placeholder="Name"
                     />
                     <Input
                       value={member.email}
-                      onChange={(e) => handleMemberChange(index, 'email', e.target.value)}
+                      onChange={(e) =>
+                        handleMemberChange(index, 'email', e.target.value)
+                      }
                       placeholder="Email"
                       type="email"
                     />
@@ -229,10 +233,9 @@ export const GroupForm: React.FC<GroupFormProps> = ({ isOpen, onClose }) => {
             <Button type="button" variant="outline" onClick={onClose}>
               Cancel
             </Button>
-            <Button 
-              type="submit" 
+            <Button
+              type="submit"
               className="bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700"
-              onClick={() => console.log('🖱️ Create Group button clicked!')}
             >
               Create Group
             </Button>
