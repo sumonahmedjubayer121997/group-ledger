@@ -54,6 +54,7 @@ export const GroupForm: React.FC<GroupFormProps> = ({ isOpen, onClose }) => {
       description: formData.description,
       members: membersWithIds,
       createdAt: new Date(),
+      groupType: 'private',
     });
     
     // Reset form
