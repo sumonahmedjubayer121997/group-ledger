@@ -16,6 +16,7 @@ import {
 } from 'firebase/auth';
 import { auth } from '@/lib/firebase';
 import { createUserProfile, getUserProfile, updateUserProfile as updateFirebaseUserProfile, UserProfile } from '@/services/firebaseService';
+import { mergeTemporaryUserWithRealUser } from '@/services/firebaseService';
 
 // Export the UserProfile interface for use in other components
 export type { UserProfile };
@@ -91,32 +92,60 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
-  const createUserProfileFromFirebaseUser = async (firebaseUser: User, additionalData: any = {}) => {
-    try {
-      const profile = await createUserProfile({
-        uid: firebaseUser.uid,
-        name: firebaseUser.displayName || additionalData.displayName || 'User',
-        email: firebaseUser.email!,
-        photoURL: firebaseUser.photoURL || undefined,
-        verified: firebaseUser.emailVerified,
-        preferences: {
-          currency: 'USD',
-          theme: 'light',
-          language: 'en',
-        },
-        ...additionalData,
-      });
-      
-      setUserProfile(profile);
-    } catch (error) {
-      console.error('Error creating user profile:', error);
+const createUserProfileFromFirebaseUser = async (firebaseUser: User, additionalData: any = {}) => {
+  try {
+    // 🔍 Check if user already exists by email
+    const existingUserSnapshot = await getDocs(query(
+      collection(db, 'users'),
+      where('email', '==', firebaseUser.email)
+    ));
+
+    if (!existingUserSnapshot.empty) {
+      console.log('🚫 User already exists by email, not creating duplicate profile');
+
+      const existingUser = existingUserSnapshot.docs[0];
+      const existingUid = existingUser.id;
+
+      // Optional: merge if this is a new real user and a temporary one existed
+      if (existingUid !== firebaseUser.uid) {
+        console.log(`🔁 Merging temporary user ${existingUid} → real user ${firebaseUser.uid}`);
+        await mergeTemporaryUserWithRealUser(firebaseUser);
+      }
+
+      const profile = await getUserProfile(firebaseUser.uid);
+      if (profile) {
+        setUserProfile(profile);
+      }
+      return;
     }
-  };
+
+    // ✅ Otherwise create new profile
+    const profile = await createUserProfile({
+      uid: firebaseUser.uid,
+      name: firebaseUser.displayName || additionalData.displayName || 'User',
+      email: firebaseUser.email!,
+      photoURL: firebaseUser.photoURL || null,
+      verified: firebaseUser.emailVerified,
+      preferences: {
+        currency: 'USD',
+        theme: 'light',
+        language: 'en',
+      },
+      ...additionalData,
+    });
+
+    setUserProfile(profile);
+  } catch (error) {
+    console.error('Error creating user profile:', error);
+  }
+};
+
 
   const login = async (email: string, password: string) => {
     setLoading(true);
     try {
-      await signInWithEmailAndPassword(auth, email, password);
+      const { user: firebaseUser } = await signInWithEmailAndPassword(auth, email, password);
+      await mergeTemporaryUserWithRealUser(firebaseUser);
     } finally {
       setLoading(false);
     }
@@ -126,7 +155,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setLoading(true);
     try {
       const { user: firebaseUser } = await createUserWithEmailAndPassword(auth, email, password);
-      
+        await mergeTemporaryUserWithRealUser(firebaseUser);
       await updateProfile(firebaseUser, { displayName });
       await sendEmailVerification(firebaseUser);
       await createUserProfileFromFirebaseUser(firebaseUser, { name: displayName });
@@ -139,7 +168,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setLoading(true);
     try {
       const provider = new GoogleAuthProvider();
-      const { user: firebaseUser } = await signInWithPopup(auth, provider);
+       const { user: firebaseUser } = await signInWithPopup(auth, provider);
+
+    await mergeTemporaryUserWithRealUser(firebaseUser); // <-- Add this line here
       
       try {
         const profile = await getUserProfile(firebaseUser.uid);
@@ -153,6 +184,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       setLoading(false);
     }
   };
+
+
+
 
   const logout = async () => {
     setLoading(true);

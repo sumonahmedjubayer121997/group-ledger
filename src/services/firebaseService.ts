@@ -17,6 +17,7 @@ import {
 } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { Group, Expense, Member, Settlement } from '@/stores/expenseStore';
+import { deleteField } from 'firebase/firestore';
 
 // User Profile Interface
 export interface UserProfile {
@@ -130,12 +131,80 @@ export const updateUserProfile = async (uid: string, updates: Partial<UserProfil
     await updateDoc(userRef, {
       ...updates,
       lastActivity: serverTimestamp(),
+      lastLoginAt: serverTimestamp(),
+      updatedAt: serverTimestamp(),
     });
   } catch (error) {
     console.error('Error updating user profile:', error);
     throw error;
   }
 };
+
+export const mergeTemporaryUserWithRealUser = async (realUser: User) => {
+  const userId = realUser.uid;
+  const email = realUser.email;
+  if (!userId || !email) {
+    console.error('❌ mergeTemporaryUserWithRealUser: Missing userId or email');
+    return;
+  }
+
+  if (!email) return;
+console.log("Merging temp user for:", realUser.email, realUser.uid);
+
+  // 🔎 STEP 1: Look for any temp user by email
+  const groupsSnapshot = await getDocs(collection(db, 'groups'));
+
+  for (const groupDoc of groupsSnapshot.docs) {
+    const groupId = groupDoc.id;
+    const groupData = groupDoc.data();
+    const usersInGroup = groupData.users || {};
+
+    const tempEntry = Object.entries(usersInGroup).find(
+      ([tempId, data]: [string, any]) =>
+        data?.isTemporary && data?.email === email
+    );
+
+    if (tempEntry) {
+      const [tempId, tempUserData] = tempEntry;
+      const groupRef = doc(db, 'groups', groupId);
+
+      // ✅ Merge user data
+      await updateDoc(groupRef, {
+        [`users.${userId}`]: {
+          ...tempUserData,
+          isTemporary: false,
+          joinedAt: tempUserData.joinedAt || serverTimestamp(),
+        },
+        [`users.${tempId}`]: deleteField(),
+      });
+
+      // 🔧 Cleanup: remove from 'users' collection if temp profile exists
+      const tempUserRef = doc(db, 'users', tempId);
+      const tempUserSnap = await getDoc(tempUserRef);
+      if (tempUserSnap.exists()) {
+        await deleteDoc(tempUserRef);
+      }
+
+      // 🔄 Subcollections update
+      await setDoc(doc(db, 'groups', groupId, 'members', userId), {
+        role: tempUserData.role,
+        joinedAt: tempUserData.joinedAt || serverTimestamp(),
+      });
+
+      await setDoc(doc(db, 'users', userId, 'groups', groupId), {
+        groupId,
+        role: tempUserData.role,
+        joinedAt: tempUserData.joinedAt || serverTimestamp(),
+      });
+
+      console.log(`✔️ Merged temp user ${tempId} → real user ${userId}`);
+    }
+  }
+};
+
+
+  
+
 
 // Group Operations
 // ✅ Full working createGroup() function fixed with safe fallbacks
@@ -484,64 +553,123 @@ export const subscribeToGroupExpenses = (groupId: string, callback: (expenses: E
 // Member management with new structure
 export const addMemberToGroup = async (groupId: string, member: Member, userId: string) => {
   try {
-    // Check if user exists in users collection
-    let userProfile = await getUserProfile(member.id);
-    
-    // If user doesn't exist, create their profile
-    if (!userProfile) {
-      userProfile = await createUserProfile({
-        uid: member.id,
-        name: member.name,
-        email: member.email,
-        verified: false,
-        preferences: {
-          currency: 'USD',
-          theme: 'light',
-          language: 'en',
-        },
-      });
+    // 🔍 Step 1: Check if user with the given email already exists
+    const matchingUserSnapshot = await getDocs(
+      query(collection(db, 'users'), where('email', '==', member.email))
+    );
+
+    let userIdToUse = '';
+    let isTemporary = false;
+
+    if (!matchingUserSnapshot.empty) {
+      // ✅ Use real Firebase UID
+      const matchedUserDoc = matchingUserSnapshot.docs[0];
+      userIdToUse = matchedUserDoc.id;
+      isTemporary = false;
+      console.log(`✔️ Existing user found: ${userIdToUse}`);
+    } else {
+      // 🆕 Generate a UUID for temporary user
+      userIdToUse = crypto.randomUUID();
+      isTemporary = true;
+      console.log(`🆕 Temporary user created with ID: ${userIdToUse}`);
     }
-    
-    // Update group's users object
-    const groupRef = doc(db, 'groups', groupId);
-    await updateDoc(groupRef, {
-      [`users.${member.id}`]: {
+
+    // 👤 Step 2: Create user profile if needed
+    let userProfile = await getUserProfile(userIdToUse);
+    if (!userProfile) {
+      await createUserProfile({
+        uid: userIdToUse,
+        email: member.email,
+        name: member.name,
+        verified: false,
+      });
+      userProfile = await getUserProfile(userIdToUse);
+    }
+
+    // 👥 Step 3: Add to group's `users` object
+    await updateDoc(doc(db, 'groups', groupId), {
+      [`users.${userIdToUse}`]: {
         name: userProfile.name,
         email: userProfile.email,
-        role: 'member',
+        role: member.role || 'member',
         joinedAt: serverTimestamp(),
+        isTemporary,
       },
     });
-    
-    // Add to members subcollection
-    const memberRef = doc(db, 'groups', groupId, 'members', member.id);
-    await setDoc(memberRef, {
-      role: 'member',
+
+    // 📂 Step 4: Add to group's `members` subcollection
+    await setDoc(doc(db, 'groups', groupId, 'members', userIdToUse), {
+      role: member.role || 'member',
       joinedAt: serverTimestamp(),
     });
-    
-    // Add to user's groups subcollection
-    const userGroupRef = doc(db, 'users', member.id, 'groups', groupId);
-    await setDoc(userGroupRef, {
+
+    // 🔗 Step 5: Add to user's `groups` subcollection
+    await setDoc(doc(db, 'users', userIdToUse, 'groups', groupId), {
       groupId,
-      role: 'member',
+      role: member.role || 'member',
       joinedAt: serverTimestamp(),
     });
-    
-    // Update user stats
-    if (userProfile) {
-      await updateUserProfile(member.id, {
+
+    // 📈 Step 6: Only update stats if it's a real user
+    if (!isTemporary && userProfile) {
+      await updateUserProfile(userIdToUse, {
         stats: {
           ...userProfile.stats,
           groupsJoined: userProfile.stats.groupsJoined + 1,
         },
       });
     }
+
+    console.log(`✅ Member added to group ${groupId}:`, userProfile.email);
   } catch (error) {
-    console.error('Error adding member to group:', error);
+    console.error('❌ Error adding member to group:', error);
     throw error;
   }
 };
+
+
+export const getGroupMembers = async (groupId: string): Promise<Member[]> => {
+  try {
+    const membersRef = collection(db, 'groups', groupId, 'members');
+    const querySnapshot = await getDocs(membersRef);
+    
+    const members: Member[] = [];
+    querySnapshot.forEach((doc) => {
+      const data = doc.data();
+      members.push({
+        id: doc.id,
+        name: data.name || 'Unknown',
+        email: data.email || '',
+        role: data.role as 'admin' | 'member',
+        joinedAt: data.joinedAt?.toDate() || new Date(),
+      });
+    });
+    
+    return members;
+  } catch (error) {
+    console.error('Error fetching group members:', error);
+    throw error;
+  }
+};
+
+export const updateMemberRole = async (groupId: string, memberId: string, newRole: 'admin' | 'member') => {
+  try {
+    const memberRef = doc(db, 'groups', groupId, 'members', memberId);
+    await updateDoc(memberRef, { role: newRole });
+
+    // Also update in the users object
+    const groupRef = doc(db, 'groups', groupId);
+    await updateDoc(groupRef, {
+      [`users.${memberId}.role`]: newRole,
+    });
+  } catch (error) {
+    console.error('Error updating member role:', error);
+    throw error;
+  }
+};
+
+
+
 
 export const removeMemberFromGroup = async (groupId: string, memberId: string) => {
   try {
