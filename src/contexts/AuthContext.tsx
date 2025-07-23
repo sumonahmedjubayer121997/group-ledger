@@ -1,3 +1,4 @@
+
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { 
   User,
@@ -65,16 +66,24 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
+      console.log('Auth state changed:', firebaseUser?.uid);
       setUser(firebaseUser);
       
       if (firebaseUser) {
-        // Update last login time
-        await updateDoc(doc(db, 'users', firebaseUser.uid), {
-          lastLoginAt: new Date()
-        });
-        
-        // Fetch user profile
-        await fetchUserProfile(firebaseUser.uid);
+        try {
+          // Try to update last login time, but don't fail if it doesn't work
+          await updateDoc(doc(db, 'users', firebaseUser.uid), {
+            lastLoginAt: new Date()
+          }).catch(error => {
+            console.log('Could not update last login time:', error);
+          });
+          
+          // Fetch user profile
+          await fetchUserProfile(firebaseUser.uid);
+        } catch (error) {
+          console.log('Error updating user data:', error);
+          // Continue without user profile if there's an error
+        }
       } else {
         setUserProfile(null);
       }
@@ -92,12 +101,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         const data = userDoc.data();
         setUserProfile({
           ...data,
-          createdAt: data.createdAt.toDate(),
-          lastLoginAt: data.lastLoginAt.toDate(),
+          createdAt: data.createdAt?.toDate() || new Date(),
+          lastLoginAt: data.lastLoginAt?.toDate() || new Date(),
         } as UserProfile);
       }
     } catch (error) {
       console.error('Error fetching user profile:', error);
+      // Don't throw error, just continue without profile
     }
   };
 
@@ -120,8 +130,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       ...additionalData,
     };
 
-    await setDoc(doc(db, 'users', firebaseUser.uid), userProfile);
-    setUserProfile(userProfile);
+    try {
+      await setDoc(doc(db, 'users', firebaseUser.uid), userProfile);
+      setUserProfile(userProfile);
+    } catch (error) {
+      console.error('Error creating user profile:', error);
+      // Don't throw error, just continue without profile
+    }
   };
 
   const login = async (email: string, password: string) => {
@@ -158,9 +173,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       const { user: firebaseUser } = await signInWithPopup(auth, provider);
       
       // Check if user profile exists, create if not
-      const userDoc = await getDoc(doc(db, 'users', firebaseUser.uid));
-      if (!userDoc.exists()) {
-        await createUserProfile(firebaseUser);
+      try {
+        const userDoc = await getDoc(doc(db, 'users', firebaseUser.uid));
+        if (!userDoc.exists()) {
+          await createUserProfile(firebaseUser);
+        }
+      } catch (error) {
+        console.error('Error checking/creating user profile:', error);
       }
     } finally {
       setLoading(false);
@@ -184,8 +203,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const updateUserProfile = async (updates: Partial<UserProfile>) => {
     if (!user) throw new Error('No user logged in');
     
-    await updateDoc(doc(db, 'users', user.uid), updates);
-    setUserProfile(prev => prev ? { ...prev, ...updates } : null);
+    try {
+      await updateDoc(doc(db, 'users', user.uid), updates);
+      setUserProfile(prev => prev ? { ...prev, ...updates } : null);
+    } catch (error) {
+      console.error('Error updating user profile:', error);
+      throw error;
+    }
   };
 
   const updateUserPassword = async (currentPassword: string, newPassword: string) => {
