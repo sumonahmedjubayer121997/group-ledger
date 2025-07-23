@@ -35,16 +35,32 @@ export interface Balance {
   amount: number;
 }
 
+export interface Settlement {
+  id: string;
+  fromMemberId: string;
+  toMemberId: string;
+  amount: number;
+  paymentMethod: string;
+  notes?: string;
+  referenceId?: string;
+  date: Date;
+  status: 'confirmed' | 'pending';
+}
+
 interface ExpenseStore {
   expenses: Expense[];
   groups: Group[];
+  settlements: Settlement[];
   addExpense: (expense: Omit<Expense, 'id'>) => void;
   addGroup: (group: Omit<Group, 'id'>) => void;
+  addSettlement: (settlement: Omit<Settlement, 'id' | 'status'>) => void;
   updateExpense: (id: string, expense: Partial<Expense>) => void;
   deleteExpense: (id: string) => void;
   getTotalExpenses: () => number;
   getBalances: () => Balance[];
   getGroupExpenses: (groupId: string) => Expense[];
+  getSettlementHistory: () => Settlement[];
+  simplifyDebts: () => void;
 }
 
 export const useExpenseStore = create<ExpenseStore>()(
@@ -52,6 +68,7 @@ export const useExpenseStore = create<ExpenseStore>()(
     (set, get) => ({
       expenses: [],
       groups: [],
+      settlements: [],
       
       addExpense: (expense) => {
         const newExpense: Expense = {
@@ -70,6 +87,17 @@ export const useExpenseStore = create<ExpenseStore>()(
         };
         set((state) => ({
           groups: [...state.groups, newGroup],
+        }));
+      },
+
+      addSettlement: (settlement) => {
+        const newSettlement: Settlement = {
+          ...settlement,
+          id: crypto.randomUUID(),
+          status: 'confirmed',
+        };
+        set((state) => ({
+          settlements: [...state.settlements, newSettlement],
         }));
       },
       
@@ -93,9 +121,10 @@ export const useExpenseStore = create<ExpenseStore>()(
       },
       
       getBalances: () => {
-        const { expenses } = get();
+        const { expenses, settlements } = get();
         const balanceMap = new Map<string, Map<string, number>>();
         
+        // Calculate balances from expenses
         expenses.forEach((expense) => {
           const { paidBy, splitAmong, amount, splitType, splitData } = expense;
           const splitAmount = splitType === 'equal' ? amount / splitAmong.length : 0;
@@ -114,6 +143,22 @@ export const useExpenseStore = create<ExpenseStore>()(
             }
           });
         });
+
+        // Subtract settlements from balances
+        settlements.forEach((settlement) => {
+          if (settlement.status === 'confirmed') {
+            const debtorBalances = balanceMap.get(settlement.fromMemberId);
+            if (debtorBalances) {
+              const currentBalance = debtorBalances.get(settlement.toMemberId) || 0;
+              const newBalance = currentBalance - settlement.amount;
+              if (newBalance <= 0.01) {
+                debtorBalances.delete(settlement.toMemberId);
+              } else {
+                debtorBalances.set(settlement.toMemberId, newBalance);
+              }
+            }
+          }
+        });
         
         const balances: Balance[] = [];
         const { groups } = get();
@@ -125,7 +170,7 @@ export const useExpenseStore = create<ExpenseStore>()(
           
           owedAmounts.forEach((amount, creditorId) => {
             const creditor = allMembers.find(m => m.id === creditorId);
-            if (!creditor || amount <= 0) return;
+            if (!creditor || amount <= 0.01) return;
             
             balances.push({
               from: debtor,
@@ -141,6 +186,17 @@ export const useExpenseStore = create<ExpenseStore>()(
       getGroupExpenses: (groupId) => {
         const { expenses } = get();
         return expenses.filter((expense) => expense.groupId === groupId);
+      },
+
+      getSettlementHistory: () => {
+        const { settlements } = get();
+        return settlements.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+      },
+
+      simplifyDebts: () => {
+        // Implementation for debt simplification algorithm
+        // This would reduce circular debts (A owes B, B owes C, simplify to A → C)
+        console.log('Debt simplification would be implemented here');
       },
     }),
     {

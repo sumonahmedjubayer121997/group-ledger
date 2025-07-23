@@ -4,6 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Balance } from '@/stores/expenseStore';
 import { ArrowRight, DollarSign } from 'lucide-react';
+import { SettlementDialog } from './SettlementDialog';
 
 interface BalanceCardProps {
   balances: Balance[];
@@ -58,13 +59,15 @@ export const BalanceCard: React.FC<BalanceCardProps> = ({ balances }) => {
                 <div className="font-semibold text-red-600">
                   ${balance.amount.toFixed(2)}
                 </div>
-                <Button
-                  size="sm"
-                  variant="outline"
-                  className="mt-1 text-xs border-green-200 text-green-600 hover:bg-green-50"
-                >
-                  Settle up
-                </Button>
+                <SettlementDialog balance={balance}>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="mt-1 text-xs border-green-200 text-green-600 hover:bg-green-50"
+                  >
+                    Settle up
+                  </Button>
+                </SettlementDialog>
               </div>
             </div>
           ))}

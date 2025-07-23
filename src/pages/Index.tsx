@@ -9,6 +9,7 @@ import { BalanceCard } from '@/components/BalanceCard';
 import { RecentExpenses } from '@/components/RecentExpenses';
 import { ExpenseChart } from '@/components/ExpenseChart';
 import { GroupList } from '@/components/GroupList';
+import { SettlementHistory } from '@/components/SettlementHistory';
 import { useExpenseStore } from '@/stores/expenseStore';
 
 const Index = () => {
@@ -102,6 +103,7 @@ const Index = () => {
           <div className="lg:col-span-2 space-y-6">
             <ExpenseChart expenses={expenses} />
             <RecentExpenses expenses={expenses} />
+            <SettlementHistory />
           </div>
         </div>
       </main>
