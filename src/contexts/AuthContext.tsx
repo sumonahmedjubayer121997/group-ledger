@@ -14,25 +14,11 @@ import {
   reauthenticateWithCredential,
   EmailAuthProvider
 } from 'firebase/auth';
-import { doc, setDoc, getDoc, updateDoc } from 'firebase/firestore';
-import { auth, db } from '@/lib/firebase';
+import { auth } from '@/lib/firebase';
+import { createUserProfile, getUserProfile, updateUserProfile as updateFirebaseUserProfile, UserProfile } from '@/services/firebaseService';
 
-export interface UserProfile {
-  uid: string;
-  email: string;
-  displayName: string;
-  photoURL?: string;
-  phoneNumber?: string;
-  emailVerified: boolean;
-  role: 'user' | 'admin';
-  createdAt: Date;
-  lastLoginAt: Date;
-  preferences: {
-    currency: string;
-    notifications: boolean;
-    theme: 'light' | 'dark';
-  };
-}
+// Export the UserProfile interface for use in other components
+export type { UserProfile };
 
 interface AuthContextType {
   user: User | null;
@@ -76,7 +62,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           // If profile doesn't exist, create it
           try {
             console.log('Creating missing user profile...');
-            await createUserProfile(firebaseUser);
+            await createUserProfileFromFirebaseUser(firebaseUser);
           } catch (createError) {
             console.error('Error creating user profile:', createError);
           }
@@ -93,46 +79,35 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const fetchUserProfile = async (uid: string) => {
     try {
-      const userDoc = await getDoc(doc(db, 'users', uid));
-      if (userDoc.exists()) {
-        const data = userDoc.data();
-        setUserProfile({
-          ...data,
-          createdAt: data.createdAt?.toDate() || new Date(),
-          lastLoginAt: data.lastLoginAt?.toDate() || new Date(),
-        } as UserProfile);
+      const profile = await getUserProfile(uid);
+      if (profile) {
+        setUserProfile(profile);
       } else {
-        // Profile doesn't exist, throw error to trigger creation
         throw new Error('User profile does not exist');
       }
     } catch (error) {
       console.error('Error fetching user profile:', error);
-      throw error; // Re-throw to trigger profile creation
+      throw error;
     }
   };
 
-  const createUserProfile = async (firebaseUser: User, additionalData: any = {}) => {
-    const userProfile: UserProfile = {
-      uid: firebaseUser.uid,
-      email: firebaseUser.email!,
-      displayName: firebaseUser.displayName || additionalData.displayName || '',
-      photoURL: firebaseUser.photoURL,
-      phoneNumber: firebaseUser.phoneNumber,
-      emailVerified: firebaseUser.emailVerified,
-      role: 'user',
-      createdAt: new Date(),
-      lastLoginAt: new Date(),
-      preferences: {
-        currency: 'USD',
-        notifications: true,
-        theme: 'light',
-      },
-      ...additionalData,
-    };
-
+  const createUserProfileFromFirebaseUser = async (firebaseUser: User, additionalData: any = {}) => {
     try {
-      await setDoc(doc(db, 'users', firebaseUser.uid), userProfile);
-      setUserProfile(userProfile);
+      const profile = await createUserProfile({
+        uid: firebaseUser.uid,
+        name: firebaseUser.displayName || additionalData.displayName || 'User',
+        email: firebaseUser.email!,
+        photoURL: firebaseUser.photoURL || undefined,
+        verified: firebaseUser.emailVerified,
+        preferences: {
+          currency: 'USD',
+          theme: 'light',
+          language: 'en',
+        },
+        ...additionalData,
+      });
+      
+      setUserProfile(profile);
     } catch (error) {
       console.error('Error creating user profile:', error);
     }
@@ -154,7 +129,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       
       await updateProfile(firebaseUser, { displayName });
       await sendEmailVerification(firebaseUser);
-      await createUserProfile(firebaseUser, { displayName });
+      await createUserProfileFromFirebaseUser(firebaseUser, { name: displayName });
     } finally {
       setLoading(false);
     }
@@ -167,9 +142,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       const { user: firebaseUser } = await signInWithPopup(auth, provider);
       
       try {
-        const userDoc = await getDoc(doc(db, 'users', firebaseUser.uid));
-        if (!userDoc.exists()) {
-          await createUserProfile(firebaseUser);
+        const profile = await getUserProfile(firebaseUser.uid);
+        if (!profile) {
+          await createUserProfileFromFirebaseUser(firebaseUser);
         }
       } catch (error) {
         console.error('Error checking/creating user profile:', error);
@@ -197,7 +172,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     if (!user) throw new Error('No user logged in');
     
     try {
-      await updateDoc(doc(db, 'users', user.uid), updates);
+      await updateFirebaseUserProfile(user.uid, updates);
       setUserProfile(prev => prev ? { ...prev, ...updates } : null);
     } catch (error) {
       console.error('Error updating user profile:', error);

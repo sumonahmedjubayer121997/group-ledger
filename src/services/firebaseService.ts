@@ -13,58 +13,178 @@ import {
   onSnapshot,
   serverTimestamp,
   arrayUnion,
-  arrayRemove
+  arrayRemove,
+  setDoc
 } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { Group, Expense, Member, Settlement } from '@/stores/expenseStore';
+
+// User Profile Interface
+export interface UserProfile {
+  uid: string;
+  name: string;
+  email: string;
+  photoURL?: string;
+  joinedAt: Date;
+  lastActivity: Date;
+  verified: boolean;
+  preferences: {
+    currency: string;
+    theme: string;
+    language: string;
+    notifications?: boolean;
+  };
+  stats: {
+    groupsJoined: number;
+    totalPaid: number;
+    totalOwed: number;
+  };
+  // Compatibility properties for existing components
+  displayName?: string; // Alias for name
+  emailVerified?: boolean; // Alias for verified
+  role?: 'user' | 'admin'; // Default role
+  createdAt?: Date; // Alias for joinedAt
+  lastLoginAt?: Date; // Alias for lastActivity
+}
+
+// User Operations
+export const createUserProfile = async (userProfile: Omit<UserProfile, 'joinedAt' | 'lastActivity' | 'stats'>): Promise<UserProfile> => {
+  try {
+    const userRef = doc(db, 'users', userProfile.uid);
+    const userData = {
+      ...userProfile,
+      joinedAt: serverTimestamp(),
+      lastActivity: serverTimestamp(),
+      stats: {
+        groupsJoined: 0,
+        totalPaid: 0,
+        totalOwed: 0,
+      },
+    };
+    
+    await setDoc(userRef, userData);
+    
+    // Return with proper Date types and compatibility properties
+    return {
+      ...userProfile,
+      joinedAt: new Date(),
+      lastActivity: new Date(),
+      stats: {
+        groupsJoined: 0,
+        totalPaid: 0,
+        totalOwed: 0,
+      },
+      // Add compatibility properties
+      displayName: userProfile.name,
+      emailVerified: userProfile.verified,
+      role: 'user' as const,
+      createdAt: new Date(),
+      lastLoginAt: new Date(),
+    };
+  } catch (error) {
+    console.error('Error creating user profile:', error);
+    throw error;
+  }
+};
+
+export const getUserProfile = async (uid: string): Promise<UserProfile | null> => {
+  try {
+    const userRef = doc(db, 'users', uid);
+    const userDoc = await getDoc(userRef);
+    
+    if (userDoc.exists()) {
+      const data = userDoc.data();
+    const profile = {
+      uid: userDoc.id,
+      ...data,
+      joinedAt: data.joinedAt?.toDate() || new Date(),
+      lastActivity: data.lastActivity?.toDate() || new Date(),
+      // Add compatibility properties
+      displayName: data.name,
+      emailVerified: data.verified,
+      role: 'user' as const,
+      createdAt: data.joinedAt?.toDate() || new Date(),
+      lastLoginAt: data.lastActivity?.toDate() || new Date(),
+    } as UserProfile;
+    
+    return profile;
+    }
+    
+    return null;
+  } catch (error) {
+    console.error('Error fetching user profile:', error);
+    throw error;
+  }
+};
+
+export const updateUserProfile = async (uid: string, updates: Partial<UserProfile>) => {
+  try {
+    const userRef = doc(db, 'users', uid);
+    await updateDoc(userRef, {
+      ...updates,
+      lastActivity: serverTimestamp(),
+    });
+  } catch (error) {
+    console.error('Error updating user profile:', error);
+    throw error;
+  }
+};
 
 // Group Operations
 export const createGroup = async (groupData: Omit<Group, 'id'>, userId: string) => {
   try {
     console.log('Creating group with userId:', userId);
-    console.log('Group data members:', groupData.members);
     
-    // Transform members array to object for Firestore rules
-    // Ensure the current user (userId) is included as admin
-    const membersObj: Record<string, string> = {};
-    const memberNames: Record<string, string> = {};
-    const memberEmails: Record<string, string> = {};
-    const joinedAt: Record<string, any> = {};
-    
-    // First, add the current user as admin
-    membersObj[userId] = 'admin';
-    
-    // Find the current user in the members array to get their name and email
-    const currentUserMember = groupData.members.find(member => member.id === userId);
-    if (currentUserMember) {
-      memberNames[userId] = currentUserMember.name;
-      memberEmails[userId] = currentUserMember.email;
-    } else {
-      // If current user is not in members array, this shouldn't happen but add fallback
-      memberNames[userId] = 'Current User';
-      memberEmails[userId] = '';
+    // Get current user's profile
+    const currentUserProfile = await getUserProfile(userId);
+    if (!currentUserProfile) {
+      throw new Error('User profile not found');
     }
-    joinedAt[userId] = serverTimestamp();
     
-    // Add other members (excluding the current user to avoid duplicates)
-    groupData.members.forEach(member => {
-      if (member.id !== userId) {
-        membersObj[member.id] = member.role || 'member';
-        memberNames[member.id] = member.name;
-        memberEmails[member.id] = member.email;
-        joinedAt[member.id] = serverTimestamp();
+    // Create users object with the new structure
+    const users: Record<string, any> = {};
+    
+    // Add current user as admin
+    users[userId] = {
+      name: currentUserProfile.name,
+      email: currentUserProfile.email,
+      role: 'admin',
+      joinedAt: serverTimestamp(),
+    };
+    
+    // Add other members from the form
+    for (const member of groupData.members) {
+      if (member.id !== userId && member.email && member.name) {
+        // Check if user exists in users collection
+        const existingUser = await getUserProfile(member.id);
+        if (existingUser) {
+          users[member.id] = {
+            name: existingUser.name,
+            email: existingUser.email,
+            role: 'member',
+            joinedAt: serverTimestamp(),
+          };
+        } else {
+          // For new users not yet in system, use placeholder ID
+          // This will be updated when they actually join
+          const tempId = `temp_${crypto.randomUUID()}`;
+          users[tempId] = {
+            name: member.name,
+            email: member.email,
+            role: 'member',
+            joinedAt: serverTimestamp(),
+            isTemporary: true, // Flag to indicate this is a placeholder
+          };
+        }
       }
-    });
+    }
 
     const firestoreGroup = {
       name: groupData.name,
-      description: groupData.description,
-      members: membersObj,
-      memberNames,
-      memberEmails,
-      joinedAt,
+      description: groupData.description || '',
+      users, // New embedded users structure
+      createdBy: userId,
       createdAt: serverTimestamp(),
-      createdBy: userId, // Use the authenticated user's uid
       groupType: groupData.groupType || 'private',
       inviteCode: groupData.inviteCode || crypto.randomUUID(),
       settings: groupData.settings || {
@@ -73,20 +193,60 @@ export const createGroup = async (groupData: Omit<Group, 'id'>, userId: string) 
         notifications: true,
         recurringBills: false,
       },
-      tags: groupData.tags || [],
-      location: groupData.location || '',
       isArchived: groupData.isArchived || false,
-      photo: groupData.photo,
-      coverImage: groupData.coverImage,
     };
 
-    console.log('Creating group with data:', firestoreGroup);
-    const docRef = await addDoc(collection(db, 'groups'), firestoreGroup);
+    console.log('Creating group with new structure:', firestoreGroup);
     
-    // Return the complete group object with the generated ID
+    // Create the group document
+    const docRef = await addDoc(collection(db, 'groups'), firestoreGroup);
+    const groupId = docRef.id;
+    
+    // Create members subcollection entries for all real users
+    const batch = [];
+    for (const [uid, userData] of Object.entries(users)) {
+      if (!userData.isTemporary) {
+        // Add to members subcollection
+        const memberRef = doc(db, 'groups', groupId, 'members', uid);
+        batch.push(setDoc(memberRef, {
+          role: userData.role,
+          joinedAt: serverTimestamp(),
+        }));
+        
+        // Add to user's groups subcollection
+        const userGroupRef = doc(db, 'users', uid, 'groups', groupId);
+        batch.push(setDoc(userGroupRef, {
+          groupId,
+          role: userData.role,
+          joinedAt: serverTimestamp(),
+        }));
+      }
+    }
+    
+    // Execute all operations
+    await Promise.all(batch);
+    
+    // Update user stats
+    await updateUserProfile(userId, {
+      stats: {
+        ...currentUserProfile.stats,
+        groupsJoined: currentUserProfile.stats.groupsJoined + 1,
+      },
+    });
+    
+    // Convert back to expected format for return
+    const membersArray = Object.entries(users).map(([id, userData]) => ({
+      id,
+      name: userData.name,
+      email: userData.email,
+      role: userData.role,
+      joinedAt: new Date(),
+    }));
+    
     return {
-      id: docRef.id,
+      id: groupId,
       ...groupData,
+      members: membersArray,
       createdAt: new Date(),
     };
   } catch (error) {
@@ -111,10 +271,12 @@ export const updateGroup = async (groupId: string, updates: Partial<Group>) => {
 export const getUserGroups = async (userId: string) => {
   try {
     console.log('Fetching groups for user:', userId);
+    
+    // Query using the new users structure
     const groupsRef = collection(db, 'groups');
     const q = query(
       groupsRef,
-      where(`members.${userId}`, 'in', ['admin', 'member'])
+      where(`users.${userId}.role`, 'in', ['admin', 'member'])
     );
     
     const querySnapshot = await getDocs(q);
@@ -126,13 +288,13 @@ export const getUserGroups = async (userId: string) => {
       const data = doc.data();
       console.log('Processing group:', doc.id, data);
       
-      // Transform members object back to array - handle both old and new format
-      const membersArray = Object.keys(data.members || {}).map(memberId => ({
-        id: memberId,
-        name: data.memberNames?.[memberId] || 'Unknown',
-        email: data.memberEmails?.[memberId] || '',
-        role: data.members[memberId] as 'admin' | 'member',
-        joinedAt: data.joinedAt?.[memberId]?.toDate() || new Date(),
+      // Transform users object to members array
+      const membersArray = Object.entries(data.users || {}).map(([uid, userData]: [string, any]) => ({
+        id: uid,
+        name: userData.name || 'Unknown',
+        email: userData.email || '',
+        role: userData.role as 'admin' | 'member',
+        joinedAt: userData.joinedAt?.toDate() || new Date(),
       }));
 
       const group: Group = {
@@ -149,11 +311,7 @@ export const getUserGroups = async (userId: string) => {
           notifications: true,
           recurringBills: false,
         },
-        tags: data.tags || [],
-        location: data.location || '',
         isArchived: data.isArchived || false,
-        photo: data.photo,
-        coverImage: data.coverImage,
       };
 
       groups.push(group);
@@ -254,7 +412,7 @@ export const subscribeToUserGroups = (userId: string, callback: (groups: Group[]
   const groupsRef = collection(db, 'groups');
   const q = query(
     groupsRef,
-    where(`members.${userId}`, 'in', ['admin', 'member'])
+    where(`users.${userId}.role`, 'in', ['admin', 'member'])
   );
   
   return onSnapshot(q, (snapshot) => {
@@ -265,13 +423,13 @@ export const subscribeToUserGroups = (userId: string, callback: (groups: Group[]
       const data = doc.data();
       console.log('Processing group from subscription:', doc.id, data);
       
-      // Transform members object back to array
-      const membersArray = Object.keys(data.members || {}).map(memberId => ({
-        id: memberId,
-        name: data.memberNames?.[memberId] || 'Unknown',
-        email: data.memberEmails?.[memberId] || '',
-        role: data.members[memberId] as 'admin' | 'member',
-        joinedAt: data.joinedAt?.[memberId]?.toDate() || new Date(),
+      // Transform users object to members array
+      const membersArray = Object.entries(data.users || {}).map(([uid, userData]: [string, any]) => ({
+        id: uid,
+        name: userData.name || 'Unknown',
+        email: userData.email || '',
+        role: userData.role as 'admin' | 'member',
+        joinedAt: userData.joinedAt?.toDate() || new Date(),
       }));
 
       const group: Group = {
@@ -288,11 +446,7 @@ export const subscribeToUserGroups = (userId: string, callback: (groups: Group[]
           notifications: true,
           recurringBills: false,
         },
-        tags: data.tags || [],
-        location: data.location || '',
         isArchived: data.isArchived || false,
-        photo: data.photo,
-        coverImage: data.coverImage,
       };
 
       groups.push(group);
@@ -328,16 +482,62 @@ export const subscribeToGroupExpenses = (groupId: string, callback: (expenses: E
   });
 };
 
-// Member management
+// Member management with new structure
 export const addMemberToGroup = async (groupId: string, member: Member, userId: string) => {
   try {
+    // Check if user exists in users collection
+    let userProfile = await getUserProfile(member.id);
+    
+    // If user doesn't exist, create their profile
+    if (!userProfile) {
+      userProfile = await createUserProfile({
+        uid: member.id,
+        name: member.name,
+        email: member.email,
+        verified: false,
+        preferences: {
+          currency: 'USD',
+          theme: 'light',
+          language: 'en',
+        },
+      });
+    }
+    
+    // Update group's users object
     const groupRef = doc(db, 'groups', groupId);
     await updateDoc(groupRef, {
-      [`members.${member.id}`]: 'member',
-      [`memberNames.${member.id}`]: member.name,
-      [`memberEmails.${member.id}`]: member.email,
-      [`joinedAt.${member.id}`]: serverTimestamp(),
+      [`users.${member.id}`]: {
+        name: userProfile.name,
+        email: userProfile.email,
+        role: 'member',
+        joinedAt: serverTimestamp(),
+      },
     });
+    
+    // Add to members subcollection
+    const memberRef = doc(db, 'groups', groupId, 'members', member.id);
+    await setDoc(memberRef, {
+      role: 'member',
+      joinedAt: serverTimestamp(),
+    });
+    
+    // Add to user's groups subcollection
+    const userGroupRef = doc(db, 'users', member.id, 'groups', groupId);
+    await setDoc(userGroupRef, {
+      groupId,
+      role: 'member',
+      joinedAt: serverTimestamp(),
+    });
+    
+    // Update user stats
+    if (userProfile) {
+      await updateUserProfile(member.id, {
+        stats: {
+          ...userProfile.stats,
+          groupsJoined: userProfile.stats.groupsJoined + 1,
+        },
+      });
+    }
   } catch (error) {
     console.error('Error adding member to group:', error);
     throw error;
@@ -346,13 +546,30 @@ export const addMemberToGroup = async (groupId: string, member: Member, userId: 
 
 export const removeMemberFromGroup = async (groupId: string, memberId: string) => {
   try {
+    // Remove from group's users object
     const groupRef = doc(db, 'groups', groupId);
     await updateDoc(groupRef, {
-      [`members.${memberId}`]: null,
-      [`memberNames.${memberId}`]: null,
-      [`memberEmails.${memberId}`]: null,
-      [`joinedAt.${memberId}`]: null,
+      [`users.${memberId}`]: null,
     });
+    
+    // Remove from members subcollection
+    const memberRef = doc(db, 'groups', groupId, 'members', memberId);
+    await deleteDoc(memberRef);
+    
+    // Remove from user's groups subcollection
+    const userGroupRef = doc(db, 'users', memberId, 'groups', groupId);
+    await deleteDoc(userGroupRef);
+    
+    // Update user stats
+    const userProfile = await getUserProfile(memberId);
+    if (userProfile) {
+      await updateUserProfile(memberId, {
+        stats: {
+          ...userProfile.stats,
+          groupsJoined: Math.max(0, userProfile.stats.groupsJoined - 1),
+        },
+      });
+    }
   } catch (error) {
     console.error('Error removing member from group:', error);
     throw error;

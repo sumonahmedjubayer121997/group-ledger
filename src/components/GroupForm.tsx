@@ -70,7 +70,7 @@ export const GroupForm: React.FC<GroupFormProps> = ({ isOpen, onClose }) => {
     // Add the current user as admin using their Firebase Auth UID
     membersWithIds.push({
       id: user.uid, // Use Firebase Auth UID
-      name: userProfile.displayName || 'Current User',
+      name: userProfile.name || 'Current User',
       email: user.email || '',
       role: 'admin',
     });
@@ -181,7 +181,7 @@ export const GroupForm: React.FC<GroupFormProps> = ({ isOpen, onClose }) => {
               <div className="flex items-center space-x-3 p-3 bg-green-50 rounded-lg border border-green-200">
                 <div className="flex-1 grid grid-cols-2 gap-3">
                   <Input
-                    value={userProfile?.displayName || 'Current User'}
+                    value={userProfile?.name || 'Current User'}
                     disabled
                     className="bg-green-100"
                   />
