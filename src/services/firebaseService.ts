@@ -1,4 +1,3 @@
-
 import { 
   collection, 
   doc, 
@@ -21,38 +20,33 @@ import { Group, Expense, Member, Settlement } from '@/stores/expenseStore';
 // Group Operations
 export const createGroup = async (groupData: Omit<Group, 'id'>, userId: string) => {
   try {
-    console.log('Creating group with userId:', userId);
-    console.log('Group data members:', groupData.members);
+    console.log('Creating group with consistent userId:', userId);
     
-    // Transform members array to object for Firestore rules
-    // Ensure the current user (userId) is included as admin
+    // Ensure the current user (authenticated user) is always the admin
     const membersObj: Record<string, string> = {};
     const memberNames: Record<string, string> = {};
     const memberEmails: Record<string, string> = {};
     const joinedAt: Record<string, any> = {};
     
-    // First, add the current user as admin
+    // First, add the authenticated user as admin using their Firebase Auth UID
     membersObj[userId] = 'admin';
     
-    // Find the current user in the members array to get their name and email
+    // Find the current user in the members array or use fallback
     const currentUserMember = groupData.members.find(member => member.id === userId);
-    if (currentUserMember) {
-      memberNames[userId] = currentUserMember.name;
-      memberEmails[userId] = currentUserMember.email;
-    } else {
-      // If current user is not in members array, this shouldn't happen but add fallback
-      memberNames[userId] = 'Current User';
-      memberEmails[userId] = '';
-    }
+    memberNames[userId] = currentUserMember?.name || 'Current User';
+    memberEmails[userId] = currentUserMember?.email || '';
     joinedAt[userId] = serverTimestamp();
     
-    // Add other members (excluding the current user to avoid duplicates)
+    // Add other members (only those who are not the current user)
     groupData.members.forEach(member => {
-      if (member.id !== userId) {
-        membersObj[member.id] = member.role || 'member';
-        memberNames[member.id] = member.name;
-        memberEmails[member.id] = member.email;
-        joinedAt[member.id] = serverTimestamp();
+      if (member.id !== userId && member.email) {
+        // For other members, use their actual Firebase Auth UID if available
+        // Otherwise use a temporary ID that will be replaced when they join
+        const memberId = member.id || crypto.randomUUID();
+        membersObj[memberId] = member.role || 'member';
+        memberNames[memberId] = member.name;
+        memberEmails[memberId] = member.email;
+        joinedAt[memberId] = serverTimestamp();
       }
     });
 
@@ -64,7 +58,7 @@ export const createGroup = async (groupData: Omit<Group, 'id'>, userId: string) 
       memberEmails,
       joinedAt,
       createdAt: serverTimestamp(),
-      createdBy: userId, // Use the authenticated user's uid
+      createdBy: userId, // Use the same Firebase Auth UID as in members
       groupType: groupData.groupType || 'private',
       inviteCode: groupData.inviteCode || crypto.randomUUID(),
       settings: groupData.settings || {
@@ -80,14 +74,24 @@ export const createGroup = async (groupData: Omit<Group, 'id'>, userId: string) 
       coverImage: groupData.coverImage,
     };
 
-    console.log('Creating group with data:', firestoreGroup);
+    console.log('Creating group with consistent data:', {
+      createdBy: userId,
+      membersKeys: Object.keys(membersObj),
+      adminUserId: userId
+    });
+    
     const docRef = await addDoc(collection(db, 'groups'), firestoreGroup);
     
-    // Return the complete group object with the generated ID
     return {
       id: docRef.id,
       ...groupData,
       createdAt: new Date(),
+      createdBy: userId, // Ensure consistency
+      members: groupData.members.map(member => 
+        member.id === userId 
+          ? { ...member, role: 'admin' as const }
+          : member
+      ),
     };
   } catch (error) {
     console.error('Error creating group:', error);
