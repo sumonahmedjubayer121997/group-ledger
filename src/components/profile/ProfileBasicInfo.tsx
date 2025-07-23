@@ -36,59 +36,59 @@ export const ProfileBasicInfo: React.FC<ProfileBasicInfoProps> = ({ user, userPr
   };
 
   return (
-    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6">
       {/* Basic Information */}
       <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <CalendarDays className="h-5 w-5" />
+        <CardHeader className="pb-3 sm:pb-6">
+          <CardTitle className="flex items-center gap-2 text-base sm:text-lg">
+            <CalendarDays className="h-4 w-4 sm:h-5 sm:w-5" />
             Basic Information
           </CardTitle>
         </CardHeader>
-        <CardContent className="space-y-4">
+        <CardContent className="space-y-3 sm:space-y-4">
           <div>
-            <label className="text-sm font-medium text-muted-foreground">Full Name</label>
-            <p className="text-lg font-semibold">{userProfile.displayName}</p>
+            <label className="text-xs sm:text-sm font-medium text-muted-foreground">Full Name</label>
+            <p className="text-sm sm:text-lg font-semibold">{userProfile.displayName}</p>
           </div>
           <div>
-            <label className="text-sm font-medium text-muted-foreground">Email Address</label>
-            <p className="text-lg">{userProfile.email}</p>
+            <label className="text-xs sm:text-sm font-medium text-muted-foreground">Email Address</label>
+            <p className="text-sm sm:text-lg truncate">{userProfile.email}</p>
           </div>
           <div>
-            <label className="text-sm font-medium text-muted-foreground">Date Joined</label>
-            <p className="text-lg">{formatDate(userProfile.createdAt)}</p>
+            <label className="text-xs sm:text-sm font-medium text-muted-foreground">Date Joined</label>
+            <p className="text-sm sm:text-lg">{formatDate(userProfile.createdAt)}</p>
           </div>
           <div>
-            <label className="text-sm font-medium text-muted-foreground">Last Activity</label>
-            <p className="text-lg">{formatDate(userProfile.lastLoginAt)}</p>
+            <label className="text-xs sm:text-sm font-medium text-muted-foreground">Last Activity</label>
+            <p className="text-sm sm:text-lg">{formatDate(userProfile.lastLoginAt)}</p>
           </div>
         </CardContent>
       </Card>
 
       {/* Personal Overview */}
       <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <TrendingUp className="h-5 w-5" />
+        <CardHeader className="pb-3 sm:pb-6">
+          <CardTitle className="flex items-center gap-2 text-base sm:text-lg">
+            <TrendingUp className="h-4 w-4 sm:h-5 sm:w-5" />
             Personal Overview
           </CardTitle>
         </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="grid grid-cols-2 gap-4">
-            <div className="text-center p-3 bg-primary/10 rounded-lg">
-              <p className="text-2xl font-bold text-primary">{totalExpensesAdded}</p>
-              <p className="text-sm text-muted-foreground">Expenses Added</p>
+        <CardContent className="space-y-3 sm:space-y-4">
+          <div className="grid grid-cols-2 gap-3 sm:gap-4">
+            <div className="text-center p-2 sm:p-3 bg-primary/10 rounded-lg">
+              <p className="text-lg sm:text-2xl font-bold text-primary">{totalExpensesAdded}</p>
+              <p className="text-xs sm:text-sm text-muted-foreground">Expenses Added</p>
             </div>
-            <div className="text-center p-3 bg-green-500/10 rounded-lg">
-              <p className="text-2xl font-bold text-green-600">{formatCurrency(totalAmountPaid)}</p>
-              <p className="text-sm text-muted-foreground">Total Paid</p>
+            <div className="text-center p-2 sm:p-3 bg-green-500/10 rounded-lg">
+              <p className="text-lg sm:text-2xl font-bold text-green-600">{formatCurrency(totalAmountPaid)}</p>
+              <p className="text-xs sm:text-sm text-muted-foreground">Total Paid</p>
             </div>
           </div>
           <div>
-            <label className="text-sm font-medium text-muted-foreground">Groups Joined</label>
-            <div className="flex flex-wrap gap-2 mt-2">
+            <label className="text-xs sm:text-sm font-medium text-muted-foreground">Groups Joined</label>
+            <div className="flex flex-wrap gap-1 sm:gap-2 mt-2">
               {groups.map(group => (
-                <Badge key={group.id} variant="outline" className="cursor-pointer">
+                <Badge key={group.id} variant="outline" className="cursor-pointer text-xs">
                   {group.name}
                 </Badge>
               ))}
@@ -99,30 +99,30 @@ export const ProfileBasicInfo: React.FC<ProfileBasicInfoProps> = ({ user, userPr
 
       {/* Recent Activity */}
       <Card className="md:col-span-2">
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Clock className="h-5 w-5" />
+        <CardHeader className="pb-3 sm:pb-6">
+          <CardTitle className="flex items-center gap-2 text-base sm:text-lg">
+            <Clock className="h-4 w-4 sm:h-5 sm:w-5" />
             Recent Transactions
           </CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="space-y-3">
+          <div className="space-y-2 sm:space-y-3">
             {userExpenses.slice(0, 5).map(expense => (
-              <div key={expense.id} className="flex items-center justify-between p-3 bg-muted/50 rounded-lg">
-                <div>
-                  <p className="font-medium">{expense.description}</p>
-                  <p className="text-sm text-muted-foreground">
+              <div key={expense.id} className="flex items-center justify-between p-2 sm:p-3 bg-muted/50 rounded-lg">
+                <div className="flex-1 min-w-0">
+                  <p className="font-medium text-sm sm:text-base truncate">{expense.description}</p>
+                  <p className="text-xs sm:text-sm text-muted-foreground">
                     {formatDate(expense.date)}
                   </p>
                 </div>
-                <div className="text-right">
-                  <p className="font-semibold">{formatCurrency(expense.amount)}</p>
-                  <p className="text-sm text-muted-foreground">{expense.category}</p>
+                <div className="text-right ml-2">
+                  <p className="font-semibold text-sm sm:text-base">{formatCurrency(expense.amount)}</p>
+                  <p className="text-xs sm:text-sm text-muted-foreground">{expense.category}</p>
                 </div>
               </div>
             ))}
             {userExpenses.length === 0 && (
-              <p className="text-center text-muted-foreground py-8">
+              <p className="text-center text-muted-foreground py-6 sm:py-8 text-sm">
                 No recent transactions
               </p>
             )}

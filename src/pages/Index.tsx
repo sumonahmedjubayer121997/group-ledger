@@ -99,153 +99,156 @@ const Index = () => {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-green-50">
-  <div className="container mx-auto px-4 py-6 sm:px-2">
-    {/* Header */}
-    <div className="flex flex-col gap-4 sm:flex-row sm:justify-between sm:items-center mb-6">
-      <div>
-        <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">SplitWize</h1>
-        <p className="text-gray-600 text-sm sm:text-base">
-          Split expenses with friends and family
-        </p>
-      </div>
-      <div className="flex flex-wrap gap-2 sm:gap-3 justify-end">
-        <Button
-          onClick={() => setShowUserProfile(true)}
-          variant="outline"
-          size="sm"
-        >
-          <User className="h-4 w-4 mr-2" />
-          Profile
-        </Button>
-        <Button
-          onClick={() => setShowGroupForm(true)}
-          className="bg-blue-600 hover:bg-blue-700"
-        >
-          <Plus className="h-4 w-4 mr-2" />
-          New Group
-        </Button>
-        <Button
-          onClick={handleLogout}
-          variant="outline"
-          size="sm"
-        >
-          <Settings className="h-4 w-4 mr-2" />
-          Logout
-        </Button>
-      </div>
-    </div>
-
-    {/* Welcome Message */}
-    <div className="mb-6">
-      <Card className="bg-white/80 backdrop-blur-sm">
-        <CardHeader>
-          <CardTitle className="text-lg sm:text-xl">
-            Welcome back, {userProfile?.displayName || 'User'}! 👋
-          </CardTitle>
-          <CardDescription>
-            Here's your expense overview
-          </CardDescription>
-        </CardHeader>
-      </Card>
-    </div>
-
-    {/* Debug info */}
-    <div className="mb-4 text-sm text-gray-600">
-      Groups: {groups.length} | Expenses: {expenses.length} | User: {user?.uid}
-    </div>
-
-    {/* Tabs */}
-    <Tabs defaultValue="overview" className="space-y-6">
-      <TabsList className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-        <TabsTrigger value="overview">Overview</TabsTrigger>
-        <TabsTrigger value="groups">Groups</TabsTrigger>
-        <TabsTrigger value="expenses">Expenses</TabsTrigger>
-        <TabsTrigger value="analytics">Analytics</TabsTrigger>
-      </TabsList>
-
-      {/* Overview */}
-      <TabsContent value="overview" className="space-y-6">
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-          <BalanceCard balances={balances} />
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Total Groups</CardTitle>
-              <Users className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{groups.length}</div>
-              <p className="text-xs text-muted-foreground">Active groups</p>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Total Expenses</CardTitle>
-              <Receipt className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{expenses.length}</div>
-              <p className="text-xs text-muted-foreground">All time</p>
-            </CardContent>
-          </Card>
+      <div className="container mx-auto px-2 py-4 sm:px-4 sm:py-6">
+        {/* Header */}
+        <div className="flex flex-col gap-3 sm:flex-row sm:justify-between sm:items-center mb-4 sm:mb-6">
+          <div className="text-center sm:text-left">
+            <h1 className="text-xl sm:text-2xl md:text-3xl font-bold text-gray-900">SplitWize</h1>
+            <p className="text-gray-600 text-xs sm:text-sm md:text-base">
+              Split expenses with friends and family
+            </p>
+          </div>
+          <div className="flex flex-wrap gap-2 justify-center sm:justify-end">
+            <Button
+              onClick={() => setShowUserProfile(true)}
+              variant="outline"
+              size="sm"
+              className="text-xs sm:text-sm"
+            >
+              <User className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-2" />
+              Profile
+            </Button>
+            <Button
+              onClick={() => setShowGroupForm(true)}
+              className="bg-blue-600 hover:bg-blue-700 text-xs sm:text-sm"
+              size="sm"
+            >
+              <Plus className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-2" />
+              New Group
+            </Button>
+            <Button
+              onClick={handleLogout}
+              variant="outline"
+              size="sm"
+              className="text-xs sm:text-sm"
+            >
+              <Settings className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-2" />
+              Logout
+            </Button>
+          </div>
         </div>
-        <RecentExpenses expenses={expenses} />
-      </TabsContent>
 
-      {/* Groups */}
-      <TabsContent value="groups" className="space-y-6">
-        <GroupList groups={groups} onGroupClick={setSelectedGroup} />
-      </TabsContent>
-
-      {/* Expenses */}
-      <TabsContent value="expenses" className="space-y-6">
-        <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4">
-          <h2 className="text-xl font-bold">All Expenses</h2>
-          <Button
-            onClick={() => setShowExpenseForm(true)}
-            className="bg-green-600 hover:bg-green-700"
-          >
-            <Plus className="h-4 w-4 mr-2" />
-            Add Expense
-          </Button>
-        </div>
-        <RecentExpenses expenses={expenses} />
-      </TabsContent>
-
-      {/* Analytics */}
-      <TabsContent value="analytics" className="space-y-6">
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          <ExpenseChart expenses={expenses} />
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <TrendingUp className="h-5 w-5" />
-                Spending Trends
+        {/* Welcome Message */}
+        <div className="mb-4 sm:mb-6">
+          <Card className="bg-white/80 backdrop-blur-sm">
+            <CardHeader className="pb-3 sm:pb-6">
+              <CardTitle className="text-base sm:text-lg md:text-xl">
+                Welcome back, {userProfile?.displayName || 'User'}! 👋
               </CardTitle>
+              <CardDescription className="text-xs sm:text-sm">
+                Here's your expense overview
+              </CardDescription>
             </CardHeader>
-            <CardContent>
-              <p className="text-muted-foreground">Analytics coming soon...</p>
-            </CardContent>
           </Card>
         </div>
-      </TabsContent>
-    </Tabs>
-  </div>
 
-  {/* Modals */}
-  {showGroupForm && (
-    <GroupForm
-      isOpen={showGroupForm}
-      onClose={() => setShowGroupForm(false)}
-    />
-  )}
-  {showExpenseForm && (
-    <ExpenseForm
-      isOpen={showExpenseForm}
-      onClose={() => setShowExpenseForm(false)}
-    />
-  )}
-</div>
+        {/* Debug info - Hidden on mobile */}
+        <div className="hidden sm:block mb-4 text-sm text-gray-600">
+          Groups: {groups.length} | Expenses: {expenses.length} | User: {user?.uid}
+        </div>
 
+        {/* Tabs */}
+        <Tabs defaultValue="overview" className="space-y-4 sm:space-y-6">
+          <TabsList className="grid w-full grid-cols-2 sm:grid-cols-4 gap-1 sm:gap-2 p-1">
+            <TabsTrigger value="overview" className="text-xs sm:text-sm">Overview</TabsTrigger>
+            <TabsTrigger value="groups" className="text-xs sm:text-sm">Groups</TabsTrigger>
+            <TabsTrigger value="expenses" className="text-xs sm:text-sm">Expenses</TabsTrigger>
+            <TabsTrigger value="analytics" className="text-xs sm:text-sm">Analytics</TabsTrigger>
+          </TabsList>
+
+          {/* Overview */}
+          <TabsContent value="overview" className="space-y-4 sm:space-y-6">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
+              <BalanceCard balances={balances} />
+              <Card>
+                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                  <CardTitle className="text-xs sm:text-sm font-medium">Total Groups</CardTitle>
+                  <Users className="h-3 w-3 sm:h-4 sm:w-4 text-muted-foreground" />
+                </CardHeader>
+                <CardContent>
+                  <div className="text-lg sm:text-2xl font-bold">{groups.length}</div>
+                  <p className="text-xs text-muted-foreground">Active groups</p>
+                </CardContent>
+              </Card>
+              <Card>
+                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                  <CardTitle className="text-xs sm:text-sm font-medium">Total Expenses</CardTitle>
+                  <Receipt className="h-3 w-3 sm:h-4 sm:w-4 text-muted-foreground" />
+                </CardHeader>
+                <CardContent>
+                  <div className="text-lg sm:text-2xl font-bold">{expenses.length}</div>
+                  <p className="text-xs text-muted-foreground">All time</p>
+                </CardContent>
+              </Card>
+            </div>
+            <RecentExpenses expenses={expenses} />
+          </TabsContent>
+
+          {/* Groups */}
+          <TabsContent value="groups" className="space-y-4 sm:space-y-6">
+            <GroupList groups={groups} onGroupClick={setSelectedGroup} />
+          </TabsContent>
+
+          {/* Expenses */}
+          <TabsContent value="expenses" className="space-y-4 sm:space-y-6">
+            <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3 sm:gap-4">
+              <h2 className="text-lg sm:text-xl font-bold">All Expenses</h2>
+              <Button
+                onClick={() => setShowExpenseForm(true)}
+                className="bg-green-600 hover:bg-green-700 text-xs sm:text-sm"
+                size="sm"
+              >
+                <Plus className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-2" />
+                Add Expense
+              </Button>
+            </div>
+            <RecentExpenses expenses={expenses} />
+          </TabsContent>
+
+          {/* Analytics */}
+          <TabsContent value="analytics" className="space-y-4 sm:space-y-6">
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6">
+              <ExpenseChart expenses={expenses} />
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2 text-base sm:text-lg">
+                    <TrendingUp className="h-4 w-4 sm:h-5 sm:w-5" />
+                    Spending Trends
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <p className="text-muted-foreground text-sm">Analytics coming soon...</p>
+                </CardContent>
+              </Card>
+            </div>
+          </TabsContent>
+        </Tabs>
+      </div>
+
+      {/* Modals */}
+      {showGroupForm && (
+        <GroupForm
+          isOpen={showGroupForm}
+          onClose={() => setShowGroupForm(false)}
+        />
+      )}
+      {showExpenseForm && (
+        <ExpenseForm
+          isOpen={showExpenseForm}
+          onClose={() => setShowExpenseForm(false)}
+        />
+      )}
+    </div>
   );
 };
 

@@ -14,17 +14,17 @@ export const GroupList: React.FC<GroupListProps> = ({ groups, onGroupClick }) =>
   if (groups.length === 0) {
     return (
       <Card className="bg-white shadow-lg border-0">
-        <CardHeader>
-          <CardTitle className="flex items-center space-x-2">
-            <Users className="w-5 h-5 text-green-500" />
+        <CardHeader className="pb-3 sm:pb-6">
+          <CardTitle className="flex items-center space-x-2 text-base sm:text-lg">
+            <Users className="w-4 h-4 sm:w-5 sm:h-5 text-green-500" />
             <span>Groups</span>
           </CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="text-center py-8">
-            <Users className="w-12 h-12 text-gray-300 mx-auto mb-4" />
-            <p className="text-gray-600 mb-2">No groups yet</p>
-            <p className="text-sm text-gray-500">Create your first group to start tracking shared expenses!</p>
+          <div className="text-center py-6 sm:py-8">
+            <Users className="w-10 h-10 sm:w-12 sm:h-12 text-gray-300 mx-auto mb-3 sm:mb-4" />
+            <p className="text-gray-600 mb-2 text-sm sm:text-base">No groups yet</p>
+            <p className="text-xs sm:text-sm text-gray-500">Create your first group to start tracking shared expenses!</p>
           </div>
         </CardContent>
       </Card>
@@ -33,32 +33,36 @@ export const GroupList: React.FC<GroupListProps> = ({ groups, onGroupClick }) =>
 
   return (
     <Card className="bg-white shadow-lg border-0">
-      <CardHeader>
+      <CardHeader className="pb-3 sm:pb-6">
         <CardTitle className="flex items-center justify-between">
           <div className="flex items-center space-x-2">
-            <Users className="w-5 h-5 text-green-500" />
-            <span>Groups</span>
+            <Users className="w-4 h-4 sm:w-5 sm:h-5 text-green-500" />
+            <span className="text-base sm:text-lg">Groups</span>
           </div>
-          <Button variant="outline" size="sm" className="text-green-600 border-green-200 hover:bg-green-50">
+          <Button 
+            variant="outline" 
+            size="sm" 
+            className="text-green-600 border-green-200 hover:bg-green-50 text-xs sm:text-sm"
+          >
             View All
           </Button>
         </CardTitle>
       </CardHeader>
       <CardContent>
-        <div className="space-y-4">
+        <div className="space-y-3 sm:space-y-4">
           {groups.map((group) => (
             <div 
               key={group.id} 
-              className="p-4 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors cursor-pointer"
+              className="p-3 sm:p-4 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors cursor-pointer"
               onClick={() => onGroupClick?.(group)}
             >
               <div className="flex items-center justify-between mb-2">
-                <h4 className="font-semibold text-gray-900">{group.name}</h4>
-                <div className="flex -space-x-2">
+                <h4 className="font-semibold text-gray-900 text-sm sm:text-base truncate pr-2">{group.name}</h4>
+                <div className="flex -space-x-1 sm:-space-x-2">
                   {group.members.slice(0, 3).map((member, index) => (
                     <div
                       key={member.id}
-                      className="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center border-2 border-white"
+                      className="w-6 h-6 sm:w-8 sm:h-8 bg-blue-100 rounded-full flex items-center justify-center border-2 border-white"
                     >
                       <span className="text-blue-600 font-medium text-xs">
                         {member.name.charAt(0)}
@@ -66,7 +70,7 @@ export const GroupList: React.FC<GroupListProps> = ({ groups, onGroupClick }) =>
                     </div>
                   ))}
                   {group.members.length > 3 && (
-                    <div className="w-8 h-8 bg-gray-100 rounded-full flex items-center justify-center border-2 border-white">
+                    <div className="w-6 h-6 sm:w-8 sm:h-8 bg-gray-100 rounded-full flex items-center justify-center border-2 border-white">
                       <span className="text-gray-600 font-medium text-xs">
                         +{group.members.length - 3}
                       </span>
@@ -74,7 +78,7 @@ export const GroupList: React.FC<GroupListProps> = ({ groups, onGroupClick }) =>
                   )}
                 </div>
               </div>
-              <p className="text-sm text-gray-600 mb-2">{group.description}</p>
+              <p className="text-xs sm:text-sm text-gray-600 mb-2 line-clamp-2">{group.description}</p>
               <div className="flex items-center justify-between text-xs text-gray-500">
                 <div className="flex items-center space-x-1">
                   <User className="w-3 h-3" />
@@ -82,7 +86,8 @@ export const GroupList: React.FC<GroupListProps> = ({ groups, onGroupClick }) =>
                 </div>
                 <div className="flex items-center space-x-1">
                   <Calendar className="w-3 h-3" />
-                  <span>{new Date(group.createdAt).toLocaleDateString()}</span>
+                  <span className="hidden sm:inline">{new Date(group.createdAt).toLocaleDateString()}</span>
+                  <span className="sm:hidden">{new Date(group.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}</span>
                 </div>
               </div>
             </div>
