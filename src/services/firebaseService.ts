@@ -120,6 +120,7 @@ export const getUserGroups = async (userId: string) => {
 // Expense Operations
 export const createExpense = async (expenseData: Omit<Expense, 'id'>, userId: string) => {
   try {
+    console.log('Creating expense in Firebase:', expenseData);
     const expenseRef = collection(db, 'groups', expenseData.groupId, 'expenses');
     
     // Clean the expense data to remove undefined fields
@@ -141,8 +142,9 @@ export const createExpense = async (expenseData: Omit<Expense, 'id'>, userId: st
       (cleanExpenseData as any).splitData = expenseData.splitData;
     }
 
-    console.log('Creating expense with data:', cleanExpenseData);
+    console.log('Creating expense with clean data:', cleanExpenseData);
     const docRef = await addDoc(expenseRef, cleanExpenseData);
+    console.log('Expense created with ID:', docRef.id);
     return { id: docRef.id, ...expenseData };
   } catch (error) {
     console.error('Error creating expense:', error);
@@ -233,10 +235,12 @@ export const subscribeToUserGroups = (userId: string, callback: (groups: Group[]
 };
 
 export const subscribeToGroupExpenses = (groupId: string, callback: (expenses: Expense[]) => void) => {
+  console.log('Setting up expense subscription for group:', groupId);
   const expensesRef = collection(db, 'groups', groupId, 'expenses');
   const q = query(expensesRef, orderBy('date', 'desc'));
   
   return onSnapshot(q, (snapshot) => {
+    console.log('Expense subscription triggered for group:', groupId, 'Changes:', snapshot.docChanges().length);
     const expenses: Expense[] = [];
     snapshot.forEach((doc) => {
       const data = doc.data();
@@ -246,7 +250,10 @@ export const subscribeToGroupExpenses = (groupId: string, callback: (expenses: E
         date: data.date?.toDate() || new Date(),
       } as Expense);
     });
+    console.log('Calling callback with expenses:', expenses);
     callback(expenses);
+  }, (error) => {
+    console.error('Error in expense subscription for group:', groupId, error);
   });
 };
 
