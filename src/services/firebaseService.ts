@@ -54,7 +54,13 @@ export const createGroup = async (groupData: Omit<Group, 'id'>, userId: string) 
 
     console.log('Creating group with data:', firestoreGroup);
     const docRef = await addDoc(collection(db, 'groups'), firestoreGroup);
-    return { id: docRef.id, ...groupData };
+    
+    // Return the complete group object with the generated ID
+    return {
+      id: docRef.id,
+      ...groupData,
+      createdAt: new Date(),
+    };
   } catch (error) {
     console.error('Error creating group:', error);
     throw error;
@@ -203,7 +209,7 @@ export const subscribeToUserGroups = (userId: string, callback: (groups: Group[]
     snapshot.forEach((doc) => {
       const data = doc.data();
       // Transform members object back to array
-      const membersArray = Object.keys(data.members).map(memberId => ({
+      const membersArray = Object.keys(data.members || {}).map(memberId => ({
         id: memberId,
         name: data.memberNames?.[memberId] || 'Unknown',
         email: data.memberEmails?.[memberId] || '',
@@ -218,7 +224,11 @@ export const subscribeToUserGroups = (userId: string, callback: (groups: Group[]
         createdAt: data.createdAt?.toDate() || new Date(),
       } as Group);
     });
+    
+    console.log('Firebase groups subscription updated:', groups);
     callback(groups);
+  }, (error) => {
+    console.error('Error in groups subscription:', error);
   });
 };
 

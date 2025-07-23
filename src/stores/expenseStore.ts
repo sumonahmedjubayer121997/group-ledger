@@ -1,3 +1,4 @@
+
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import { 
@@ -161,7 +162,7 @@ export const useExpenseStore = create<ExpenseStore>()(
           
           // Subscribe to user's groups
           const groupsUnsubscriber = subscribeToUserGroups(userId, (groups) => {
-            console.log('Groups updated:', groups);
+            console.log('Groups updated from Firebase:', groups);
             set({ groups, loading: false });
             
             // Clean up old expense subscriptions
@@ -197,7 +198,7 @@ export const useExpenseStore = create<ExpenseStore>()(
           try {
             set({ loading: true, error: null });
             await createExpenseFirebase(expense, userId);
-            // Firebase listener will update the state
+            // Real-time listener will update the state
           } catch (error) {
             console.error('Error adding expense:', error);
             set({ error: 'Failed to add expense', loading: false });
@@ -221,8 +222,15 @@ export const useExpenseStore = create<ExpenseStore>()(
               isArchived: false,
             };
             
-            await createGroupFirebase(completeGroup, userId);
-            // Firebase listener will update the state
+            const newGroup = await createGroupFirebase(completeGroup, userId);
+            console.log('Group created successfully:', newGroup);
+            
+            // The real-time listener should update the state, but let's add a manual update
+            // to ensure immediate UI feedback
+            set(state => ({
+              groups: [...state.groups, newGroup as Group],
+              loading: false
+            }));
             
             get().addActivity({
               type: 'group_updated',
