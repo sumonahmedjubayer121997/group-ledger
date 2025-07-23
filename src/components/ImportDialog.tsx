@@ -1,3 +1,4 @@
+
 import React, { useState, useRef } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
@@ -42,12 +43,12 @@ export const ImportDialog: React.FC<ImportDialogProps> = ({ children }) => {
   const [csvData, setCsvData] = useState<any[]>([]);
   const [headers, setHeaders] = useState<string[]>([]);
   const [mapping, setMapping] = useState<ColumnMapping>({
-    date: '',
-    description: '',
-    amount: '',
-    paidBy: '',
-    sharedWith: '',
-    category: ''
+    date: '__skip__',
+    description: '__skip__',
+    amount: '__skip__',
+    paidBy: '__skip__',
+    sharedWith: '__skip__',
+    category: '__skip__'
   });
   const [selectedGroup, setSelectedGroup] = useState('');
   const [previewData, setPreviewData] = useState<ImportRow[]>([]);
@@ -102,13 +103,13 @@ export const ImportDialog: React.FC<ImportDialogProps> = ({ children }) => {
     const processedData: ImportRow[] = csvData.map((row, index) => {
       const errors: string[] = [];
       
-      // Extract mapped values
-      const date = row[mapping.date] || '';
-      const description = row[mapping.description] || '';
-      const amount = row[mapping.amount] || '';
-      const paidBy = row[mapping.paidBy] || '';
-      const sharedWith = row[mapping.sharedWith] || '';
-      const category = row[mapping.category] || 'other';
+      // Extract mapped values (skip fields that are set to '__skip__')
+      const date = mapping.date !== '__skip__' ? row[mapping.date] || '' : '';
+      const description = mapping.description !== '__skip__' ? row[mapping.description] || '' : '';
+      const amount = mapping.amount !== '__skip__' ? row[mapping.amount] || '' : '';
+      const paidBy = mapping.paidBy !== '__skip__' ? row[mapping.paidBy] || '' : '';
+      const sharedWith = mapping.sharedWith !== '__skip__' ? row[mapping.sharedWith] || '' : '';
+      const category = mapping.category !== '__skip__' ? row[mapping.category] || 'other' : 'other';
 
       // Validate required fields
       if (!date) errors.push('Missing date');
@@ -218,12 +219,12 @@ export const ImportDialog: React.FC<ImportDialogProps> = ({ children }) => {
     setCsvData([]);
     setHeaders([]);
     setMapping({
-      date: '',
-      description: '',
-      amount: '',
-      paidBy: '',
-      sharedWith: '',
-      category: ''
+      date: '__skip__',
+      description: '__skip__',
+      amount: '__skip__',
+      paidBy: '__skip__',
+      sharedWith: '__skip__',
+      category: '__skip__'
     });
     setSelectedGroup('');
     setPreviewData([]);
@@ -317,7 +318,7 @@ export const ImportDialog: React.FC<ImportDialogProps> = ({ children }) => {
                           <SelectValue placeholder={`Select column for ${field}`} />
                         </SelectTrigger>
                         <SelectContent>
-                          <SelectItem value="">-- Skip this field --</SelectItem>
+                          <SelectItem value="__skip__">-- Skip this field --</SelectItem>
                           {headers.map(header => (
                             <SelectItem key={header} value={header}>
                               {header}
