@@ -43,27 +43,40 @@ export const GroupForm: React.FC<GroupFormProps> = ({ isOpen, onClose }) => {
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     
-    if (!user || !userProfile) return;
+    if (!user || !userProfile) {
+      console.error('No authenticated user found');
+      return;
+    }
     
     const validMembers = members.filter(m => m.name.trim() && m.email.trim());
     
-    // Create members array with Firebase Auth UIDs
+    // Create members array with the authenticated user as admin
     const membersWithIds: Member[] = [];
     
-    // Add the current user as admin using their Firebase Auth UID
+    // CRITICAL: Always use the Firebase Auth UID for the current user
+    const currentUserId = user.uid;
+    const currentUserEmail = user.email || '';
+    const currentUserName = userProfile.displayName || user.displayName || 'Current User';
+    
+    console.log('Creating group with authenticated user:', {
+      uid: currentUserId,
+      email: currentUserEmail,
+      name: currentUserName
+    });
+    
+    // Add the authenticated user as admin
     membersWithIds.push({
-      id: user.uid, // Use Firebase Auth UID
-      name: userProfile.displayName || 'Current User',
-      email: user.email || '',
+      id: currentUserId, // Use Firebase Auth UID
+      name: currentUserName,
+      email: currentUserEmail,
       role: 'admin',
     });
     
-    // Add other members with generated IDs (these would be replaced with actual UIDs when they join)
+    // Add other members (avoid duplicates by checking email)
     validMembers.forEach(member => {
-      // Only add if not the current user (to avoid duplicates)
-      if (member.email !== user.email) {
+      if (member.email !== currentUserEmail && member.email.trim()) {
         membersWithIds.push({
-          id: crypto.randomUUID(), // This will be replaced when they actually join
+          id: crypto.randomUUID(), // Temporary ID until they join
           name: member.name,
           email: member.email,
           role: 'member',
@@ -71,7 +84,6 @@ export const GroupForm: React.FC<GroupFormProps> = ({ isOpen, onClose }) => {
       }
     });
     
-    // Create complete group object with all required properties
     const completeGroup: Omit<Group, 'id'> = {
       name: formData.name,
       description: formData.description,
@@ -88,16 +100,21 @@ export const GroupForm: React.FC<GroupFormProps> = ({ isOpen, onClose }) => {
       isArchived: false,
     };
     
-    console.log('Creating group with current user UID:', user.uid);
-    console.log('Group members:', membersWithIds);
+    console.log('Creating group with members:', membersWithIds);
+    console.log('Current user will be createdBy:', currentUserId);
     
-    addGroup(completeGroup, user.uid);
+    // Pass the Firebase Auth UID to ensure consistency
+    addGroup(completeGroup, currentUserId);
     
     // Reset form
     setFormData({ name: '', description: '' });
     setMembers([{ name: '', email: '' }]);
     onClose();
   };
+
+  if (!user || !userProfile) {
+    return null;
+  }
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
@@ -150,16 +167,16 @@ export const GroupForm: React.FC<GroupFormProps> = ({ isOpen, onClose }) => {
             </div>
             
             <div className="space-y-3 max-h-60 overflow-y-auto">
-              {/* Show current user info */}
+              {/* Show current authenticated user info */}
               <div className="flex items-center space-x-3 p-3 bg-green-50 rounded-lg border border-green-200">
                 <div className="flex-1 grid grid-cols-2 gap-3">
                   <Input
-                    value={userProfile?.displayName || 'Current User'}
+                    value={userProfile.displayName || 'Current User'}
                     disabled
                     className="bg-green-100"
                   />
                   <Input
-                    value={user?.email || ''}
+                    value={user.email || ''}
                     disabled
                     className="bg-green-100"
                   />
