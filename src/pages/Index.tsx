@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import { Plus, Settings, Users, Receipt, TrendingUp, User } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -14,6 +15,7 @@ import { BalanceCard } from "@/components/BalanceCard";
 import { ExpenseChart } from "@/components/ExpenseChart";
 import { UserProfile } from "@/components/UserProfile";
 import { LandingPage } from "@/components/LandingPage";
+import { AuthPage } from "./AuthPage";
 
 const Index = () => {
   const { user, userProfile, logout } = useAuth();
@@ -22,6 +24,7 @@ const Index = () => {
   const [showExpenseForm, setShowExpenseForm] = useState(false);
   const [showUserProfile, setShowUserProfile] = useState(false);
   const [showLanding, setShowLanding] = useState(false);
+  const [showAuth, setShowAuth] = useState(false);
 
   // Initialize Firebase sync when user is authenticated
   useEffect(() => {
@@ -36,23 +39,37 @@ const Index = () => {
   useEffect(() => {
     if (!user) {
       setShowLanding(true);
+      setShowAuth(false);
     } else {
       setShowLanding(false);
+      setShowAuth(false);
     }
   }, [user]);
 
   const handleGetStarted = () => {
     setShowLanding(false);
+    setShowAuth(true);
+  };
+
+  const handleBackToLanding = () => {
+    setShowAuth(false);
+    setShowLanding(true);
   };
 
   const handleLogout = async () => {
     try {
       await logout();
       setShowLanding(true);
+      setShowAuth(false);
     } catch (error) {
       console.error('Error logging out:', error);
     }
   };
+
+  // Show auth page when user wants to sign in
+  if (showAuth && !user) {
+    return <AuthPage onBack={handleBackToLanding} />;
+  }
 
   // Show landing page
   if (showLanding || !user) {
