@@ -20,78 +20,46 @@ import { Group, Expense, Member, Settlement } from '@/stores/expenseStore';
 // Group Operations
 export const createGroup = async (groupData: Omit<Group, 'id'>, userId: string) => {
   try {
-    console.log('Creating group with consistent userId:', userId);
-    
-    // Ensure the current user (authenticated user) is always the admin
-    const membersObj: Record<string, string> = {};
-    const memberNames: Record<string, string> = {};
-    const memberEmails: Record<string, string> = {};
-    const joinedAt: Record<string, any> = {};
-    
-    // First, add the authenticated user as admin using their Firebase Auth UID
-    membersObj[userId] = 'admin';
-    
-    // Find the current user in the members array or use fallback
-    const currentUserMember = groupData.members.find(member => member.id === userId);
-    memberNames[userId] = currentUserMember?.name || 'Current User';
-    memberEmails[userId] = currentUserMember?.email || '';
-    joinedAt[userId] = serverTimestamp();
-    
-    // Add other members (only those who are not the current user)
-    groupData.members.forEach(member => {
-      if (member.id !== userId && member.email) {
-        // For other members, use their actual Firebase Auth UID if available
-        // Otherwise use a temporary ID that will be replaced when they join
-        const memberId = member.id || crypto.randomUUID();
-        membersObj[memberId] = member.role || 'member';
-        memberNames[memberId] = member.name;
-        memberEmails[memberId] = member.email;
-        joinedAt[memberId] = serverTimestamp();
-      }
-    });
+    // Transform members array to object for Firestore rules
+    const membersObj = groupData.members.reduce((acc, member) => {
+      acc[member.id] = member.id === userId ? 'admin' : 'member';
+      return acc;
+    }, {} as Record<string, string>);
+
+    // Create member names and emails objects
+    const memberNames = groupData.members.reduce((acc, member) => {
+      acc[member.id] = member.name;
+      return acc;
+    }, {} as Record<string, string>);
+
+    const memberEmails = groupData.members.reduce((acc, member) => {
+      acc[member.id] = member.email;
+      return acc;
+    }, {} as Record<string, string>);
+
+    const joinedAt = groupData.members.reduce((acc, member) => {
+      acc[member.id] = serverTimestamp();
+      return acc;
+    }, {} as Record<string, any>);
 
     const firestoreGroup = {
-      name: groupData.name,
-      description: groupData.description,
+      ...groupData,
       members: membersObj,
       memberNames,
       memberEmails,
       joinedAt,
       createdAt: serverTimestamp(),
-      createdBy: userId, // Use the same Firebase Auth UID as in members
-      groupType: groupData.groupType || 'private',
-      inviteCode: groupData.inviteCode || crypto.randomUUID(),
-      settings: groupData.settings || {
-        currency: 'USD',
-        simplifyDebts: true,
-        notifications: true,
-        recurringBills: false,
-      },
-      tags: groupData.tags || [],
-      location: groupData.location || '',
-      isArchived: groupData.isArchived || false,
-      photo: groupData.photo,
-      coverImage: groupData.coverImage,
+      createdBy: userId,
     };
 
-    console.log('Creating group with consistent data:', {
-      createdBy: userId,
-      membersKeys: Object.keys(membersObj),
-      adminUserId: userId
-    });
-    
+    console.log('Creating group with data:', firestoreGroup);
     const docRef = await addDoc(collection(db, 'groups'), firestoreGroup);
     
+    // Return the complete group object with the generated ID
     return {
       id: docRef.id,
       ...groupData,
       createdAt: new Date(),
-      createdBy: userId, // Ensure consistency
-      members: groupData.members.map(member => 
-        member.id === userId 
-          ? { ...member, role: 'admin' as const }
-          : member
-      ),
     };
   } catch (error) {
     console.error('Error creating group:', error);
@@ -114,7 +82,6 @@ export const updateGroup = async (groupId: string, updates: Partial<Group>) => {
 
 export const getUserGroups = async (userId: string) => {
   try {
-    console.log('Fetching groups for user:', userId);
     const groupsRef = collection(db, 'groups');
     const q = query(
       groupsRef,
@@ -124,14 +91,10 @@ export const getUserGroups = async (userId: string) => {
     const querySnapshot = await getDocs(q);
     const groups: Group[] = [];
     
-    console.log('Found groups:', querySnapshot.size);
-    
     querySnapshot.forEach((doc) => {
       const data = doc.data();
-      console.log('Processing group:', doc.id, data);
-      
-      // Transform members object back to array - handle both old and new format
-      const membersArray = Object.keys(data.members || {}).map(memberId => ({
+      // Transform members object back to array
+      const membersArray = Object.keys(data.members).map(memberId => ({
         id: memberId,
         name: data.memberNames?.[memberId] || 'Unknown',
         email: data.memberEmails?.[memberId] || '',
@@ -139,31 +102,14 @@ export const getUserGroups = async (userId: string) => {
         joinedAt: data.joinedAt?.[memberId]?.toDate() || new Date(),
       }));
 
-      const group: Group = {
+      groups.push({
         id: doc.id,
-        name: data.name || 'Unnamed Group',
-        description: data.description || '',
+        ...data,
         members: membersArray,
         createdAt: data.createdAt?.toDate() || new Date(),
-        groupType: data.groupType || 'private',
-        inviteCode: data.inviteCode || '',
-        settings: data.settings || {
-          currency: 'USD',
-          simplifyDebts: true,
-          notifications: true,
-          recurringBills: false,
-        },
-        tags: data.tags || [],
-        location: data.location || '',
-        isArchived: data.isArchived || false,
-        photo: data.photo,
-        coverImage: data.coverImage,
-      };
-
-      groups.push(group);
+      } as Group);
     });
     
-    console.log('Processed groups:', groups.length);
     return groups;
   } catch (error) {
     console.error('Error fetching groups:', error);
@@ -254,7 +200,6 @@ export const getGroupExpenses = async (groupId: string) => {
 
 // Real-time listeners
 export const subscribeToUserGroups = (userId: string, callback: (groups: Group[]) => void) => {
-  console.log('Setting up groups subscription for user:', userId);
   const groupsRef = collection(db, 'groups');
   const q = query(
     groupsRef,
@@ -262,13 +207,9 @@ export const subscribeToUserGroups = (userId: string, callback: (groups: Group[]
   );
   
   return onSnapshot(q, (snapshot) => {
-    console.log('Groups snapshot received, size:', snapshot.size);
     const groups: Group[] = [];
-    
     snapshot.forEach((doc) => {
       const data = doc.data();
-      console.log('Processing group from subscription:', doc.id, data);
-      
       // Transform members object back to array
       const membersArray = Object.keys(data.members || {}).map(memberId => ({
         id: memberId,
@@ -278,31 +219,15 @@ export const subscribeToUserGroups = (userId: string, callback: (groups: Group[]
         joinedAt: data.joinedAt?.[memberId]?.toDate() || new Date(),
       }));
 
-      const group: Group = {
+      groups.push({
         id: doc.id,
-        name: data.name || 'Unnamed Group',
-        description: data.description || '',
+        ...data,
         members: membersArray,
         createdAt: data.createdAt?.toDate() || new Date(),
-        groupType: data.groupType || 'private',
-        inviteCode: data.inviteCode || '',
-        settings: data.settings || {
-          currency: 'USD',
-          simplifyDebts: true,
-          notifications: true,
-          recurringBills: false,
-        },
-        tags: data.tags || [],
-        location: data.location || '',
-        isArchived: data.isArchived || false,
-        photo: data.photo,
-        coverImage: data.coverImage,
-      };
-
-      groups.push(group);
+      } as Group);
     });
     
-    console.log('Firebase groups subscription updated with groups:', groups.length);
+    console.log('Firebase groups subscription updated:', groups);
     callback(groups);
   }, (error) => {
     console.error('Error in groups subscription:', error);

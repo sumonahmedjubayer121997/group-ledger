@@ -20,7 +20,6 @@ const Index = () => {
   const [showGroupForm, setShowGroupForm] = useState(false);
   const [showExpenseForm, setShowExpenseForm] = useState(false);
   const [showUserProfile, setShowUserProfile] = useState(false);
-  const [activeTab, setActiveTab] = useState("overview");
 
   // Initialize Firebase sync when user is authenticated
   useEffect(() => {
@@ -37,16 +36,6 @@ const Index = () => {
     } catch (error) {
       console.error('Error logging out:', error);
     }
-  };
-
-  const handleNewGroupClick = () => {
-    console.log('New Group button clicked - opening group form');
-    setShowGroupForm(true);
-  };
-
-  const handleCloseGroupForm = () => {
-    console.log('Closing group form');
-    setShowGroupForm(false);
   };
 
   if (showUserProfile) {
@@ -89,7 +78,7 @@ const Index = () => {
               Profile
             </Button>
             <Button
-              onClick={handleNewGroupClick}
+              onClick={() => setShowGroupForm(true)}
               className="bg-blue-600 hover:bg-blue-700"
             >
               <Plus className="h-4 w-4 mr-2" />
@@ -122,11 +111,11 @@ const Index = () => {
 
         {/* Debug info */}
         <div className="mb-4 text-sm text-gray-600">
-          Groups: {groups.length} | Expenses: {expenses.length} | User: {user?.uid} | Show Form: {showGroupForm ? 'true' : 'false'}
+          Groups: {groups.length} | Expenses: {expenses.length} | User: {user?.uid}
         </div>
 
         {/* Main Content */}
-        <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
+        <Tabs defaultValue="overview" className="space-y-6">
           <TabsList className="grid w-full grid-cols-4">
             <TabsTrigger value="overview">Overview</TabsTrigger>
             <TabsTrigger value="groups">Groups</TabsTrigger>
@@ -204,11 +193,13 @@ const Index = () => {
         </Tabs>
       </div>
 
-      {/* Modals - Always render at the end */}
-      <GroupForm 
-        isOpen={showGroupForm} 
-        onClose={handleCloseGroupForm} 
-      />
+      {/* Modals */}
+      {showGroupForm && (
+        <GroupForm 
+          isOpen={showGroupForm} 
+          onClose={() => setShowGroupForm(false)} 
+        />
+      )}
       {showExpenseForm && (
         <ExpenseForm 
           isOpen={showExpenseForm} 

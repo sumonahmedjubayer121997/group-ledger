@@ -1,4 +1,3 @@
-
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import { 
@@ -9,7 +8,6 @@ import {
   deleteExpense as deleteExpenseFirebase,
   subscribeToUserGroups,
   subscribeToGroupExpenses,
-  getUserGroups,
   addMemberToGroup as addMemberToGroupFirebase,
   removeMemberFromGroup as removeMemberFromGroupFirebase,
 } from '@/services/firebaseService';
@@ -112,7 +110,7 @@ interface ExpenseStore {
   currentUserId: string | null;
   
   // Firebase integration methods
-  initializeFirebaseSync: (userId: string) => Promise<void>;
+  initializeFirebaseSync: (userId: string) => void;
   cleanup: () => void;
   
   // Updated methods for Firebase
@@ -163,84 +161,63 @@ export const useExpenseStore = create<ExpenseStore>()(
         isInitialized: false,
         currentUserId: null,
         
-        initializeFirebaseSync: async (userId: string) => {
+        initializeFirebaseSync: (userId: string) => {
           const { currentUserId, isInitialized } = get();
           
-          console.log('initializeFirebaseSync called with userId:', userId);
-          console.log('Current state - isInitialized:', isInitialized, 'currentUserId:', currentUserId);
+          // Don't re-initialize if already initialized for the same user
+          if (isInitialized && currentUserId === userId) {
+            console.log('Firebase sync already initialized for user:', userId);
+            return;
+          }
           
-          // Always initialize if user changed or not initialized
-          if (!isInitialized || currentUserId !== userId) {
-            console.log('Initializing Firebase sync for user:', userId);
+          console.log('Initializing Firebase sync for user:', userId);
+          
+          // Clean up existing subscriptions first
+          if (groupsUnsubscriber) {
+            groupsUnsubscriber();
+            groupsUnsubscriber = null;
+          }
+          expenseUnsubscribers.forEach(unsubscribe => unsubscribe());
+          expenseUnsubscribers.clear();
+          
+          set({ 
+            loading: true, 
+            error: null, 
+            currentUserId: userId,
+            isInitialized: true
+          });
+          
+          // Subscribe to user's groups
+          groupsUnsubscriber = subscribeToUserGroups(userId, (groups) => {
+            console.log('Groups updated from Firebase:', groups.length, 'groups');
+            set({ groups, loading: false });
             
-            // Clean up existing subscriptions first
-            if (groupsUnsubscriber) {
-              console.log('Cleaning up existing group subscription');
-              groupsUnsubscriber();
-              groupsUnsubscriber = null;
-            }
-            expenseUnsubscribers.forEach(unsubscribe => unsubscribe());
-            expenseUnsubscribers.clear();
-            
-            set({ 
-              loading: true, 
-              error: null, 
-              currentUserId: userId,
-              isInitialized: true
+            // Clean up old expense subscriptions for groups that no longer exist
+            const currentGroupIds = new Set(groups.map(g => g.id));
+            expenseUnsubscribers.forEach((unsubscribe, groupId) => {
+              if (!currentGroupIds.has(groupId)) {
+                unsubscribe();
+                expenseUnsubscribers.delete(groupId);
+              }
             });
             
-            try {
-              // First, try to get initial groups data
-              console.log('Fetching initial groups data...');
-              const initialGroups = await getUserGroups(userId);
-              console.log('Initial groups fetched:', initialGroups.length);
-              
-              // Set initial groups
-              set({ groups: initialGroups });
-              
-              // Then set up real-time subscription
-              console.log('Setting up real-time subscription...');
-              groupsUnsubscriber = subscribeToUserGroups(userId, (groups) => {
-                console.log('Groups updated from Firebase subscription:', groups.length, 'groups');
-                set({ groups, loading: false });
-                
-                // Clean up old expense subscriptions for groups that no longer exist
-                const currentGroupIds = new Set(groups.map(g => g.id));
-                expenseUnsubscribers.forEach((unsubscribe, groupId) => {
-                  if (!currentGroupIds.has(groupId)) {
-                    console.log('Cleaning up expense subscription for removed group:', groupId);
-                    unsubscribe();
-                    expenseUnsubscribers.delete(groupId);
-                  }
+            // Subscribe to expenses for each group
+            groups.forEach(group => {
+              // Only subscribe if we don't already have a subscription for this group
+              if (!expenseUnsubscribers.has(group.id)) {
+                const expensesUnsubscriber = subscribeToGroupExpenses(group.id, (expenses) => {
+                  console.log('Expenses updated for group:', group.id, expenses.length, 'expenses');
+                  set(state => ({
+                    expenses: [
+                      ...state.expenses.filter(e => e.groupId !== group.id),
+                      ...expenses
+                    ]
+                  }));
                 });
-                
-                // Subscribe to expenses for each group
-                groups.forEach(group => {
-                  // Only subscribe if we don't already have a subscription for this group
-                  if (!expenseUnsubscribers.has(group.id)) {
-                    console.log('Setting up expense subscription for group:', group.id);
-                    const expensesUnsubscriber = subscribeToGroupExpenses(group.id, (expenses) => {
-                      console.log('Expenses updated for group:', group.id, expenses.length, 'expenses');
-                      set(state => ({
-                        expenses: [
-                          ...state.expenses.filter(e => e.groupId !== group.id),
-                          ...expenses
-                        ]
-                      }));
-                    });
-                    expenseUnsubscribers.set(group.id, expensesUnsubscriber);
-                  }
-                });
-              });
-              
-              set({ loading: false });
-            } catch (error) {
-              console.error('Error initializing Firebase sync:', error);
-              set({ error: 'Failed to initialize Firebase sync', loading: false });
-            }
-          } else {
-            console.log('Firebase sync already initialized for user:', userId);
-          }
+                expenseUnsubscribers.set(group.id, expensesUnsubscriber);
+              }
+            });
+          });
         },
         
         cleanup: () => {
