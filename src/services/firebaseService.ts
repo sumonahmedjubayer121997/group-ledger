@@ -13,11 +13,12 @@ import {
   serverTimestamp,
   arrayUnion,
   arrayRemove,
-  setDoc
+  setDoc,
+  deleteField
 } from 'firebase/firestore';
+import { User } from 'firebase/auth';
 import { db } from '@/lib/firebase';
 import { Group, Expense, Member, Settlement } from '@/stores/expenseStore';
-import { deleteField } from 'firebase/firestore';
 
 // User Profile Interface
 export interface UserProfile {
@@ -171,9 +172,9 @@ console.log("Merging temp user for:", realUser.email, realUser.uid);
       // ✅ Merge user data
       await updateDoc(groupRef, {
         [`users.${userId}`]: {
-          ...tempUserData,
+          ...(tempUserData as any),
           isTemporary: false,
-          joinedAt: tempUserData.joinedAt || serverTimestamp(),
+          joinedAt: (tempUserData as any).joinedAt || serverTimestamp(),
         },
         [`users.${tempId}`]: deleteField(),
       });
@@ -187,14 +188,14 @@ console.log("Merging temp user for:", realUser.email, realUser.uid);
 
       // 🔄 Subcollections update
       await setDoc(doc(db, 'groups', groupId, 'members', userId), {
-        role: tempUserData.role,
-        joinedAt: tempUserData.joinedAt || serverTimestamp(),
+        role: (tempUserData as any).role,
+        joinedAt: (tempUserData as any).joinedAt || serverTimestamp(),
       });
 
       await setDoc(doc(db, 'users', userId, 'groups', groupId), {
         groupId,
-        role: tempUserData.role,
-        joinedAt: tempUserData.joinedAt || serverTimestamp(),
+        role: (tempUserData as any).role,
+        joinedAt: (tempUserData as any).joinedAt || serverTimestamp(),
       });
 
       console.log(`✔️ Merged temp user ${tempId} → real user ${userId}`);
@@ -582,6 +583,11 @@ export const addMemberToGroup = async (groupId: string, member: Member, userId: 
         email: member.email,
         name: member.name,
         verified: false,
+        preferences: {
+          currency: 'USD',
+          theme: 'light',
+          language: 'en',
+        },
       });
       userProfile = await getUserProfile(userIdToUse);
     }
