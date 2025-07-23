@@ -35,7 +35,7 @@ export const GroupSettings: React.FC<GroupSettingsProps> = ({ group }) => {
       description,
       location: location || undefined,
       tags: tags ? tags.split(',').map(tag => tag.trim()).filter(Boolean) : undefined,
-      groupType,
+      groupType: groupType as 'private' | 'public',
       settings: {
         currency,
         simplifyDebts,
@@ -50,14 +50,19 @@ export const GroupSettings: React.FC<GroupSettingsProps> = ({ group }) => {
     });
   };
 
-  const currencies = [
+  const validCurrencies = [
     { value: 'USD', label: '$ USD' },
     { value: 'EUR', label: '€ EUR' },
     { value: 'GBP', label: '£ GBP' },
     { value: 'CAD', label: '$ CAD' },
     { value: 'AUD', label: '$ AUD' },
     { value: 'JPY', label: '¥ JPY' },
-  ].filter(curr => curr.value && curr.value.trim() !== ''); // Filter out any empty values
+  ].filter(curr => curr.value && curr.value.trim() !== '');
+
+  const validGroupTypes = [
+    { value: 'private', label: 'Private (Invite Only)' },
+    { value: 'public', label: 'Public (Join with link)' },
+  ].filter(type => type.value && type.value.trim() !== '');
 
   return (
     <div className="space-y-6">
@@ -118,13 +123,16 @@ export const GroupSettings: React.FC<GroupSettingsProps> = ({ group }) => {
 
             <div>
               <Label htmlFor="group-type">Group Type</Label>
-              <Select value={groupType} onValueChange={(value: 'private' | 'public') => setGroupType(value)}>
+              <Select value={groupType} onValueChange={(value) => setGroupType(value)}>
                 <SelectTrigger>
                   <SelectValue placeholder="Select group type" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="private">Private (Invite Only)</SelectItem>
-                  <SelectItem value="public">Public (Join with link)</SelectItem>
+                  {validGroupTypes.map(type => (
+                    <SelectItem key={type.value} value={type.value}>
+                      {type.label}
+                    </SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
             </div>
@@ -141,7 +149,7 @@ export const GroupSettings: React.FC<GroupSettingsProps> = ({ group }) => {
                   <SelectValue placeholder="Select currency" />
                 </SelectTrigger>
                 <SelectContent>
-                  {currencies.map(curr => (
+                  {validCurrencies.map(curr => (
                     <SelectItem key={curr.value} value={curr.value}>
                       {curr.label}
                     </SelectItem>

@@ -16,12 +16,12 @@ interface SettlementDialogProps {
   children: React.ReactNode;
 }
 
-const paymentMethods = [
+const validPaymentMethods = [
   { id: 'cash', label: 'Cash', icon: Banknote },
   { id: 'bank_transfer', label: 'Bank Transfer', icon: CreditCard },
   { id: 'paypal', label: 'PayPal', icon: DollarSign },
   { id: 'venmo', label: 'Venmo/UPI', icon: Smartphone },
-].filter(method => method.id && method.id.trim() !== ''); // Filter out any empty values
+].filter(method => method.id && method.id.trim() !== '' && method.label && method.label.trim() !== '');
 
 export const SettlementDialog: React.FC<SettlementDialogProps> = ({ balance, children }) => {
   const [open, setOpen] = useState(false);
@@ -135,7 +135,7 @@ export const SettlementDialog: React.FC<SettlementDialogProps> = ({ balance, chi
             <Label>Payment Method</Label>
             <RadioGroup value={paymentMethod} onValueChange={setPaymentMethod}>
               <div className="grid grid-cols-2 gap-3">
-                {paymentMethods.map((method) => {
+                {validPaymentMethods.map((method) => {
                   const Icon = method.icon;
                   return (
                     <div key={method.id} className="flex items-center space-x-2">
