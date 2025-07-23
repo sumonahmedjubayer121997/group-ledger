@@ -338,7 +338,8 @@ export const LandingPage = ({ onGetStarted }: LandingPageProps) => {
           </div>
           
           <div className="border-t border-gray-800 mt-8 pt-8 text-center text-gray-400">
-            <p>&copy; 2024 SplitWize. All rights reserved.</p>
+            <p>&copy; 2025 SplitWize. Developed with ❤️ by
+ <a href="sumonahmed.info">Sumon Ahmed</a> </p>
           </div>
         </div>
       </footer>

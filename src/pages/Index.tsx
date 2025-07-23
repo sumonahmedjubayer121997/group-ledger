@@ -107,13 +107,7 @@ const Index = () => {
             <p className="text-gray-600">Split expenses with friends and family</p>
           </div>
           <div className="flex items-center gap-3">
-            <Button
-              onClick={() => setShowLanding(true)}
-              variant="outline"
-              size="sm"
-            >
-              Landing Page
-            </Button>
+            
             <Button
               onClick={() => setShowUserProfile(true)}
               variant="outline"
