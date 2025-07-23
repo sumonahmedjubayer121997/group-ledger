@@ -1,9 +1,8 @@
-
 import { initializeApp } from 'firebase/app';
 import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut, updateProfile, Auth, User } from "firebase/auth";
 import { getFirestore, collection, addDoc, getDocs, query, where, doc, deleteDoc, updateDoc, Firestore, onSnapshot, Timestamp, setDoc } from 'firebase/firestore';
 import { FirebaseOptions } from '@firebase/app';
-import { Expense, Group, UserProfile } from '@/types';
+import { FirebaseExpense, FirebaseGroup, UserProfile } from '@/types';
 
 const firebaseConfig: FirebaseOptions = {
   apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY,
@@ -94,7 +93,7 @@ const mergeTemporaryUserWithRealUser = async (user: User) => {
 };
 
 // Group functions
-const createGroup = async (groupData: Omit<Group, 'id' | 'createdAt'>, userId: string): Promise<Group> => {
+const createGroup = async (groupData: Omit<FirebaseGroup, 'id' | 'createdAt'>, userId: string): Promise<FirebaseGroup> => {
   try {
     const group = {
       ...groupData,
@@ -126,7 +125,7 @@ const addGroup = async (userId: string, groupName: string) => {
   }
 };
 
-const getGroups = async (userId: string): Promise<Group[]> => {
+const getGroups = async (userId: string): Promise<FirebaseGroup[]> => {
   const q = query(collection(db, "groups"), where("members", "array-contains", userId));
   const querySnapshot = await getDocs(q);
   return querySnapshot.docs.map(doc => ({
@@ -136,14 +135,15 @@ const getGroups = async (userId: string): Promise<Group[]> => {
     members: doc.data().members,
     createdAt: convertTimestamp(doc.data().createdAt),
     description: doc.data().description,
-  })) as Group[];
+    settings: doc.data().settings,
+  })) as FirebaseGroup[];
 };
 
-const getUserGroups = async (userId: string): Promise<Group[]> => {
+const getUserGroups = async (userId: string): Promise<FirebaseGroup[]> => {
   return getGroups(userId);
 };
 
-const updateGroup = async (groupId: string, updates: Partial<Group>) => {
+const updateGroup = async (groupId: string, updates: Partial<FirebaseGroup>) => {
   try {
     const groupDocRef = doc(db, "groups", groupId);
     await updateDoc(groupDocRef, updates);
@@ -199,7 +199,7 @@ const removeMemberFromGroup = async (groupId: string, memberId: string) => {
 };
 
 // Subscription functions
-const subscribeToUserGroups = (userId: string, callback: (groups: Group[]) => void) => {
+const subscribeToUserGroups = (userId: string, callback: (groups: FirebaseGroup[]) => void) => {
   const q = query(collection(db, "groups"), where("members", "array-contains", userId));
   
   return onSnapshot(q, (querySnapshot) => {
@@ -207,13 +207,13 @@ const subscribeToUserGroups = (userId: string, callback: (groups: Group[]) => vo
       id: doc.id,
       ...doc.data(),
       createdAt: convertTimestamp(doc.data().createdAt),
-    })) as Group[];
+    })) as FirebaseGroup[];
     
     callback(groups);
   });
 };
 
-const subscribeToGroupExpenses = (groupId: string, callback: (expenses: Expense[]) => void) => {
+const subscribeToGroupExpenses = (groupId: string, callback: (expenses: FirebaseExpense[]) => void) => {
   const q = query(collection(db, "expenses"), where("groupId", "==", groupId));
   
   return onSnapshot(q, (querySnapshot) => {
@@ -221,14 +221,14 @@ const subscribeToGroupExpenses = (groupId: string, callback: (expenses: Expense[
       id: doc.id,
       ...doc.data(),
       createdAt: convertTimestamp(doc.data().createdAt),
-    })) as Expense[];
+    })) as FirebaseExpense[];
     
     callback(expenses);
   });
 };
 
 // Expense functions
-const createExpense = async (expenseData: Omit<Expense, 'id' | 'createdAt'>, userId: string): Promise<Expense> => {
+const createExpense = async (expenseData: Omit<FirebaseExpense, 'id' | 'createdAt'>, userId: string): Promise<FirebaseExpense> => {
   try {
     const expense = {
       ...expenseData,
@@ -261,7 +261,7 @@ const addExpense = async (groupId: string, description: string, amount: number, 
   }
 };
 
-const getExpenses = async (groupId: string): Promise<Expense[]> => {
+const getExpenses = async (groupId: string): Promise<FirebaseExpense[]> => {
   const q = query(collection(db, "expenses"), where("groupId", "==", groupId));
   const querySnapshot = await getDocs(q);
   return querySnapshot.docs.map(doc => ({
@@ -272,10 +272,11 @@ const getExpenses = async (groupId: string): Promise<Expense[]> => {
     paidBy: doc.data().paidBy,
     splitBetween: doc.data().splitBetween,
     createdAt: convertTimestamp(doc.data().createdAt),
-  })) as Expense[];
+    category: doc.data().category,
+  })) as FirebaseExpense[];
 };
 
-const updateExpense = async (groupId: string, expenseId: string, updates: Partial<Expense>) => {
+const updateExpense = async (groupId: string, expenseId: string, updates: Partial<FirebaseExpense>) => {
   try {
     const expenseDocRef = doc(db, "expenses", expenseId);
     await updateDoc(expenseDocRef, updates);
@@ -322,4 +323,4 @@ export {
   updateExpense,
 };
 
-export type { UserProfile, Expense, Group };
+export type { UserProfile, FirebaseExpense as Expense, FirebaseGroup as Group };

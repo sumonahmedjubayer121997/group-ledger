@@ -19,7 +19,8 @@ export interface UserProfile {
   verified?: boolean;
 }
 
-export interface Expense {
+// Firebase Expense type (what's stored in Firestore)
+export interface FirebaseExpense {
   id: string;
   groupId: string;
   description: string;
@@ -31,7 +32,8 @@ export interface Expense {
   updatedAt?: Date;
 }
 
-export interface Group {
+// Firebase Group type (what's stored in Firestore)
+export interface FirebaseGroup {
   id: string;
   name: string;
   description?: string;
@@ -45,3 +47,7 @@ export interface Group {
     notifications: boolean;
   };
 }
+
+// Re-export for compatibility
+export type Expense = FirebaseExpense;
+export type Group = FirebaseGroup;
