@@ -45,6 +45,7 @@ export const SettlementDialog: React.FC<SettlementDialogProps> = ({ balance, chi
       notes,
       referenceId,
       date: new Date(),
+      status: 'completed'
     });
 
     toast({

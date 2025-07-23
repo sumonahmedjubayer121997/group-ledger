@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
@@ -112,6 +113,9 @@ membersWithIds.unshift({
       description: formData.description?.trim() || '',
       members: membersWithIds,
       createdAt: new Date(),
+      createdBy: user.uid,
+      photo: '',
+      coverImage: '',
       groupType: 'private',
       inviteCode: crypto.randomUUID(),
       settings: {
@@ -120,7 +124,17 @@ membersWithIds.unshift({
         notifications: true,
         recurringBills: false,
       },
+      tags: [],
+      location: '',
       isArchived: false,
+      memberNames: membersWithIds.reduce((acc, member) => {
+        acc[member.id] = member.name;
+        return acc;
+      }, {} as Record<string, string>),
+      memberEmails: membersWithIds.reduce((acc, member) => {
+        acc[member.id] = member.email;
+        return acc;
+      }, {} as Record<string, string>),
     };
 
     try {

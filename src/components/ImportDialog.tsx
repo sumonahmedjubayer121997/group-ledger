@@ -198,7 +198,8 @@ export const ImportDialog: React.FC<ImportDialogProps> = ({ children }) => {
           groupId: selectedGroup,
           category: row.category,
           date: new Date(row.date),
-          splitType: 'equal'
+          splitType: 'equal',
+          splitData: {}
         }, user.uid);
 
         successCount++;
