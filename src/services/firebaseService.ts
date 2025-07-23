@@ -1,4 +1,3 @@
-
 import { 
   collection, 
   doc, 
@@ -27,13 +26,33 @@ export const createGroup = async (groupData: Omit<Group, 'id'>, userId: string) 
       return acc;
     }, {} as Record<string, string>);
 
+    // Create member names and emails objects
+    const memberNames = groupData.members.reduce((acc, member) => {
+      acc[member.id] = member.name;
+      return acc;
+    }, {} as Record<string, string>);
+
+    const memberEmails = groupData.members.reduce((acc, member) => {
+      acc[member.id] = member.email;
+      return acc;
+    }, {} as Record<string, string>);
+
+    const joinedAt = groupData.members.reduce((acc, member) => {
+      acc[member.id] = serverTimestamp();
+      return acc;
+    }, {} as Record<string, any>);
+
     const firestoreGroup = {
       ...groupData,
       members: membersObj,
+      memberNames,
+      memberEmails,
+      joinedAt,
       createdAt: serverTimestamp(),
       createdBy: userId,
     };
 
+    console.log('Creating group with data:', firestoreGroup);
     const docRef = await addDoc(collection(db, 'groups'), firestoreGroup);
     return { id: docRef.id, ...groupData };
   } catch (error) {
@@ -96,14 +115,28 @@ export const getUserGroups = async (userId: string) => {
 export const createExpense = async (expenseData: Omit<Expense, 'id'>, userId: string) => {
   try {
     const expenseRef = collection(db, 'groups', expenseData.groupId, 'expenses');
-    const firestoreExpense = {
-      ...expenseData,
+    
+    // Clean the expense data to remove undefined fields
+    const cleanExpenseData = {
+      description: expenseData.description,
+      amount: expenseData.amount,
+      paidBy: expenseData.paidBy,
+      splitAmong: expenseData.splitAmong,
+      groupId: expenseData.groupId,
+      category: expenseData.category,
+      date: expenseData.date,
+      splitType: expenseData.splitType,
       userId,
       createdAt: serverTimestamp(),
-      date: expenseData.date,
     };
 
-    const docRef = await addDoc(expenseRef, firestoreExpense);
+    // Only add splitData if it's not undefined and not empty
+    if (expenseData.splitData && Object.keys(expenseData.splitData).length > 0) {
+      (cleanExpenseData as any).splitData = expenseData.splitData;
+    }
+
+    console.log('Creating expense with data:', cleanExpenseData);
+    const docRef = await addDoc(expenseRef, cleanExpenseData);
     return { id: docRef.id, ...expenseData };
   } catch (error) {
     console.error('Error creating expense:', error);
