@@ -28,7 +28,7 @@ export const ProfileFinancialSummary: React.FC<ProfileFinancialSummaryProps> = (
     }).format(Math.abs(amount));
   };
 
-  const userExpenses = expenses.filter(expense => expense.paidBy === user?.uid);
+  const userExpenses = expenses.filter(expense => expense.paidBy.id === user?.uid);
   const totalPaid = userExpenses.reduce((sum, expense) => sum + expense.amount, 0);
 
   // Calculate spending by category

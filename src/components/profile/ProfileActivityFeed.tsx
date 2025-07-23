@@ -26,7 +26,7 @@ export const ProfileActivityFeed: React.FC<ProfileActivityFeedProps> = ({ userPr
   const { user } = useAuth();
   const { expenses, groups } = useExpenseStore();
 
-  const userExpenses = expenses.filter(expense => expense.paidBy === user?.uid);
+  const userExpenses = expenses.filter(expense => expense.paidBy.id === user?.uid);
   const userGroups = groups.filter(group => 
     group.members.some(member => member.id === user?.uid)
   );

@@ -16,7 +16,7 @@ interface ProfileBasicInfoProps {
 export const ProfileBasicInfo: React.FC<ProfileBasicInfoProps> = ({ user, userProfile }) => {
   const { groups, expenses } = useExpenseStore();
 
-  const userExpenses = expenses.filter(expense => expense.paidBy === user.uid);
+  const userExpenses = expenses.filter(expense => expense.paidBy.id === user.uid);
   const totalExpensesAdded = userExpenses.length;
   const totalAmountPaid = userExpenses.reduce((sum, expense) => sum + expense.amount, 0);
 

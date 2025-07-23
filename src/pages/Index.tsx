@@ -17,7 +17,7 @@ import { UserProfile } from "@/components/UserProfile";
 
 const Index = () => {
   const { user, userProfile, logout } = useAuth();
-  const { groups, expenses, selectedGroup, setSelectedGroup } = useExpenseStore();
+  const { groups, expenses, selectedGroup, setSelectedGroup, getBalances } = useExpenseStore();
   const [showGroupForm, setShowGroupForm] = useState(false);
   const [showExpenseForm, setShowExpenseForm] = useState(false);
   const [showUserProfile, setShowUserProfile] = useState(false);
@@ -41,10 +41,15 @@ const Index = () => {
   if (selectedGroup) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-blue-50 to-green-50">
-        <GroupDetailView />
+        <GroupDetailView 
+          group={selectedGroup} 
+          onBack={() => setSelectedGroup(null)} 
+        />
       </div>
     );
   }
+
+  const balances = getBalances();
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-green-50">
@@ -107,7 +112,7 @@ const Index = () => {
 
           <TabsContent value="overview" className="space-y-6">
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              <BalanceCard />
+              <BalanceCard balances={balances} />
               <Card>
                 <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                   <CardTitle className="text-sm font-medium">Total Groups</CardTitle>
@@ -133,11 +138,11 @@ const Index = () => {
                 </CardContent>
               </Card>
             </div>
-            <RecentExpenses />
+            <RecentExpenses expenses={expenses} />
           </TabsContent>
 
           <TabsContent value="groups" className="space-y-6">
-            <GroupList />
+            <GroupList groups={groups} />
           </TabsContent>
 
           <TabsContent value="expenses" className="space-y-6">
@@ -151,12 +156,12 @@ const Index = () => {
                 Add Expense
               </Button>
             </div>
-            <RecentExpenses showAll />
+            <RecentExpenses expenses={expenses} />
           </TabsContent>
 
           <TabsContent value="analytics" className="space-y-6">
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-              <ExpenseChart />
+              <ExpenseChart expenses={expenses} />
               <Card>
                 <CardHeader>
                   <CardTitle className="flex items-center gap-2">
@@ -177,10 +182,16 @@ const Index = () => {
 
       {/* Modals */}
       {showGroupForm && (
-        <GroupForm onClose={() => setShowGroupForm(false)} />
+        <GroupForm 
+          isOpen={showGroupForm} 
+          onClose={() => setShowGroupForm(false)} 
+        />
       )}
       {showExpenseForm && (
-        <ExpenseForm onClose={() => setShowExpenseForm(false)} />
+        <ExpenseForm 
+          isOpen={showExpenseForm} 
+          onClose={() => setShowExpenseForm(false)} 
+        />
       )}
     </div>
   );

@@ -103,6 +103,7 @@ interface ExpenseStore {
   settlements: Settlement[];
   activities: GroupActivity[];
   recurringExpenses: RecurringExpense[];
+  selectedGroup: Group | null;
   loading: boolean;
   error: string | null;
   
@@ -124,9 +125,13 @@ interface ExpenseStore {
   updateExpense: (id: string, expense: Partial<Expense>) => Promise<void>;
   deleteExpense: (id: string, groupId: string) => Promise<void>;
   
+  // Navigation methods
+  setSelectedGroup: (group: Group | null) => void;
+  
   // Keep existing methods unchanged
   getTotalExpenses: () => number;
   getBalances: () => Balance[];
+  calculateBalances: () => Record<string, number>;
   getGroupExpenses: (groupId: string) => Expense[];
   getGroupActivities: (groupId: string) => GroupActivity[];
   getGroupAnalytics: (groupId: string) => any;
@@ -148,6 +153,7 @@ export const useExpenseStore = create<ExpenseStore>()(
         settlements: [],
         activities: [],
         recurringExpenses: [],
+        selectedGroup: null,
         loading: false,
         error: null,
         
@@ -355,6 +361,41 @@ export const useExpenseStore = create<ExpenseStore>()(
             console.error('Error deleting expense:', error);
             set({ error: 'Failed to delete expense', loading: false });
           }
+        },
+
+        setSelectedGroup: (group) => {
+          set({ selectedGroup: group });
+        },
+        
+        calculateBalances: () => {
+          const { expenses, settlements } = get();
+          const balanceMap = new Map<string, number>();
+          
+          // Calculate balances from expenses
+          expenses.forEach((expense) => {
+            const { paidBy, splitAmong, amount, splitType, splitData } = expense;
+            const splitAmount = splitType === 'equal' ? amount / splitAmong.length : 0;
+            
+            splitAmong.forEach((member) => {
+              if (member.id !== paidBy.id) {
+                const owedAmount = splitType === 'equal' ? splitAmount : (splitData?.[member.id] || 0);
+                balanceMap.set(member.id, (balanceMap.get(member.id) || 0) + owedAmount);
+                balanceMap.set(paidBy.id, (balanceMap.get(paidBy.id) || 0) - owedAmount);
+              }
+            });
+          });
+
+          // Subtract settlements from balances
+          settlements.forEach((settlement) => {
+            if (settlement.status === 'confirmed') {
+              const currentBalance = balanceMap.get(settlement.fromMemberId) || 0;
+              balanceMap.set(settlement.fromMemberId, currentBalance - settlement.amount);
+              const toBalance = balanceMap.get(settlement.toMemberId) || 0;
+              balanceMap.set(settlement.toMemberId, toBalance + settlement.amount);
+            }
+          });
+          
+          return Object.fromEntries(balanceMap);
         },
 
         updateMemberRole: (groupId, memberId, role) => {
