@@ -57,7 +57,7 @@ export const GroupSettings: React.FC<GroupSettingsProps> = ({ group }) => {
     { value: 'CAD', label: '$ CAD' },
     { value: 'AUD', label: '$ AUD' },
     { value: 'JPY', label: '¥ JPY' },
-  ];
+  ].filter(curr => curr.value && curr.value.trim() !== ''); // Filter out any empty values
 
   return (
     <div className="space-y-6">
@@ -245,7 +245,7 @@ export const GroupSettings: React.FC<GroupSettingsProps> = ({ group }) => {
             <div className="bg-gray-50 p-4 rounded-lg">
               <Label>Invite Code</Label>
               <div className="flex items-center space-x-2 mt-1">
-                <Input value={group.inviteCode || ''} readOnly className="font-mono" />
+                <Input value={group.inviteCode || 'LOADING'} readOnly className="font-mono" />
                 <Button variant="outline" size="sm">
                   Regenerate
                 </Button>

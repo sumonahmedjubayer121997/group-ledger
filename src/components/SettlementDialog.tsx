@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
@@ -20,7 +21,7 @@ const paymentMethods = [
   { id: 'bank_transfer', label: 'Bank Transfer', icon: CreditCard },
   { id: 'paypal', label: 'PayPal', icon: DollarSign },
   { id: 'venmo', label: 'Venmo/UPI', icon: Smartphone },
-];
+].filter(method => method.id && method.id.trim() !== ''); // Filter out any empty values
 
 export const SettlementDialog: React.FC<SettlementDialogProps> = ({ balance, children }) => {
   const [open, setOpen] = useState(false);
