@@ -1,13 +1,15 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
+import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
+import { Slider } from '@/components/ui/slider';
 import { useExpenseStore, Member } from '@/stores/expenseStore';
-import { Calendar, DollarSign, Users, Tag } from 'lucide-react';
+import { Calendar, DollarSign, Users, Tag, Percent, Calculator } from 'lucide-react';
 
 interface ExpenseFormProps {
   isOpen: boolean;
@@ -33,11 +35,56 @@ export const ExpenseForm: React.FC<ExpenseFormProps> = ({ isOpen, onClose }) => 
     groupId: '',
     category: '',
     date: new Date().toISOString().split('T')[0],
-    splitType: 'equal' as const,
+    splitType: 'equal' as 'equal' | 'exact' | 'percentage',
   });
+  
+  const [splitData, setSplitData] = useState<{ [memberId: string]: number }>({});
+  const [includeSelf, setIncludeSelf] = useState(true);
 
   const selectedGroup = groups.find(g => g.id === formData.groupId);
   const selectedPayer = selectedGroup?.members.find(m => m.id === formData.paidBy);
+  const splitAmong = selectedGroup?.members.filter(m => 
+    includeSelf ? true : m.id !== formData.paidBy
+  ) || [];
+
+  // Initialize split data when group or split type changes
+  useEffect(() => {
+    if (selectedGroup && formData.splitType !== 'equal') {
+      const initialSplitData: { [memberId: string]: number } = {};
+      const memberCount = splitAmong.length;
+      const amount = parseFloat(formData.amount) || 0;
+      
+      if (formData.splitType === 'percentage') {
+        const equalPercentage = memberCount > 0 ? Math.floor(100 / memberCount) : 0;
+        splitAmong.forEach(member => {
+          initialSplitData[member.id] = equalPercentage;
+        });
+      } else if (formData.splitType === 'exact') {
+        const equalAmount = memberCount > 0 ? Number((amount / memberCount).toFixed(2)) : 0;
+        splitAmong.forEach(member => {
+          initialSplitData[member.id] = equalAmount;
+        });
+      }
+      
+      setSplitData(initialSplitData);
+    }
+  }, [formData.groupId, formData.splitType, formData.amount, includeSelf]);
+
+  const updateSplitAmount = (memberId: string, value: number) => {
+    setSplitData(prev => ({ ...prev, [memberId]: value }));
+  };
+
+  const getTotalSplit = () => {
+    return Object.values(splitData).reduce((sum, val) => sum + val, 0);
+  };
+
+  const getRemainingAmount = () => {
+    const total = parseFloat(formData.amount) || 0;
+    if (formData.splitType === 'percentage') {
+      return 100 - getTotalSplit();
+    }
+    return total - getTotalSplit();
+  };
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -48,11 +95,12 @@ export const ExpenseForm: React.FC<ExpenseFormProps> = ({ isOpen, onClose }) => 
       description: formData.description,
       amount: parseFloat(formData.amount),
       paidBy: selectedPayer,
-      splitAmong: selectedGroup.members,
+      splitAmong: splitAmong,
       groupId: formData.groupId,
       category: formData.category,
       date: new Date(formData.date),
       splitType: formData.splitType,
+      splitData: formData.splitType !== 'equal' ? splitData : undefined,
     });
     
     // Reset form
@@ -65,6 +113,8 @@ export const ExpenseForm: React.FC<ExpenseFormProps> = ({ isOpen, onClose }) => 
       date: new Date().toISOString().split('T')[0],
       splitType: 'equal',
     });
+    setSplitData({});
+    setIncludeSelf(true);
     
     onClose();
   };
@@ -170,6 +220,118 @@ export const ExpenseForm: React.FC<ExpenseFormProps> = ({ isOpen, onClose }) => 
                 required
               />
             </div>
+          </div>
+
+          {/* Split Type Selection */}
+          <div className="space-y-4">
+            <Label>How should this be split?</Label>
+            <RadioGroup 
+              value={formData.splitType} 
+              onValueChange={(value: 'equal' | 'exact' | 'percentage') => 
+                setFormData({ ...formData, splitType: value })
+              }
+              className="flex space-x-6"
+            >
+              <div className="flex items-center space-x-2">
+                <RadioGroupItem value="equal" id="equal" />
+                <Label htmlFor="equal" className="flex items-center space-x-2">
+                  <Users className="w-4 h-4" />
+                  <span>Equal Split</span>
+                </Label>
+              </div>
+              <div className="flex items-center space-x-2">
+                <RadioGroupItem value="exact" id="exact" />
+                <Label htmlFor="exact" className="flex items-center space-x-2">
+                  <Calculator className="w-4 h-4" />
+                  <span>Exact Amounts</span>
+                </Label>
+              </div>
+              <div className="flex items-center space-x-2">
+                <RadioGroupItem value="percentage" id="percentage" />
+                <Label htmlFor="percentage" className="flex items-center space-x-2">
+                  <Percent className="w-4 h-4" />
+                  <span>Percentages</span>
+                </Label>
+              </div>
+            </RadioGroup>
+
+            {/* Include/Exclude Self Toggle */}
+            {selectedGroup && formData.paidBy && (
+              <div className="flex items-center space-x-2">
+                <input
+                  type="checkbox"
+                  id="includeSelf"
+                  checked={includeSelf}
+                  onChange={(e) => setIncludeSelf(e.target.checked)}
+                  className="rounded border-input"
+                />
+                <Label htmlFor="includeSelf">
+                  Include {selectedPayer?.name || 'payer'} in the split
+                </Label>
+              </div>
+            )}
+
+            {/* Advanced Split UI */}
+            {formData.splitType !== 'equal' && splitAmong.length > 0 && formData.amount && (
+              <div className="space-y-4 border rounded-lg p-4 bg-secondary/20">
+                <div className="flex justify-between items-center">
+                  <h4 className="font-medium">Split Details</h4>
+                  {formData.splitType === 'percentage' && (
+                    <span className={`text-sm ${getRemainingAmount() === 0 ? 'text-green-600' : 'text-orange-600'}`}>
+                      Remaining: {getRemainingAmount()}%
+                    </span>
+                  )}
+                  {formData.splitType === 'exact' && (
+                    <span className={`text-sm ${Math.abs(getRemainingAmount()) < 0.01 ? 'text-green-600' : 'text-orange-600'}`}>
+                      Remaining: ${getRemainingAmount().toFixed(2)}
+                    </span>
+                  )}
+                </div>
+
+                <div className="space-y-3">
+                  {splitAmong.map((member) => (
+                    <div key={member.id} className="space-y-2">
+                      <div className="flex justify-between items-center">
+                        <Label className="text-sm font-medium">{member.name}</Label>
+                        <span className="text-sm text-muted-foreground">
+                          {formData.splitType === 'percentage' 
+                            ? `${splitData[member.id] || 0}%` 
+                            : `$${(splitData[member.id] || 0).toFixed(2)}`
+                          }
+                        </span>
+                      </div>
+                      
+                      {formData.splitType === 'percentage' ? (
+                        <Slider
+                          value={[splitData[member.id] || 0]}
+                          onValueChange={([value]) => updateSplitAmount(member.id, value)}
+                          max={100}
+                          step={1}
+                          className="w-full"
+                        />
+                      ) : (
+                        <div className="flex items-center space-x-2">
+                          <Slider
+                            value={[splitData[member.id] || 0]}
+                            onValueChange={([value]) => updateSplitAmount(member.id, value)}
+                            max={parseFloat(formData.amount) || 100}
+                            step={0.01}
+                            className="flex-1"
+                          />
+                          <Input
+                            type="number"
+                            step="0.01"
+                            value={splitData[member.id] || 0}
+                            onChange={(e) => updateSplitAmount(member.id, parseFloat(e.target.value) || 0)}
+                            className="w-20 text-xs"
+                          />
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
 
           <div className="flex justify-end space-x-3 pt-4">
