@@ -1,16 +1,17 @@
+
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import { 
   createGroup as createGroupFirebase,
   updateGroup as updateGroupFirebase,
-  addExpense as createExpenseFirebase,
+  createExpense as createExpenseFirebase,
   updateExpense as updateExpenseFirebase,
   deleteExpense as deleteExpenseFirebase,
   subscribeToUserGroups,
   subscribeToGroupExpenses,
   getUserGroups,
-  addUserToGroup as addMemberToGroupFirebase,
-  removeUserFromGroup as removeMemberFromGroupFirebase,
+  addMemberToGroup as addMemberToGroupFirebase,
+  removeMemberFromGroup as removeMemberFromGroupFirebase,
 } from '@/services/firebaseService';
 
 export interface Member {
@@ -252,24 +253,12 @@ export const useExpenseStore = create<ExpenseStore>()(
           expenseUnsubscribers.clear();
           set({ isInitialized: false, currentUserId: null });
         },
-
+        
         addExpense: async (expense, userId) => {
           try {
             set({ loading: true, error: null });
             console.log('Adding expense:', expense);
-            
-            // Convert store expense format to Firebase format
-            const firebaseExpense = {
-              groupId: expense.groupId,
-              description: expense.description,
-              amount: expense.amount,
-              paidBy: expense.paidBy.id, // Convert Member to string ID
-              splitBetween: expense.splitAmong.map(member => member.id), // Convert Member[] to string[]
-              category: expense.category,
-              date: expense.date,
-            };
-            
-            await createExpenseFirebase(firebaseExpense);
+            await createExpenseFirebase(expense, userId);
             console.log('Expense added successfully to Firebase');
             set({ loading: false });
             // Real-time listener will update the state
@@ -279,88 +268,83 @@ export const useExpenseStore = create<ExpenseStore>()(
             throw error;
           }
         },
-
         addGroup: async (group, userId) => {
-          try {
-            set({ loading: true, error: null });
+  try {
+    set({ loading: true, error: null });
 
-            // ✅ Defensive check to ensure members is an array
-            if (!Array.isArray(group.members)) {
-              console.error('❌ group.members must be an array but got:', group.members);
-              throw new Error('Invalid group data: "members" must be an array.');
-            }
+    // ✅ Defensive check to ensure members is an array
+    if (!Array.isArray(group.members)) {
+      console.error('❌ group.members must be an array but got:', group.members);
+      throw new Error('Invalid group data: "members" must be an array.');
+    }
 
-            // ✅ Prepare safe parallel maps for Firebase document
-            const membersMap: Record<string, string> = {};
-            const memberNames: Record<string, string> = {};
-            const memberEmails: Record<string, string> = {};
-            const joinedAt: Record<string, any> = {};
+    // ✅ Prepare safe parallel maps for Firebase document
+    const membersMap: Record<string, string> = {};
+    const memberNames: Record<string, string> = {};
+    const memberEmails: Record<string, string> = {};
+    const joinedAt: Record<string, any> = {};
 
-            group.members.forEach((member) => {
-              const id = member.id?.trim() || crypto.randomUUID();
-              const name = member.name?.trim() || 'Unnamed';
-              const email = member.email?.trim() || 'unknown@example.com';
-              const role = member.role || 'member';
+    group.members.forEach((member) => {
+      const id = member.id?.trim() || crypto.randomUUID();
+      const name = member.name?.trim() || 'Unnamed';
+      const email = member.email?.trim() || 'unknown@example.com';
+      const role = member.role || 'member';
 
-              membersMap[id] = role;
-              memberNames[id] = name;
-              memberEmails[id] = email;
-              joinedAt[id] = new Date(); // optionally use serverTimestamp() here
-            });
+      membersMap[id] = role;
+      memberNames[id] = name;
+      memberEmails[id] = email;
+      joinedAt[id] = new Date(); // optionally use serverTimestamp() here
+    });
 
-            // ✅ Construct the Firestore-friendly group document
-            const groupDoc = {
-              name: group.name.trim(),
-              description: group.description?.trim() || '',
-              groupType: group.groupType || 'private',
-              inviteCode: group.inviteCode || crypto.randomUUID(),
-              createdAt: new Date(),
-              createdBy: userId,
-              isArchived: false,
-              settings: {
-                currency: 'USD',
-                simplifyDebts: true,
-                notifications: true,
-                recurringBills: false,
-                ...group.settings,
-              },
-              members: group.members.map(m => m.id), // Convert to string array for Firebase
-              memberNames,
-              memberEmails,
-              joinedAt,
-            };
+    // ✅ Construct the Firestore-friendly group document
+    const groupDoc = {
+      name: group.name.trim(),
+      description: group.description?.trim() || '',
+      groupType: group.groupType || 'private',
+      inviteCode: group.inviteCode || crypto.randomUUID(),
+      createdAt: new Date(),
+      createdBy: userId,
+      isArchived: false,
+      settings: {
+        currency: 'USD',
+        simplifyDebts: true,
+        notifications: true,
+        recurringBills: false,
+        ...group.settings,
+      },
+      members: group.members, // Pass the original Members array
+      memberNames,
+      memberEmails,
+      joinedAt,
+    };
 
-            // ✅ Call Firebase function to create group
-            const newGroup = await createGroupFirebase(groupDoc);
-            console.log('✅ Group created:', newGroup);
+    // ✅ Call Firebase function to create group
+    const newGroup = await createGroupFirebase(groupDoc, userId);
+    console.log('✅ Group created:', newGroup);
 
-            set({ loading: false });
+    set({ loading: false });
 
-            // ✅ Record group creation activity
-            get().addActivity({
-              type: 'group_updated',
-              userId,
-              userName: group.members[0]?.name || 'Unknown',
-              description: `Created group "${group.name}"`,
-            });
-          } catch (error) {
-            console.error('❌ Failed to create group:', error);
-            set({ error: 'Failed to create group', loading: false });
-            throw error;
-          }
-        },
+    // ✅ Record group creation activity
+    get().addActivity({
+      type: 'group_updated',
+      userId,
+      userName: group.members[0]?.name || 'Unknown',
+      description: `Created group "${group.name}"`,
+    });
+  } catch (error) {
+    console.error('❌ Failed to create group:', error);
+    set({ error: 'Failed to create group', loading: false });
+    throw error;
+  }
+}
+
+       ,
+
 
         updateGroup: async (id, updates) => {
           try {
             set({ loading: true, error: null });
-            // Convert Member[] to string[] if needed
-            const firebaseUpdates: any = { ...updates };
-            if (updates.members && Array.isArray(updates.members)) {
-              firebaseUpdates.members = updates.members.map((member: any) => 
-                typeof member === 'string' ? member : member.id
-              );
-            }
-            await updateGroupFirebase(id, firebaseUpdates);
+            await updateGroupFirebase(id, updates);
             set({ loading: false });
             // Firebase listener will update the state
           } catch (error) {
@@ -372,7 +356,7 @@ export const useExpenseStore = create<ExpenseStore>()(
         addMemberToGroup: async (groupId, member, userId) => {
           try {
             set({ loading: true, error: null });
-            await addMemberToGroupFirebase(groupId, member.id);
+            await addMemberToGroupFirebase(groupId, member, userId);
             set({ loading: false });
             // Firebase listener will update the state
             
@@ -417,23 +401,7 @@ export const useExpenseStore = create<ExpenseStore>()(
             set({ loading: true, error: null });
             const expense = get().expenses.find(e => e.id === id);
             if (expense) {
-              // Convert store expense format to Firebase format
-              const firebaseUpdates: any = { ...updatedExpense };
-              
-              if (updatedExpense.paidBy) {
-                firebaseUpdates.paidBy = typeof updatedExpense.paidBy === 'string' 
-                  ? updatedExpense.paidBy 
-                  : updatedExpense.paidBy.id;
-              }
-              
-              if (updatedExpense.splitAmong) {
-                firebaseUpdates.splitBetween = updatedExpense.splitAmong.map(member => 
-                  typeof member === 'string' ? member : member.id
-                );
-                delete firebaseUpdates.splitAmong;
-              }
-              
-              await updateExpenseFirebase(expense.groupId, id, firebaseUpdates);
+              await updateExpenseFirebase(expense.groupId, id, updatedExpense);
               set({ loading: false });
               // Firebase listener will update the state
               

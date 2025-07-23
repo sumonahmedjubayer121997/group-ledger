@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
@@ -9,8 +8,6 @@ import { useExpenseStore, Member, Group } from '@/stores/expenseStore';
 import { Users, Plus, X } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { findSimilarEmailUIDs } from '@/components/firebaseComponents/FindSimilarUIDs';
-import { v4 as uuidv4 } from 'uuid';
-
 interface GroupFormProps {
   isOpen: boolean;
   onClose: () => void;
@@ -76,31 +73,32 @@ export const GroupForm: React.FC<GroupFormProps> = ({ isOpen, onClose }) => {
 
     const membersWithIds: Member[] = [];
 
-    for (const member of validMembers) {
-      const trimmedEmail = member.email.trim().toLowerCase();
+for (const member of validMembers) {
+  const trimmedEmail = member.email.trim().toLowerCase();
 
-      // Skip current user
-      if (trimmedEmail === currentUserEmail.trim().toLowerCase()) continue;
+  // Skip current user
+  if (trimmedEmail === currentUserEmail.trim().toLowerCase()) continue;
 
-      const similarUsers = await findSimilarEmailUIDs(trimmedEmail);
+  const similarUsers = await findSimilarEmailUIDs(trimmedEmail);
 
-      const matchedUser = similarUsers.length > 0 ? similarUsers[0] : null;
+  const matchedUser = similarUsers.length > 0 ? similarUsers[0] : null;
 
-      membersWithIds.push({
-        id: matchedUser ? matchedUser.uid : uuidv4(),
-        name: member.name.trim(),
-        email: trimmedEmail,
-        role: 'member' as const,
-      });
-    }
+  membersWithIds.push({
+    id: matchedUser ? matchedUser.uid : (typeof crypto?.randomUUID === 'function' ? crypto.randomUUID() : uuidv4()),
+    name: member.name.trim(),
+    email: trimmedEmail,
+    role: 'member' as const,
+  });
+}
 
-    // Add current user (admin) at the beginning
-    membersWithIds.unshift({
-      id: user.uid,
-      name: currentUserName.trim(),
-      email: currentUserEmail.trim().toLowerCase(),
-      role: 'admin',
-    });
+// Add current user (admin) at the beginning
+membersWithIds.unshift({
+  id: user.uid,
+  name: currentUserName.trim(),
+  email: currentUserEmail.trim().toLowerCase(),
+  role: 'admin',
+});
+
 
     if (!Array.isArray(membersWithIds) || membersWithIds.length === 0) {
       alert('At least one valid member is required');
