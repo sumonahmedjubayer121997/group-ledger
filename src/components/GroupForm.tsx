@@ -16,7 +16,7 @@ interface GroupFormProps {
 
 export const GroupForm: React.FC<GroupFormProps> = ({ isOpen, onClose }) => {
   const { addGroup } = useExpenseStore();
-  const { user } = useAuth();
+  const { user, userProfile } = useAuth();
   const [formData, setFormData] = useState({
     name: '',
     description: '',
@@ -43,15 +43,33 @@ export const GroupForm: React.FC<GroupFormProps> = ({ isOpen, onClose }) => {
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     
-    if (!user) return;
+    if (!user || !userProfile) return;
     
     const validMembers = members.filter(m => m.name.trim() && m.email.trim());
-    if (validMembers.length === 0) return;
     
-    const membersWithIds: Member[] = validMembers.map(member => ({
-      ...member,
-      id: crypto.randomUUID(),
-    }));
+    // Create members array with Firebase Auth UIDs
+    const membersWithIds: Member[] = [];
+    
+    // Add the current user as admin using their Firebase Auth UID
+    membersWithIds.push({
+      id: user.uid, // Use Firebase Auth UID
+      name: userProfile.displayName || 'Current User',
+      email: user.email || '',
+      role: 'admin',
+    });
+    
+    // Add other members with generated IDs (these would be replaced with actual UIDs when they join)
+    validMembers.forEach(member => {
+      // Only add if not the current user (to avoid duplicates)
+      if (member.email !== user.email) {
+        membersWithIds.push({
+          id: crypto.randomUUID(), // This will be replaced when they actually join
+          name: member.name,
+          email: member.email,
+          role: 'member',
+        });
+      }
+    });
     
     // Create complete group object with all required properties
     const completeGroup: Omit<Group, 'id'> = {
@@ -69,6 +87,9 @@ export const GroupForm: React.FC<GroupFormProps> = ({ isOpen, onClose }) => {
       },
       isArchived: false,
     };
+    
+    console.log('Creating group with current user UID:', user.uid);
+    console.log('Group members:', membersWithIds);
     
     addGroup(completeGroup, user.uid);
     
@@ -129,6 +150,23 @@ export const GroupForm: React.FC<GroupFormProps> = ({ isOpen, onClose }) => {
             </div>
             
             <div className="space-y-3 max-h-60 overflow-y-auto">
+              {/* Show current user info */}
+              <div className="flex items-center space-x-3 p-3 bg-green-50 rounded-lg border border-green-200">
+                <div className="flex-1 grid grid-cols-2 gap-3">
+                  <Input
+                    value={userProfile?.displayName || 'Current User'}
+                    disabled
+                    className="bg-green-100"
+                  />
+                  <Input
+                    value={user?.email || ''}
+                    disabled
+                    className="bg-green-100"
+                  />
+                </div>
+                <span className="text-sm text-green-600 font-medium">Admin</span>
+              </div>
+              
               {members.map((member, index) => (
                 <div key={index} className="flex items-center space-x-3 p-3 bg-gray-50 rounded-lg">
                   <div className="flex-1 grid grid-cols-2 gap-3">
