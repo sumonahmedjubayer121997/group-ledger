@@ -101,13 +101,13 @@ export const UserProfile: React.FC<UserProfileProps> = ({ onClose }) => {
             </Button>
           </div>
           <div>
-            <h1 className="text-2xl font-bold">{profileData.displayName}</h1>
+            <h1 className="text-2xl font-bold">{(profileData as any).name || (profileData as any).displayName}</h1>
             <p className="text-muted-foreground">{profileData.email}</p>
             <div className="flex items-center gap-2 mt-2">
               <Badge variant="secondary">
                 👤 {profileData.role === 'admin' ? 'Admin' : 'User'}
               </Badge>
-              {profileData.emailVerified && (
+              {((profileData as any).verified || (profileData as any).emailVerified) && (
                 <Badge variant="outline" className="text-green-600">
                   ✅ Verified
                 </Badge>
@@ -152,27 +152,27 @@ export const UserProfile: React.FC<UserProfileProps> = ({ onClose }) => {
         </TabsList>
 
         <TabsContent value="overview" className="space-y-4">
-          <ProfileBasicInfo user={user} userProfile={profileData} />
+          <ProfileBasicInfo user={user} userProfile={profileData as any} />
         </TabsContent>
 
         <TabsContent value="financial" className="space-y-4">
-          <ProfileFinancialSummary userProfile={profileData} />
+          <ProfileFinancialSummary userProfile={profileData as any} />
         </TabsContent>
 
         <TabsContent value="settings" className="space-y-4">
-          <ProfileAccountSettings user={user} userProfile={profileData} />
+          <ProfileAccountSettings user={user} userProfile={profileData as any} />
         </TabsContent>
 
         <TabsContent value="preferences" className="space-y-4">
-          <ProfilePreferences userProfile={profileData} />
+          <ProfilePreferences userProfile={profileData as any} />
         </TabsContent>
 
         <TabsContent value="privacy" className="space-y-4">
-          <ProfilePrivacySecurity user={user} userProfile={profileData} />
+          <ProfilePrivacySecurity user={user} userProfile={profileData as any} />
         </TabsContent>
 
         <TabsContent value="activity" className="space-y-4">
-          <ProfileActivityFeed userProfile={profileData} />
+          <ProfileActivityFeed userProfile={profileData as any} />
         </TabsContent>
       </Tabs>
     </div>

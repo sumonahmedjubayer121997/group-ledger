@@ -312,7 +312,7 @@ export const useExpenseStore = create<ExpenseStore>()(
         recurringBills: false,
         ...group.settings,
       },
-      members: membersMap,
+      members: group.members, // Pass the original Members array
       memberNames,
       memberEmails,
       joinedAt,
