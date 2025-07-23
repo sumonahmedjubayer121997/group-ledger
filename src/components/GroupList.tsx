@@ -7,9 +7,10 @@ import { Users, Calendar, User } from 'lucide-react';
 
 interface GroupListProps {
   groups: Group[];
+  onGroupClick?: (group: Group) => void;
 }
 
-export const GroupList: React.FC<GroupListProps> = ({ groups }) => {
+export const GroupList: React.FC<GroupListProps> = ({ groups, onGroupClick }) => {
   if (groups.length === 0) {
     return (
       <Card className="bg-white shadow-lg border-0">
@@ -46,7 +47,11 @@ export const GroupList: React.FC<GroupListProps> = ({ groups }) => {
       <CardContent>
         <div className="space-y-4">
           {groups.map((group) => (
-            <div key={group.id} className="p-4 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors cursor-pointer">
+            <div 
+              key={group.id} 
+              className="p-4 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors cursor-pointer"
+              onClick={() => onGroupClick?.(group)}
+            >
               <div className="flex items-center justify-between mb-2">
                 <h4 className="font-semibold text-gray-900">{group.name}</h4>
                 <div className="flex -space-x-2">
