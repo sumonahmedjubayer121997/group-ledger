@@ -1,8 +1,9 @@
+
 import { initializeApp } from 'firebase/app';
 import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut, updateProfile, Auth, User } from "firebase/auth";
-import { getFirestore, collection, addDoc, getDocs, query, where, doc, deleteDoc, updateDoc, Firestore } from 'firebase/firestore';
+import { getFirestore, collection, addDoc, getDocs, query, where, doc, deleteDoc, updateDoc, Firestore, onSnapshot, Timestamp, setDoc } from 'firebase/firestore';
 import { FirebaseOptions } from '@firebase/app';
-import { Expense, Group } from '@/types';
+import { Expense, Group, UserProfile } from '@/types';
 
 const firebaseConfig: FirebaseOptions = {
   apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY,
@@ -16,6 +17,14 @@ const firebaseConfig: FirebaseOptions = {
 const app = initializeApp(firebaseConfig);
 const auth: Auth = getAuth(app);
 const db: Firestore = getFirestore(app);
+
+// Helper function to convert Timestamp to Date
+const convertTimestamp = (timestamp: any): Date => {
+  if (timestamp && typeof timestamp.toDate === 'function') {
+    return timestamp.toDate();
+  }
+  return timestamp instanceof Date ? timestamp : new Date(timestamp);
+};
 
 // Authentication functions
 const signUp = (email: string, password: string) => {
@@ -34,13 +43,80 @@ const updateDisplayName = (user: User, displayName: string) => {
   return updateProfile(user, { displayName: displayName });
 };
 
-// Firestore functions
+// User Profile functions
+const createUserProfile = async (userProfile: Omit<UserProfile, 'createdAt'> & { createdAt?: Date }): Promise<UserProfile> => {
+  try {
+    const profileWithDate = {
+      ...userProfile,
+      createdAt: userProfile.createdAt || new Date(),
+    };
+    
+    await setDoc(doc(db, "users", userProfile.uid), profileWithDate);
+    return profileWithDate;
+  } catch (error) {
+    console.error("Error creating user profile: ", error);
+    throw error;
+  }
+};
+
+const getUserProfile = async (uid: string): Promise<UserProfile | null> => {
+  try {
+    const userDoc = await getDocs(query(collection(db, "users"), where("uid", "==", uid)));
+    if (!userDoc.empty) {
+      const userData = userDoc.docs[0].data();
+      return {
+        ...userData,
+        createdAt: convertTimestamp(userData.createdAt),
+        lastLoginAt: userData.lastLoginAt ? convertTimestamp(userData.lastLoginAt) : undefined,
+      } as UserProfile;
+    }
+    return null;
+  } catch (error) {
+    console.error("Error getting user profile: ", error);
+    return null;
+  }
+};
+
+const updateUserProfile = async (uid: string, updates: Partial<UserProfile>) => {
+  try {
+    const userRef = doc(db, "users", uid);
+    await updateDoc(userRef, updates);
+  } catch (error) {
+    console.error("Error updating user profile: ", error);
+    throw error;
+  }
+};
+
+const mergeTemporaryUserWithRealUser = async (user: User) => {
+  // Implementation for merging temporary user data
+  console.log('Merging temporary user with real user:', user.uid);
+  // This would contain the logic to merge temporary user data
+};
+
+// Group functions
+const createGroup = async (groupData: Omit<Group, 'id' | 'createdAt'>, userId: string): Promise<Group> => {
+  try {
+    const group = {
+      ...groupData,
+      createdAt: new Date(),
+      createdBy: userId,
+    };
+    
+    const docRef = await addDoc(collection(db, "groups"), group);
+    return { ...group, id: docRef.id };
+  } catch (error) {
+    console.error("Error creating group: ", error);
+    throw error;
+  }
+};
+
 const addGroup = async (userId: string, groupName: string) => {
   try {
     const docRef = await addDoc(collection(db, "groups"), {
       name: groupName,
       createdBy: userId,
       members: [userId],
+      createdAt: new Date(),
     });
     console.log("Document written with ID: ", docRef.id);
     return docRef.id;
@@ -58,16 +134,13 @@ const getGroups = async (userId: string): Promise<Group[]> => {
     name: doc.data().name,
     createdBy: doc.data().createdBy,
     members: doc.data().members,
+    createdAt: convertTimestamp(doc.data().createdAt),
+    description: doc.data().description,
   })) as Group[];
 };
 
-const deleteGroup = async (groupId: string) => {
-  try {
-    await deleteDoc(doc(db, "groups", groupId));
-    console.log("Document successfully deleted!");
-  } catch (error) {
-    console.error("Error deleting document: ", error);
-  }
+const getUserGroups = async (userId: string): Promise<Group[]> => {
+  return getGroups(userId);
 };
 
 const updateGroup = async (groupId: string, updates: Partial<Group>) => {
@@ -80,6 +153,96 @@ const updateGroup = async (groupId: string, updates: Partial<Group>) => {
   }
 };
 
+const deleteGroup = async (groupId: string) => {
+  try {
+    await deleteDoc(doc(db, "groups", groupId));
+    console.log("Document successfully deleted!");
+  } catch (error) {
+    console.error("Error deleting document: ", error);
+  }
+};
+
+const addMemberToGroup = async (groupId: string, member: { id: string; name: string; email: string }, userId: string) => {
+  try {
+    const groupRef = doc(db, "groups", groupId);
+    const groupDoc = await getDocs(query(collection(db, "groups"), where("__name__", "==", groupId)));
+    
+    if (!groupDoc.empty) {
+      const currentMembers = groupDoc.docs[0].data().members || [];
+      if (!currentMembers.includes(member.id)) {
+        await updateDoc(groupRef, {
+          members: [...currentMembers, member.id]
+        });
+      }
+    }
+  } catch (error) {
+    console.error("Error adding member to group: ", error);
+    throw error;
+  }
+};
+
+const removeMemberFromGroup = async (groupId: string, memberId: string) => {
+  try {
+    const groupRef = doc(db, "groups", groupId);
+    const groupDoc = await getDocs(query(collection(db, "groups"), where("__name__", "==", groupId)));
+    
+    if (!groupDoc.empty) {
+      const currentMembers = groupDoc.docs[0].data().members || [];
+      await updateDoc(groupRef, {
+        members: currentMembers.filter((id: string) => id !== memberId)
+      });
+    }
+  } catch (error) {
+    console.error("Error removing member from group: ", error);
+    throw error;
+  }
+};
+
+// Subscription functions
+const subscribeToUserGroups = (userId: string, callback: (groups: Group[]) => void) => {
+  const q = query(collection(db, "groups"), where("members", "array-contains", userId));
+  
+  return onSnapshot(q, (querySnapshot) => {
+    const groups = querySnapshot.docs.map(doc => ({
+      id: doc.id,
+      ...doc.data(),
+      createdAt: convertTimestamp(doc.data().createdAt),
+    })) as Group[];
+    
+    callback(groups);
+  });
+};
+
+const subscribeToGroupExpenses = (groupId: string, callback: (expenses: Expense[]) => void) => {
+  const q = query(collection(db, "expenses"), where("groupId", "==", groupId));
+  
+  return onSnapshot(q, (querySnapshot) => {
+    const expenses = querySnapshot.docs.map(doc => ({
+      id: doc.id,
+      ...doc.data(),
+      createdAt: convertTimestamp(doc.data().createdAt),
+    })) as Expense[];
+    
+    callback(expenses);
+  });
+};
+
+// Expense functions
+const createExpense = async (expenseData: Omit<Expense, 'id' | 'createdAt'>, userId: string): Promise<Expense> => {
+  try {
+    const expense = {
+      ...expenseData,
+      createdAt: new Date(),
+    };
+    
+    const docRef = await addDoc(collection(db, "expenses"), expense);
+    return { ...expense, id: docRef.id };
+  } catch (error) {
+    console.error("Error creating expense: ", error);
+    throw error;
+  }
+};
+
 const addExpense = async (groupId: string, description: string, amount: number, paidBy: string, splitAmong: string[]) => {
   try {
     const docRef = await addDoc(collection(db, "expenses"), {
@@ -87,8 +250,8 @@ const addExpense = async (groupId: string, description: string, amount: number, 
       description: description,
       amount: amount,
       paidBy: paidBy,
-      splitAmong: splitAmong,
-      timestamp: new Date(),
+      splitBetween: splitAmong,
+      createdAt: new Date(),
     });
     console.log("Document written with ID: ", docRef.id);
     return docRef.id;
@@ -107,27 +270,27 @@ const getExpenses = async (groupId: string): Promise<Expense[]> => {
     description: doc.data().description,
     amount: doc.data().amount,
     paidBy: doc.data().paidBy,
-    splitAmong: doc.data().splitAmong,
-    timestamp: doc.data().timestamp,
+    splitBetween: doc.data().splitBetween,
+    createdAt: convertTimestamp(doc.data().createdAt),
   })) as Expense[];
 };
 
-const deleteExpense = async (expenseId: string) => {
-  try {
-    await deleteDoc(doc(db, "expenses", expenseId));
-    console.log("Document successfully deleted!");
-  } catch (error) {
-    console.error("Error deleting document: ", error);
-  }
-};
-
-const updateExpense = async (expenseId: string, updates: Partial<Expense>) => {
+const updateExpense = async (groupId: string, expenseId: string, updates: Partial<Expense>) => {
   try {
     const expenseDocRef = doc(db, "expenses", expenseId);
     await updateDoc(expenseDocRef, updates);
     console.log("Document successfully updated!");
   } catch (error) {
     console.error("Error updating document: ", error);
+  }
+};
+
+const deleteExpense = async (groupId: string, expenseId: string) => {
+  try {
+    await deleteDoc(doc(db, "expenses", expenseId));
+    console.log("Document successfully deleted!");
+  } catch (error) {
+    console.error("Error deleting document: ", error);
   }
 };
 
@@ -138,12 +301,25 @@ export {
   signIn,
   signOutUser,
   updateDisplayName,
+  createUserProfile,
+  getUserProfile,
+  updateUserProfile,
+  mergeTemporaryUserWithRealUser,
+  createGroup,
   addGroup,
   getGroups,
+  getUserGroups,
   deleteGroup,
   updateGroup,
+  addMemberToGroup,
+  removeMemberFromGroup,
+  subscribeToUserGroups,
+  subscribeToGroupExpenses,
+  createExpense,
   addExpense,
   getExpenses,
   deleteExpense,
   updateExpense,
 };
+
+export type { UserProfile, Expense, Group };

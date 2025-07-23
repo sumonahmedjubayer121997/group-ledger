@@ -1,4 +1,3 @@
-
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import { 
@@ -258,7 +257,17 @@ export const useExpenseStore = create<ExpenseStore>()(
           try {
             set({ loading: true, error: null });
             console.log('Adding expense:', expense);
-            await createExpenseFirebase(expense, userId);
+            
+            // Convert Member objects to string IDs for Firebase
+            const firebaseExpense = {
+              ...expense,
+              paidBy: typeof expense.paidBy === 'object' ? expense.paidBy.id : expense.paidBy,
+              splitBetween: expense.splitAmong.map(member => 
+                typeof member === 'object' ? member.id : member
+              ),
+            };
+            
+            await createExpenseFirebase(firebaseExpense, userId);
             console.log('Expense added successfully to Firebase');
             set({ loading: false });
             // Real-time listener will update the state
@@ -336,15 +345,21 @@ export const useExpenseStore = create<ExpenseStore>()(
     set({ error: 'Failed to create group', loading: false });
     throw error;
   }
-}
-
-       ,
-
+},
 
         updateGroup: async (id, updates) => {
           try {
             set({ loading: true, error: null });
-            await updateGroupFirebase(id, updates);
+            
+            // Convert Member[] to string[] if needed
+            const firebaseUpdates = { ...updates };
+            if (updates.members && Array.isArray(updates.members)) {
+              firebaseUpdates.members = updates.members.map((member: any) => 
+                typeof member === 'object' ? member.id : member
+              );
+            }
+            
+            await updateGroupFirebase(id, firebaseUpdates);
             set({ loading: false });
             // Firebase listener will update the state
           } catch (error) {
@@ -401,14 +416,26 @@ export const useExpenseStore = create<ExpenseStore>()(
             set({ loading: true, error: null });
             const expense = get().expenses.find(e => e.id === id);
             if (expense) {
-              await updateExpenseFirebase(expense.groupId, id, updatedExpense);
+              // Convert Member objects to string IDs for Firebase
+              const firebaseUpdates = { ...updatedExpense };
+              if (updatedExpense.paidBy && typeof updatedExpense.paidBy === 'object') {
+                firebaseUpdates.paidBy = updatedExpense.paidBy.id;
+              }
+              if (updatedExpense.splitAmong) {
+                firebaseUpdates.splitBetween = updatedExpense.splitAmong.map(member =>
+                  typeof member === 'object' ? member.id : member
+                );
+                delete firebaseUpdates.splitAmong;
+              }
+              
+              await updateExpenseFirebase(expense.groupId, id, firebaseUpdates);
               set({ loading: false });
               // Firebase listener will update the state
               
               get().addActivity({
                 type: 'expense_updated',
-                userId: expense.paidBy.id,
-                userName: expense.paidBy.name,
+                userId: typeof expense.paidBy === 'object' ? expense.paidBy.id : expense.paidBy,
+                userName: typeof expense.paidBy === 'object' ? expense.paidBy.name : 'Unknown',
                 description: `Updated expense "${expense.description}"`,
               });
             }
@@ -430,8 +457,8 @@ export const useExpenseStore = create<ExpenseStore>()(
             if (expense) {
               get().addActivity({
                 type: 'expense_deleted',
-                userId: expense.paidBy.id,
-                userName: expense.paidBy.name,
+                userId: typeof expense.paidBy === 'object' ? expense.paidBy.id : expense.paidBy,
+                userName: typeof expense.paidBy === 'object' ? expense.paidBy.name : 'Unknown',
                 description: `Deleted expense "${expense.description}"`,
               });
             }
