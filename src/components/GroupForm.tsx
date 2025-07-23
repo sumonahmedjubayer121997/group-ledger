@@ -40,10 +40,18 @@ export const GroupForm: React.FC<GroupFormProps> = ({ isOpen, onClose }) => {
     setMembers(updatedMembers);
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    if (!user || !userProfile) return;
+    if (!user || !userProfile) {
+      console.error('No user or userProfile available');
+      return;
+    }
+
+    if (!formData.name.trim()) {
+      console.error('Group name is required');
+      return;
+    }
     
     const validMembers = members.filter(m => m.name.trim() && m.email.trim());
     
@@ -91,12 +99,17 @@ export const GroupForm: React.FC<GroupFormProps> = ({ isOpen, onClose }) => {
     console.log('Creating group with current user UID:', user.uid);
     console.log('Group members:', membersWithIds);
     
-    addGroup(completeGroup, user.uid);
-    
-    // Reset form
-    setFormData({ name: '', description: '' });
-    setMembers([{ name: '', email: '' }]);
-    onClose();
+    try {
+      await addGroup(completeGroup, user.uid);
+      
+      // Reset form
+      setFormData({ name: '', description: '' });
+      setMembers([{ name: '', email: '' }]);
+      onClose();
+    } catch (error) {
+      console.error('Failed to create group:', error);
+      // Keep the form open so user can try again
+    }
   };
 
   return (
