@@ -152,12 +152,22 @@ export const useExpenseStore = create<ExpenseStore>()(
         
         initializeFirebaseSync: (userId: string) => {
           console.log('Initializing Firebase sync for user:', userId);
+          
+          // Clean up existing subscriptions first
+          unsubscribers.forEach(unsubscribe => unsubscribe());
+          unsubscribers = [];
+          
           set({ loading: true, error: null });
           
           // Subscribe to user's groups
           const groupsUnsubscriber = subscribeToUserGroups(userId, (groups) => {
             console.log('Groups updated:', groups);
             set({ groups, loading: false });
+            
+            // Clean up old expense subscriptions
+            const existingExpenseUnsubscribers = unsubscribers.filter(unsub => unsub !== groupsUnsubscriber);
+            existingExpenseUnsubscribers.forEach(unsubscribe => unsubscribe());
+            unsubscribers = [groupsUnsubscriber];
             
             // Subscribe to expenses for each group
             groups.forEach(group => {
@@ -178,6 +188,7 @@ export const useExpenseStore = create<ExpenseStore>()(
         },
         
         cleanup: () => {
+          console.log('Cleaning up Firebase subscriptions');
           unsubscribers.forEach(unsubscribe => unsubscribe());
           unsubscribers = [];
         },

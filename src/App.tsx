@@ -6,6 +6,8 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { AuthProvider, useAuth } from "@/contexts/AuthContext";
 import { AuthForm } from "@/components/AuthForm";
+import { useExpenseStore } from "@/stores/expenseStore";
+import { useEffect } from "react";
 import Index from "./pages/Index";
 import NotFound from "./pages/NotFound";
 
@@ -13,6 +15,23 @@ const queryClient = new QueryClient();
 
 const AppContent = () => {
   const { user, loading } = useAuth();
+  const { initializeFirebaseSync, cleanup } = useExpenseStore();
+
+  // Initialize Firebase sync when user is authenticated
+  useEffect(() => {
+    if (user) {
+      console.log('Initializing Firebase sync for user:', user.uid);
+      initializeFirebaseSync(user.uid);
+    } else {
+      console.log('User logged out, cleaning up Firebase sync');
+      cleanup();
+    }
+
+    // Cleanup on unmount
+    return () => {
+      cleanup();
+    };
+  }, [user, initializeFirebaseSync, cleanup]);
 
   console.log('App loading state:', loading);
   console.log('User state:', user ? 'authenticated' : 'not authenticated');
