@@ -1,17 +1,16 @@
-
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import { 
   createGroup as createGroupFirebase,
   updateGroup as updateGroupFirebase,
-  createExpense as createExpenseFirebase,
+  addExpense as createExpenseFirebase,
   updateExpense as updateExpenseFirebase,
   deleteExpense as deleteExpenseFirebase,
   subscribeToUserGroups,
   subscribeToGroupExpenses,
   getUserGroups,
-  addMemberToGroup as addMemberToGroupFirebase,
-  removeMemberFromGroup as removeMemberFromGroupFirebase,
+  addUserToGroup as addMemberToGroupFirebase,
+  removeUserFromGroup as removeMemberFromGroupFirebase,
 } from '@/services/firebaseService';
 
 export interface Member {
@@ -253,12 +252,24 @@ export const useExpenseStore = create<ExpenseStore>()(
           expenseUnsubscribers.clear();
           set({ isInitialized: false, currentUserId: null });
         },
-        
+
         addExpense: async (expense, userId) => {
           try {
             set({ loading: true, error: null });
             console.log('Adding expense:', expense);
-            await createExpenseFirebase(expense, userId);
+            
+            // Convert store expense format to Firebase format
+            const firebaseExpense = {
+              groupId: expense.groupId,
+              description: expense.description,
+              amount: expense.amount,
+              paidBy: expense.paidBy.id, // Convert Member to string ID
+              splitBetween: expense.splitAmong.map(member => member.id), // Convert Member[] to string[]
+              category: expense.category,
+              date: expense.date,
+            };
+            
+            await createExpenseFirebase(firebaseExpense);
             console.log('Expense added successfully to Firebase');
             set({ loading: false });
             // Real-time listener will update the state
@@ -343,7 +354,7 @@ export const useExpenseStore = create<ExpenseStore>()(
           try {
             set({ loading: true, error: null });
             // Convert Member[] to string[] if needed
-            const firebaseUpdates = { ...updates };
+            const firebaseUpdates: any = { ...updates };
             if (updates.members && Array.isArray(updates.members)) {
               firebaseUpdates.members = updates.members.map((member: any) => 
                 typeof member === 'string' ? member : member.id
@@ -406,7 +417,23 @@ export const useExpenseStore = create<ExpenseStore>()(
             set({ loading: true, error: null });
             const expense = get().expenses.find(e => e.id === id);
             if (expense) {
-              await updateExpenseFirebase(expense.groupId, id, updatedExpense);
+              // Convert store expense format to Firebase format
+              const firebaseUpdates: any = { ...updatedExpense };
+              
+              if (updatedExpense.paidBy) {
+                firebaseUpdates.paidBy = typeof updatedExpense.paidBy === 'string' 
+                  ? updatedExpense.paidBy 
+                  : updatedExpense.paidBy.id;
+              }
+              
+              if (updatedExpense.splitAmong) {
+                firebaseUpdates.splitBetween = updatedExpense.splitAmong.map(member => 
+                  typeof member === 'string' ? member : member.id
+                );
+                delete firebaseUpdates.splitAmong;
+              }
+              
+              await updateExpenseFirebase(expense.groupId, id, firebaseUpdates);
               set({ loading: false });
               // Firebase listener will update the state
               
