@@ -41,7 +41,6 @@ const Index = () => {
 
   const handleNewGroupClick = () => {
     console.log('New Group button clicked - opening group form');
-    setActiveTab("groups");
     setShowGroupForm(true);
   };
 
