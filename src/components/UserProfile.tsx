@@ -29,10 +29,12 @@ interface UserProfileProps {
 }
 
 export const UserProfile: React.FC<UserProfileProps> = ({ onClose }) => {
-  const { user, userProfile } = useAuth();
+  const { user, userProfile, loading } = useAuth();
   const [activeTab, setActiveTab] = useState('overview');
 
-  if (!user || !userProfile) {
+  console.log('UserProfile render - user:', user?.uid, 'userProfile:', userProfile?.displayName, 'loading:', loading);
+
+  if (loading) {
     return (
       <div className="flex items-center justify-center p-8">
         <div className="text-center">
@@ -41,6 +43,34 @@ export const UserProfile: React.FC<UserProfileProps> = ({ onClose }) => {
       </div>
     );
   }
+
+  if (!user) {
+    return (
+      <div className="flex items-center justify-center p-8">
+        <div className="text-center">
+          <p className="text-muted-foreground">No user found. Please log in.</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Create a fallback userProfile if it doesn't exist
+  const profileData = userProfile || {
+    uid: user.uid,
+    email: user.email || '',
+    displayName: user.displayName || 'User',
+    photoURL: user.photoURL,
+    phoneNumber: user.phoneNumber,
+    emailVerified: user.emailVerified,
+    role: 'user' as const,
+    createdAt: new Date(),
+    lastLoginAt: new Date(),
+    preferences: {
+      currency: 'USD',
+      notifications: true,
+      theme: 'light' as const,
+    },
+  };
 
   const getInitials = (name: string) => {
     return name
@@ -57,9 +87,9 @@ export const UserProfile: React.FC<UserProfileProps> = ({ onClose }) => {
         <div className="flex items-center space-x-4">
           <div className="relative">
             <Avatar className="h-20 w-20">
-              <AvatarImage src={userProfile.photoURL || undefined} />
+              <AvatarImage src={profileData.photoURL || undefined} />
               <AvatarFallback className="text-lg font-semibold">
-                {getInitials(userProfile.displayName || 'User')}
+                {getInitials(profileData.displayName || 'User')}
               </AvatarFallback>
             </Avatar>
             <Button 
@@ -71,13 +101,13 @@ export const UserProfile: React.FC<UserProfileProps> = ({ onClose }) => {
             </Button>
           </div>
           <div>
-            <h1 className="text-2xl font-bold">{userProfile.displayName}</h1>
-            <p className="text-muted-foreground">{userProfile.email}</p>
+            <h1 className="text-2xl font-bold">{profileData.displayName}</h1>
+            <p className="text-muted-foreground">{profileData.email}</p>
             <div className="flex items-center gap-2 mt-2">
               <Badge variant="secondary">
-                👤 {userProfile.role === 'admin' ? 'Admin' : 'User'}
+                👤 {profileData.role === 'admin' ? 'Admin' : 'User'}
               </Badge>
-              {userProfile.emailVerified && (
+              {profileData.emailVerified && (
                 <Badge variant="outline" className="text-green-600">
                   ✅ Verified
                 </Badge>
@@ -122,27 +152,27 @@ export const UserProfile: React.FC<UserProfileProps> = ({ onClose }) => {
         </TabsList>
 
         <TabsContent value="overview" className="space-y-4">
-          <ProfileBasicInfo user={user} userProfile={userProfile} />
+          <ProfileBasicInfo user={user} userProfile={profileData} />
         </TabsContent>
 
         <TabsContent value="financial" className="space-y-4">
-          <ProfileFinancialSummary userProfile={userProfile} />
+          <ProfileFinancialSummary userProfile={profileData} />
         </TabsContent>
 
         <TabsContent value="settings" className="space-y-4">
-          <ProfileAccountSettings user={user} userProfile={userProfile} />
+          <ProfileAccountSettings user={user} userProfile={profileData} />
         </TabsContent>
 
         <TabsContent value="preferences" className="space-y-4">
-          <ProfilePreferences userProfile={userProfile} />
+          <ProfilePreferences userProfile={profileData} />
         </TabsContent>
 
         <TabsContent value="privacy" className="space-y-4">
-          <ProfilePrivacySecurity user={user} userProfile={userProfile} />
+          <ProfilePrivacySecurity user={user} userProfile={profileData} />
         </TabsContent>
 
         <TabsContent value="activity" className="space-y-4">
-          <ProfileActivityFeed userProfile={userProfile} />
+          <ProfileActivityFeed userProfile={profileData} />
         </TabsContent>
       </Tabs>
     </div>
