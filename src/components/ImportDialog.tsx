@@ -1,4 +1,3 @@
-
 import React, { useState, useRef } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
@@ -11,6 +10,7 @@ import { useExpenseStore, Member } from '@/stores/expenseStore';
 import { Upload, FileText, CheckCircle, AlertTriangle, X } from 'lucide-react';
 import Papa from 'papaparse';
 import { useToast } from '@/hooks/use-toast';
+import { useAuth } from '@/hooks/use-auth';
 
 interface ImportDialogProps {
   children: React.ReactNode;
@@ -57,6 +57,7 @@ export const ImportDialog: React.FC<ImportDialogProps> = ({ children }) => {
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { addExpense, groups } = useExpenseStore();
+  const { user } = useAuth();
   const { toast } = useToast();
 
   const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -148,7 +149,7 @@ export const ImportDialog: React.FC<ImportDialogProps> = ({ children }) => {
 
   const performImport = () => {
     const group = groups.find(g => g.id === selectedGroup);
-    if (!group) return;
+    if (!group || !user) return;
 
     let successCount = 0;
     let errorCount = 0;
@@ -198,7 +199,7 @@ export const ImportDialog: React.FC<ImportDialogProps> = ({ children }) => {
           category: row.category,
           date: new Date(row.date),
           splitType: 'equal'
-        });
+        }, user.uid);
 
         successCount++;
       } catch (error) {

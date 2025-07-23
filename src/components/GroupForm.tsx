@@ -52,13 +52,24 @@ export const GroupForm: React.FC<GroupFormProps> = ({ isOpen, onClose }) => {
       id: crypto.randomUUID(),
     }));
     
-    addGroup({
+    // Create complete group object with all required properties
+    const completeGroup: Omit<Group, 'id'> = {
       name: formData.name,
       description: formData.description,
       members: membersWithIds,
       createdAt: new Date(),
       groupType: 'private',
-    }, user.uid);
+      inviteCode: crypto.randomUUID(),
+      settings: {
+        currency: 'USD',
+        simplifyDebts: true,
+        notifications: true,
+        recurringBills: false,
+      },
+      isArchived: false,
+    };
+    
+    addGroup(completeGroup, user.uid);
     
     // Reset form
     setFormData({ name: '', description: '' });
