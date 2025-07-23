@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import { Plus, Settings, Users, Receipt, TrendingUp, User } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -36,6 +37,16 @@ const Index = () => {
     } catch (error) {
       console.error('Error logging out:', error);
     }
+  };
+
+  const handleNewGroupClick = () => {
+    console.log('New Group button clicked');
+    setShowGroupForm(true);
+  };
+
+  const handleCloseGroupForm = () => {
+    console.log('Closing group form');
+    setShowGroupForm(false);
   };
 
   if (showUserProfile) {
@@ -78,7 +89,7 @@ const Index = () => {
               Profile
             </Button>
             <Button
-              onClick={() => setShowGroupForm(true)}
+              onClick={handleNewGroupClick}
               className="bg-blue-600 hover:bg-blue-700"
             >
               <Plus className="h-4 w-4 mr-2" />
@@ -197,7 +208,7 @@ const Index = () => {
       {showGroupForm && (
         <GroupForm 
           isOpen={showGroupForm} 
-          onClose={() => setShowGroupForm(false)} 
+          onClose={handleCloseGroupForm} 
         />
       )}
       {showExpenseForm && (
