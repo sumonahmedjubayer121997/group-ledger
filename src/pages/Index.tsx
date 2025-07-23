@@ -40,7 +40,7 @@ const Index = () => {
   };
 
   const handleNewGroupClick = () => {
-    console.log('New Group button clicked');
+    console.log('New Group button clicked - opening group form');
     setActiveTab("groups");
     setShowGroupForm(true);
   };
@@ -123,7 +123,7 @@ const Index = () => {
 
         {/* Debug info */}
         <div className="mb-4 text-sm text-gray-600">
-          Groups: {groups.length} | Expenses: {expenses.length} | User: {user?.uid}
+          Groups: {groups.length} | Expenses: {expenses.length} | User: {user?.uid} | Show Form: {showGroupForm ? 'true' : 'false'}
         </div>
 
         {/* Main Content */}
@@ -205,13 +205,11 @@ const Index = () => {
         </Tabs>
       </div>
 
-      {/* Modals */}
-      {showGroupForm && (
-        <GroupForm 
-          isOpen={showGroupForm} 
-          onClose={handleCloseGroupForm} 
-        />
-      )}
+      {/* Modals - Always render at the end */}
+      <GroupForm 
+        isOpen={showGroupForm} 
+        onClose={handleCloseGroupForm} 
+      />
       {showExpenseForm && (
         <ExpenseForm 
           isOpen={showExpenseForm} 
