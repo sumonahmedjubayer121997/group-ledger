@@ -1,3 +1,4 @@
+
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { 
   User,
@@ -85,12 +86,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       console.log('No existing profile found, will create one:', error);
     }
 
-    // If no profile exists, create one
+    // If no profile exists, create one (this handles both new users and existing users without profiles)
     try {
       console.log('Creating user profile for:', firebaseUser.email, 'with UID:', firebaseUser.uid);
       const newProfile = await createUserProfile({
         uid: firebaseUser.uid,
-        name: firebaseUser.displayName || 'User',
+        name: firebaseUser.displayName || firebaseUser.email?.split('@')[0] || 'User',
         email: firebaseUser.email!,
         photoURL: firebaseUser.photoURL || undefined,
         verified: firebaseUser.emailVerified,
@@ -138,7 +139,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     try {
       const profile = await createUserProfile({
         uid: firebaseUser.uid,
-        name: firebaseUser.displayName || additionalData.displayName || 'User',
+        name: firebaseUser.displayName || additionalData.displayName || firebaseUser.email?.split('@')[0] || 'User',
         email: firebaseUser.email!,
         photoURL: firebaseUser.photoURL || undefined,
         verified: firebaseUser.emailVerified,
