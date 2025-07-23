@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { Plus, Settings, Users, Receipt, TrendingUp, User } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -21,6 +20,7 @@ const Index = () => {
   const [showGroupForm, setShowGroupForm] = useState(false);
   const [showExpenseForm, setShowExpenseForm] = useState(false);
   const [showUserProfile, setShowUserProfile] = useState(false);
+  const [activeTab, setActiveTab] = useState("overview");
 
   // Initialize Firebase sync when user is authenticated
   useEffect(() => {
@@ -41,6 +41,7 @@ const Index = () => {
 
   const handleNewGroupClick = () => {
     console.log('New Group button clicked');
+    setActiveTab("groups");
     setShowGroupForm(true);
   };
 
@@ -126,7 +127,7 @@ const Index = () => {
         </div>
 
         {/* Main Content */}
-        <Tabs defaultValue="overview" className="space-y-6">
+        <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
           <TabsList className="grid w-full grid-cols-4">
             <TabsTrigger value="overview">Overview</TabsTrigger>
             <TabsTrigger value="groups">Groups</TabsTrigger>
