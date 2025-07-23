@@ -8,6 +8,8 @@ import { useExpenseStore, Member, Group } from '@/stores/expenseStore';
 import { Users, Plus, X } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { findSimilarEmailUIDs } from '@/components/firebaseComponents/FindSimilarUIDs';
+import { v4 as uuidv4 } from 'uuid';
+
 interface GroupFormProps {
   isOpen: boolean;
   onClose: () => void;

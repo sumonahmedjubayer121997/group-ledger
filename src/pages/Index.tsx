@@ -13,6 +13,7 @@ import { RecentExpenses } from "@/components/RecentExpenses";
 import { BalanceCard } from "@/components/BalanceCard";
 import { ExpenseChart } from "@/components/ExpenseChart";
 import { UserProfile } from "@/components/UserProfile";
+import { LandingPage } from "@/components/LandingPage";
 
 const Index = () => {
   const { user, userProfile, logout } = useAuth();
@@ -20,6 +21,7 @@ const Index = () => {
   const [showGroupForm, setShowGroupForm] = useState(false);
   const [showExpenseForm, setShowExpenseForm] = useState(false);
   const [showUserProfile, setShowUserProfile] = useState(false);
+  const [showLanding, setShowLanding] = useState(false);
 
   // Initialize Firebase sync when user is authenticated
   useEffect(() => {
@@ -30,13 +32,32 @@ const Index = () => {
     }
   }, [user?.uid, initializeFirebaseSync]);
 
+  // Show landing page if no user or user wants to see it
+  useEffect(() => {
+    if (!user) {
+      setShowLanding(true);
+    } else {
+      setShowLanding(false);
+    }
+  }, [user]);
+
+  const handleGetStarted = () => {
+    setShowLanding(false);
+  };
+
   const handleLogout = async () => {
     try {
       await logout();
+      setShowLanding(true);
     } catch (error) {
       console.error('Error logging out:', error);
     }
   };
+
+  // Show landing page
+  if (showLanding || !user) {
+    return <LandingPage onGetStarted={handleGetStarted} />;
+  }
 
   if (showUserProfile) {
     return (
@@ -69,6 +90,13 @@ const Index = () => {
             <p className="text-gray-600">Split expenses with friends and family</p>
           </div>
           <div className="flex items-center gap-3">
+            <Button
+              onClick={() => setShowLanding(true)}
+              variant="outline"
+              size="sm"
+            >
+              Landing Page
+            </Button>
             <Button
               onClick={() => setShowUserProfile(true)}
               variant="outline"
