@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -19,11 +20,11 @@ export const GroupSettings: React.FC<GroupSettingsProps> = ({ group }) => {
   const [description, setDescription] = useState(group.description);
   const [location, setLocation] = useState(group.location || '');
   const [tags, setTags] = useState(group.tags?.join(', ') || '');
-  const [currency, setCurrency] = useState(group.settings.currency);
-  const [simplifyDebts, setSimplifyDebts] = useState(group.settings.simplifyDebts);
-  const [notifications, setNotifications] = useState(group.settings.notifications);
-  const [recurringBills, setRecurringBills] = useState(group.settings.recurringBills);
-  const [groupType, setGroupType] = useState(group.groupType);
+  const [currency, setCurrency] = useState(group.settings?.currency || 'USD');
+  const [simplifyDebts, setSimplifyDebts] = useState(group.settings?.simplifyDebts ?? true);
+  const [notifications, setNotifications] = useState(group.settings?.notifications ?? true);
+  const [recurringBills, setRecurringBills] = useState(group.settings?.recurringBills ?? false);
+  const [groupType, setGroupType] = useState(group.groupType || 'private');
 
   const { updateGroup } = useExpenseStore();
   const { toast } = useToast();
@@ -119,7 +120,7 @@ export const GroupSettings: React.FC<GroupSettingsProps> = ({ group }) => {
               <Label htmlFor="group-type">Group Type</Label>
               <Select value={groupType} onValueChange={(value: 'private' | 'public') => setGroupType(value)}>
                 <SelectTrigger>
-                  <SelectValue />
+                  <SelectValue placeholder="Select group type" />
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="private">Private (Invite Only)</SelectItem>
@@ -137,7 +138,7 @@ export const GroupSettings: React.FC<GroupSettingsProps> = ({ group }) => {
               <Label htmlFor="currency">Default Currency</Label>
               <Select value={currency} onValueChange={setCurrency}>
                 <SelectTrigger>
-                  <SelectValue />
+                  <SelectValue placeholder="Select currency" />
                 </SelectTrigger>
                 <SelectContent>
                   {currencies.map(curr => (
@@ -244,7 +245,7 @@ export const GroupSettings: React.FC<GroupSettingsProps> = ({ group }) => {
             <div className="bg-gray-50 p-4 rounded-lg">
               <Label>Invite Code</Label>
               <div className="flex items-center space-x-2 mt-1">
-                <Input value={group.inviteCode} readOnly className="font-mono" />
+                <Input value={group.inviteCode || ''} readOnly className="font-mono" />
                 <Button variant="outline" size="sm">
                   Regenerate
                 </Button>
