@@ -42,16 +42,25 @@ export const GroupForm: React.FC<GroupFormProps> = ({ isOpen, onClose }) => {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    console.log('🚀 Form submitted!');
+    console.log('📋 Form data:', formData);
+    console.log('👥 Members:', members);
+    console.log('🔐 User:', user?.uid);
+    console.log('👤 User profile:', userProfile);
     
     if (!user || !userProfile) {
-      console.error('No user or userProfile available');
+      console.error('❌ No user or userProfile available');
+      alert('Error: User not authenticated');
       return;
     }
 
     if (!formData.name.trim()) {
-      console.error('Group name is required');
+      console.error('❌ Group name is required');
+      alert('Error: Group name is required');
       return;
     }
+
+    console.log('✅ Validation passed, creating group...');
     
     const validMembers = members.filter(m => m.name.trim() && m.email.trim());
     
@@ -96,18 +105,22 @@ export const GroupForm: React.FC<GroupFormProps> = ({ isOpen, onClose }) => {
       isArchived: false,
     };
     
-    console.log('Creating group with current user UID:', user.uid);
-    console.log('Group members:', membersWithIds);
+    console.log('🏗️ Creating group with current user UID:', user.uid);
+    console.log('👥 Group members:', membersWithIds);
+    console.log('📝 Complete group object:', completeGroup);
     
     try {
+      console.log('🔄 Calling addGroup...');
       await addGroup(completeGroup, user.uid);
+      console.log('✅ Group created successfully!');
       
       // Reset form
       setFormData({ name: '', description: '' });
       setMembers([{ name: '', email: '' }]);
       onClose();
     } catch (error) {
-      console.error('Failed to create group:', error);
+      console.error('❌ Failed to create group:', error);
+      alert(`Failed to create group: ${error.message || error}`);
       // Keep the form open so user can try again
     }
   };
@@ -215,7 +228,11 @@ export const GroupForm: React.FC<GroupFormProps> = ({ isOpen, onClose }) => {
             <Button type="button" variant="outline" onClick={onClose}>
               Cancel
             </Button>
-            <Button type="submit" className="bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700">
+            <Button 
+              type="submit" 
+              className="bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700"
+              onClick={() => console.log('🖱️ Create Group button clicked!')}
+            >
               Create Group
             </Button>
           </div>
