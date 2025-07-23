@@ -1,3 +1,4 @@
+
 import { create } from 'zustand';
 import { 
   createGroup as createFirebaseGroup,
@@ -13,84 +14,69 @@ import {
   updateExpense as updateFirebaseExpense,
   deleteExpense as deleteFirebaseExpense
 } from '@/services/firebaseService';
-import { FirebaseGroup, FirebaseExpense, Group, Expense, Member, GroupSettings } from '@/types';
-
-interface Member {
-  id: string;
-  name: string;
-  email: string;
-}
-
-interface Group {
-  id: string;
-  name: string;
-  description: string;
-  members: Member[];
-  createdAt: Date;
-  createdBy: string;
-  photo: string;
-  coverImage: string;
-  groupType: 'private' | 'public';
-  inviteCode: string;
-  settings: GroupSettings;
-  tags: string[];
-  location: string;
-  isArchived: boolean;
-  memberNames: Record<string, string>;
-  memberEmails: Record<string, string>;
-}
-
-interface Expense {
-  id: string;
-  description: string;
-  amount: number;
-  paidBy: Member;
-  splitAmong: Member[];
-  groupId: string;
-  category: string;
-  date: Date;
-  splitType: 'equal' | 'unequal';
-  splitData: Record<string, number>;
-}
-
-interface GroupSettings {
-  currency: string;
-  simplifyDebts: boolean;
-  notifications: boolean;
-  recurringBills: boolean;
-}
+import { 
+  FirebaseGroup, 
+  FirebaseExpense, 
+  Group as StoreGroup, 
+  Expense as StoreExpense, 
+  Member, 
+  GroupSettings,
+  Balance,
+  Settlement,
+  RecurringExpense
+} from '@/types';
 
 interface ExpenseStore {
   // State
-  groups: Group[];
-  expenses: Expense[];
+  groups: StoreGroup[];
+  expenses: StoreExpense[];
   currentGroupId: string | null;
+  selectedGroup: StoreGroup | null;
+  settlements: Settlement[];
+  recurringExpenses: RecurringExpense[];
   loading: boolean;
   error: string | null;
   
   // Actions
   setCurrentGroup: (groupId: string | null) => void;
+  setSelectedGroup: (group: StoreGroup | null) => void;
   fetchGroups: (userId: string) => Promise<void>;
-  createGroup: (groupData: Omit<Group, 'id' | 'createdAt' | 'createdBy'>, userId: string) => Promise<void>;
-  updateGroup: (groupId: string, updates: Partial<Group>) => Promise<void>;
+  createGroup: (groupData: Omit<StoreGroup, 'id' | 'createdAt' | 'createdBy'>, userId: string) => Promise<void>;
+  addGroup: (groupData: Omit<StoreGroup, 'id' | 'createdAt' | 'createdBy'>, userId: string) => Promise<void>;
+  updateGroup: (groupId: string, updates: Partial<StoreGroup>) => Promise<void>;
   deleteGroup: (groupId: string) => Promise<void>;
-  addMember: (groupId: string, member: Member) => Promise<void>;
-  removeMember: (groupId: string, memberId: string) => Promise<void>;
+  archiveGroup: (groupId: string) => Promise<void>;
+  addMemberToGroup: (groupId: string, member: Member, addedBy: string) => Promise<void>;
+  removeMemberFromGroup: (groupId: string, memberId: string) => Promise<void>;
+  updateMemberRole: (groupId: string, memberId: string, role: Member['role']) => Promise<void>;
   
   fetchExpenses: (groupId: string) => Promise<void>;
-  createExpense: (expenseData: Omit<Expense, 'id' | 'createdAt'>) => Promise<void>;
-  updateExpense: (expenseId: string, updates: Partial<Expense>) => Promise<void>;
+  createExpense: (expenseData: Omit<StoreExpense, 'id'>, userId: string) => Promise<void>;
+  addExpense: (expenseData: Omit<StoreExpense, 'id'>, userId: string) => Promise<void>;
+  updateExpense: (expenseId: string, updates: Partial<StoreExpense>) => Promise<void>;
   deleteExpense: (expenseId: string) => Promise<void>;
+  
+  getGroupExpenses: (groupId: string) => StoreExpense[];
+  getBalances: (groupId?: string) => Balance[];
+  calculateBalances: (groupId?: string) => Balance[];
+  addSettlement: (settlement: Omit<Settlement, 'id'>) => void;
+  simplifyDebts: () => void;
+  
+  addRecurringExpense: (recurringExpense: Omit<RecurringExpense, 'id'>) => void;
+  getGroupActivities: (groupId: string) => any[];
+  getGroupAnalytics: (groupId: string) => any;
   
   subscribeToGroups: (userId: string) => () => void;
   subscribeToExpenses: (groupId: string) => () => void;
+  initializeFirebaseSync: (userId: string) => () => void;
+  cleanup: () => void;
   
   clearError: () => void;
   resetStore: () => void;
 }
 
 // Helper functions to convert between Firebase and Store types
-const convertFirebaseGroupToGroup = (firebaseGroup: FirebaseGroup, memberData: Record<string, Member> = {}): Group => {
+const convertFirebaseGroupToGroup = (firebaseGroup: FirebaseGroup, memberData: Record<string, Member> = {}): StoreGroup => {
   return {
     id: firebaseGroup.id,
     name: firebaseGroup.name,
@@ -104,10 +90,10 @@ const convertFirebaseGroupToGroup = (firebaseGroup: FirebaseGroup, memberData: R
     coverImage: '',
     groupType: 'private',
     inviteCode: '',
-    settings: firebaseGroup.settings || {
-      currency: 'USD',
-      simplifyDebts: true,
-      notifications: true,
+    settings: {
+      currency: firebaseGroup.settings?.currency || 'USD',
+      simplifyDebts: firebaseGroup.settings?.simplifyDebts ?? true,
+      notifications: firebaseGroup.settings?.notifications ?? true,
       recurringBills: false,
     },
     tags: [],
@@ -124,17 +110,21 @@ const convertFirebaseGroupToGroup = (firebaseGroup: FirebaseGroup, memberData: R
   };
 };
 
-const convertGroupToFirebaseGroup = (group: Group): Omit<FirebaseGroup, 'id' | 'createdAt'> => {
+const convertGroupToFirebaseGroup = (group: StoreGroup): Omit<FirebaseGroup, 'id' | 'createdAt'> => {
   return {
     name: group.name,
     description: group.description,
     members: group.members.map(member => member.id),
     createdBy: group.createdBy,
-    settings: group.settings,
+    settings: {
+      currency: group.settings.currency,
+      simplifyDebts: group.settings.simplifyDebts,
+      notifications: group.settings.notifications,
+    },
   };
 };
 
-const convertFirebaseExpenseToExpense = (firebaseExpense: FirebaseExpense, memberData: Record<string, Member> = {}): Expense => {
+const convertFirebaseExpenseToExpense = (firebaseExpense: FirebaseExpense, memberData: Record<string, Member> = {}): StoreExpense => {
   return {
     id: firebaseExpense.id,
     description: firebaseExpense.description,
@@ -151,7 +141,7 @@ const convertFirebaseExpenseToExpense = (firebaseExpense: FirebaseExpense, membe
   };
 };
 
-const convertExpenseToFirebaseExpense = (expense: Expense): Omit<FirebaseExpense, 'id' | 'createdAt'> => {
+const convertExpenseToFirebaseExpense = (expense: Omit<StoreExpense, 'id'>): Omit<FirebaseExpense, 'id' | 'createdAt'> => {
   return {
     description: expense.description,
     amount: expense.amount,
@@ -167,11 +157,15 @@ export const useExpenseStore = create<ExpenseStore>((set, get) => ({
   groups: [],
   expenses: [],
   currentGroupId: null,
+  selectedGroup: null,
+  settlements: [],
+  recurringExpenses: [],
   loading: false,
   error: null,
 
   // Actions
   setCurrentGroup: (groupId) => set({ currentGroupId: groupId }),
+  setSelectedGroup: (group) => set({ selectedGroup: group }),
 
   fetchGroups: async (userId: string) => {
     set({ loading: true, error: null });
@@ -192,7 +186,11 @@ export const useExpenseStore = create<ExpenseStore>((set, get) => ({
         description: groupData.description,
         members: groupData.members.map(member => member.id),
         createdBy: userId,
-        settings: groupData.settings,
+        settings: {
+          currency: groupData.settings.currency,
+          simplifyDebts: groupData.settings.simplifyDebts,
+          notifications: groupData.settings.notifications,
+        },
       };
       
       const newFirebaseGroup = await createFirebaseGroup(firebaseGroupData, userId);
@@ -207,6 +205,10 @@ export const useExpenseStore = create<ExpenseStore>((set, get) => ({
     }
   },
 
+  addGroup: async (groupData, userId) => {
+    return get().createGroup(groupData, userId);
+  },
+
   updateGroup: async (groupId, updates) => {
     set({ loading: true, error: null });
     try {
@@ -215,7 +217,13 @@ export const useExpenseStore = create<ExpenseStore>((set, get) => ({
       if (updates.name) firebaseUpdates.name = updates.name;
       if (updates.description) firebaseUpdates.description = updates.description;
       if (updates.members) firebaseUpdates.members = updates.members.map(member => member.id);
-      if (updates.settings) firebaseUpdates.settings = updates.settings;
+      if (updates.settings) {
+        firebaseUpdates.settings = {
+          currency: updates.settings.currency,
+          simplifyDebts: updates.settings.simplifyDebts,
+          notifications: updates.settings.notifications,
+        };
+      }
       
       await updateFirebaseGroup(groupId, firebaseUpdates);
       
@@ -243,10 +251,14 @@ export const useExpenseStore = create<ExpenseStore>((set, get) => ({
     }
   },
 
-  addMember: async (groupId: string, member: Member) => {
+  archiveGroup: async (groupId: string) => {
+    await get().updateGroup(groupId, { isArchived: true });
+  },
+
+  addMemberToGroup: async (groupId: string, member: Member, addedBy: string) => {
     set({ loading: true, error: null });
     try {
-      await addMemberToGroup(groupId, member, member.id);
+      await addMemberToGroup(groupId, member, addedBy);
       set(state => ({
         groups: state.groups.map(group =>
           group.id === groupId ? { ...group, members: [...group.members, member] } : group
@@ -258,7 +270,7 @@ export const useExpenseStore = create<ExpenseStore>((set, get) => ({
     }
   },
 
-  removeMember: async (groupId: string, memberId: string) => {
+  removeMemberFromGroup: async (groupId: string, memberId: string) => {
     set({ loading: true, error: null });
     try {
       await removeMemberFromGroup(groupId, memberId);
@@ -274,6 +286,21 @@ export const useExpenseStore = create<ExpenseStore>((set, get) => ({
     }
   },
 
+  updateMemberRole: async (groupId: string, memberId: string, role: Member['role']) => {
+    set(state => ({
+      groups: state.groups.map(group => 
+        group.id === groupId 
+          ? {
+              ...group,
+              members: group.members.map(member =>
+                member.id === memberId ? { ...member, role } : member
+              )
+            }
+          : group
+      )
+    }));
+  },
+
   fetchExpenses: async (groupId: string) => {
     set({ loading: true, error: null });
     try {
@@ -285,11 +312,11 @@ export const useExpenseStore = create<ExpenseStore>((set, get) => ({
     }
   },
 
-  createExpense: async (expenseData) => {
+  createExpense: async (expenseData, userId: string) => {
     set({ loading: true, error: null });
     try {
       const firebaseExpenseData = convertExpenseToFirebaseExpense(expenseData);
-      const newFirebaseExpense = await createFirebaseExpense(firebaseExpenseData, expenseData.paidBy.id);
+      const newFirebaseExpense = await createFirebaseExpense(firebaseExpenseData, userId);
       const newExpense = convertFirebaseExpenseToExpense(newFirebaseExpense);
       
       set(state => ({ 
@@ -299,6 +326,10 @@ export const useExpenseStore = create<ExpenseStore>((set, get) => ({
     } catch (error) {
       set({ error: (error as Error).message, loading: false });
     }
+  },
+
+  addExpense: async (expenseData, userId: string) => {
+    return get().createExpense(expenseData, userId);
   },
 
   updateExpense: async (expenseId, updates) => {
@@ -344,6 +375,101 @@ export const useExpenseStore = create<ExpenseStore>((set, get) => ({
     }
   },
 
+  getGroupExpenses: (groupId: string) => {
+    const { expenses } = get();
+    return expenses.filter(expense => expense.groupId === groupId);
+  },
+
+  getBalances: (groupId?: string) => {
+    return get().calculateBalances(groupId);
+  },
+
+  calculateBalances: (groupId?: string) => {
+    const { expenses, currentGroupId } = get();
+    const targetGroupId = groupId || currentGroupId;
+    if (!targetGroupId) return [];
+
+    const groupExpenses = expenses.filter(expense => expense.groupId === targetGroupId);
+    const balances: Record<string, Record<string, number>> = {};
+
+    groupExpenses.forEach(expense => {
+      const paidById = expense.paidBy.id;
+      const splitAmount = expense.amount / expense.splitAmong.length;
+
+      expense.splitAmong.forEach(member => {
+        if (member.id !== paidById) {
+          if (!balances[member.id]) balances[member.id] = {};
+          if (!balances[member.id][paidById]) balances[member.id][paidById] = 0;
+          balances[member.id][paidById] += splitAmount;
+        }
+      });
+    });
+
+    const result: Balance[] = [];
+    const { groups } = get();
+    const group = groups.find(g => g.id === targetGroupId);
+    if (!group) return [];
+
+    Object.entries(balances).forEach(([fromId, debts]) => {
+      Object.entries(debts).forEach(([toId, amount]) => {
+        const fromMember = group.members.find(m => m.id === fromId);
+        const toMember = group.members.find(m => m.id === toId);
+        if (fromMember && toMember && amount > 0) {
+          result.push({
+            from: fromMember,
+            to: toMember,
+            amount
+          });
+        }
+      });
+    });
+
+    return result;
+  },
+
+  addSettlement: (settlement: Omit<Settlement, 'id'>) => {
+    const newSettlement: Settlement = {
+      id: crypto.randomUUID(),
+      ...settlement
+    };
+    set(state => ({
+      settlements: [...state.settlements, newSettlement]
+    }));
+  },
+
+  simplifyDebts: () => {
+    // Implementation for debt simplification algorithm
+    console.log('Simplifying debts...');
+  },
+
+  addRecurringExpense: (recurringExpense: Omit<RecurringExpense, 'id'>) => {
+    const newRecurringExpense: RecurringExpense = {
+      id: crypto.randomUUID(),
+      ...recurringExpense
+    };
+    set(state => ({
+      recurringExpenses: [...state.recurringExpenses, newRecurringExpense]
+    }));
+  },
+
+  getGroupActivities: (groupId: string) => {
+    const { expenses } = get();
+    return expenses.filter(expense => expense.groupId === groupId);
+  },
+
+  getGroupAnalytics: (groupId: string) => {
+    const { expenses } = get();
+    const groupExpenses = expenses.filter(expense => expense.groupId === groupId);
+    return {
+      totalExpenses: groupExpenses.length,
+      totalAmount: groupExpenses.reduce((sum, expense) => sum + expense.amount, 0),
+      categories: groupExpenses.reduce((acc, expense) => {
+        acc[expense.category] = (acc[expense.category] || 0) + expense.amount;
+        return acc;
+      }, {} as Record<string, number>)
+    };
+  },
+
   subscribeToGroups: (userId: string) => {
     let unsubscribe: () => void;
     set({ loading: true, error: null });
@@ -374,12 +500,31 @@ export const useExpenseStore = create<ExpenseStore>((set, get) => ({
     return unsubscribe;
   },
 
+  initializeFirebaseSync: (userId: string) => {
+    const unsubscribeGroups = get().subscribeToGroups(userId);
+    return () => {
+      unsubscribeGroups();
+    };
+  },
+
+  cleanup: () => {
+    set({
+      groups: [],
+      expenses: [],
+      currentGroupId: null,
+      selectedGroup: null,
+      settlements: [],
+      recurringExpenses: [],
+      loading: false,
+      error: null,
+    });
+  },
+
   clearError: () => set({ error: null }),
-  resetStore: () => set({
-    groups: [],
-    expenses: [],
-    currentGroupId: null,
-    loading: false,
-    error: null,
-  }),
+  resetStore: () => {
+    get().cleanup();
+  },
 }));
+
+// Export types for use in components
+export type { StoreGroup as Group, StoreExpense as Expense, Member, Balance, Settlement, RecurringExpense, GroupSettings };
