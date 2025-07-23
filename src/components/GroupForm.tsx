@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
@@ -30,7 +29,7 @@ export const GroupForm: React.FC<GroupFormProps> = ({ isOpen, onClose }) => {
     newTag: ''
   });
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!user) return;
 
@@ -61,7 +60,7 @@ export const GroupForm: React.FC<GroupFormProps> = ({ isOpen, onClose }) => {
       members,
       createdAt: new Date(),
       groupType: formData.groupType,
-      inviteCode: `${uuidv4().slice(0, 8)}-${uuidv4().slice(0, 4)}-${uuidv4().slice(0, 4)}-${uuidv4().slice(0, 4)}-${uuidv4().slice(0, 12)}` as const,
+      inviteCode: uuidv4(),
       settings: {
         currency: formData.currency,
         simplifyDebts: true,
@@ -69,25 +68,24 @@ export const GroupForm: React.FC<GroupFormProps> = ({ isOpen, onClose }) => {
         recurringBills: false
       },
       isArchived: false,
-      photo: null,
-      coverImage: null,
-      tags: formData.tags,
-      location: null,
-      memberNames: members.map(m => m.name),
-      memberEmails: members.map(m => m.email)
+      tags: formData.tags
     };
 
-    addGroup(newGroup);
-    onClose();
-    setFormData({
-      name: '',
-      description: '',
-      groupType: 'private',
-      currency: 'USD',
-      memberEmails: [''],
-      tags: [],
-      newTag: ''
-    });
+    try {
+      await addGroup(newGroup, user.uid);
+      onClose();
+      setFormData({
+        name: '',
+        description: '',
+        groupType: 'private',
+        currency: 'USD',
+        memberEmails: [''],
+        tags: [],
+        newTag: ''
+      });
+    } catch (error) {
+      console.error('Error creating group:', error);
+    }
   };
 
   const addMemberEmail = () => {
@@ -130,7 +128,7 @@ export const GroupForm: React.FC<GroupFormProps> = ({ isOpen, onClose }) => {
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="sm:max-w-[500px]">
+      <DialogContent className="sm:max-w-[500px] max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>Create New Group</DialogTitle>
         </DialogHeader>
@@ -157,7 +155,7 @@ export const GroupForm: React.FC<GroupFormProps> = ({ isOpen, onClose }) => {
             />
           </div>
 
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
               <Label htmlFor="groupType">Group Type</Label>
               <Select value={formData.groupType} onValueChange={(value: 'private' | 'public') => setFormData(prev => ({ ...prev, groupType: value }))}>
@@ -197,6 +195,7 @@ export const GroupForm: React.FC<GroupFormProps> = ({ isOpen, onClose }) => {
                     onChange={(e) => updateMemberEmail(index, e.target.value)}
                     placeholder="Enter email address"
                     type="email"
+                    className="flex-1"
                   />
                   {formData.memberEmails.length > 1 && (
                     <Button
@@ -204,6 +203,7 @@ export const GroupForm: React.FC<GroupFormProps> = ({ isOpen, onClose }) => {
                       variant="outline"
                       size="icon"
                       onClick={() => removeMemberEmail(index)}
+                      className="shrink-0"
                     >
                       <X className="h-4 w-4" />
                     </Button>
@@ -231,8 +231,9 @@ export const GroupForm: React.FC<GroupFormProps> = ({ isOpen, onClose }) => {
                 onChange={(e) => setFormData(prev => ({ ...prev, newTag: e.target.value }))}
                 placeholder="Add a tag"
                 onKeyPress={(e) => e.key === 'Enter' && (e.preventDefault(), addTag())}
+                className="flex-1"
               />
-              <Button type="button" variant="outline" onClick={addTag}>
+              <Button type="button" variant="outline" onClick={addTag} className="shrink-0">
                 Add
               </Button>
             </div>
@@ -245,11 +246,11 @@ export const GroupForm: React.FC<GroupFormProps> = ({ isOpen, onClose }) => {
             </div>
           </div>
 
-          <div className="flex justify-end space-x-2">
-            <Button type="button" variant="outline" onClick={onClose}>
+          <div className="flex flex-col sm:flex-row justify-end space-y-2 sm:space-y-0 sm:space-x-2">
+            <Button type="button" variant="outline" onClick={onClose} className="order-2 sm:order-1">
               Cancel
             </Button>
-            <Button type="submit">Create Group</Button>
+            <Button type="submit" className="order-1 sm:order-2">Create Group</Button>
           </div>
         </form>
       </DialogContent>
