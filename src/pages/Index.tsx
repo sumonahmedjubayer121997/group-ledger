@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Plus, Users, Receipt, TrendingUp, DollarSign, Calendar } from 'lucide-react';
 import { ExpenseForm } from '@/components/ExpenseForm';
 import { GroupForm } from '@/components/GroupForm';
+import { GroupDetailView } from '@/components/GroupDetailView';
 import { BalanceCard } from '@/components/BalanceCard';
 import { RecentExpenses } from '@/components/RecentExpenses';
 import { ExpenseChart } from '@/components/ExpenseChart';
@@ -12,15 +13,35 @@ import { GroupList } from '@/components/GroupList';
 import { SettlementHistory } from '@/components/SettlementHistory';
 import { ExportDialog } from '@/components/ExportDialog';
 import { ImportDialog } from '@/components/ImportDialog';
-import { useExpenseStore } from '@/stores/expenseStore';
+import { useExpenseStore, Group } from '@/stores/expenseStore';
 
 const Index = () => {
   const [showExpenseForm, setShowExpenseForm] = useState(false);
   const [showGroupForm, setShowGroupForm] = useState(false);
+  const [selectedGroup, setSelectedGroup] = useState<Group | null>(null);
   const { expenses, groups, getTotalExpenses, getBalances } = useExpenseStore();
 
   const totalExpenses = getTotalExpenses();
   const balances = getBalances();
+
+  const handleGroupClick = (group: Group) => {
+    setSelectedGroup(group);
+  };
+
+  const handleBackToMain = () => {
+    setSelectedGroup(null);
+  };
+
+  // Show group detail view if a group is selected
+  if (selectedGroup) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-blue-50 to-green-50">
+        <div className="max-w-7xl mx-auto px-4 py-8">
+          <GroupDetailView group={selectedGroup} onBack={handleBackToMain} />
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-green-50">
@@ -110,7 +131,7 @@ const Index = () => {
           {/* Left Column - Balances and Groups */}
           <div className="lg:col-span-1 space-y-6">
             <BalanceCard balances={balances} />
-            <GroupList groups={groups} />
+            <GroupList groups={groups} onGroupClick={handleGroupClick} />
           </div>
 
           {/* Right Column - Expenses and Chart */}
