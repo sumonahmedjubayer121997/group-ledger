@@ -1,157 +1,187 @@
 
-import React, { useState } from 'react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Plus, Users, Receipt, TrendingUp, DollarSign, Calendar } from 'lucide-react';
-import { ExpenseForm } from '@/components/ExpenseForm';
-import { GroupForm } from '@/components/GroupForm';
-import { GroupDetailView } from '@/components/GroupDetailView';
-import { BalanceCard } from '@/components/BalanceCard';
-import { RecentExpenses } from '@/components/RecentExpenses';
-import { ExpenseChart } from '@/components/ExpenseChart';
-import { GroupList } from '@/components/GroupList';
-import { SettlementHistory } from '@/components/SettlementHistory';
-import { ExportDialog } from '@/components/ExportDialog';
-import { ImportDialog } from '@/components/ImportDialog';
-import { useExpenseStore, Group } from '@/stores/expenseStore';
+import { useState } from "react";
+import { Plus, Settings, Users, Receipt, TrendingUp, User } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { useAuth } from "@/contexts/AuthContext";
+import { useExpenseStore } from "@/stores/expenseStore";
+import { GroupForm } from "@/components/GroupForm";
+import { GroupList } from "@/components/GroupList";
+import { GroupDetailView } from "@/components/GroupDetailView";
+import { ExpenseForm } from "@/components/ExpenseForm";
+import { RecentExpenses } from "@/components/RecentExpenses";
+import { BalanceCard } from "@/components/BalanceCard";
+import { ExpenseChart } from "@/components/ExpenseChart";
+import { UserProfile } from "@/components/UserProfile";
 
 const Index = () => {
-  const [showExpenseForm, setShowExpenseForm] = useState(false);
+  const { user, userProfile, logout } = useAuth();
+  const { groups, expenses, selectedGroup, setSelectedGroup } = useExpenseStore();
   const [showGroupForm, setShowGroupForm] = useState(false);
-  const [selectedGroup, setSelectedGroup] = useState<Group | null>(null);
-  const { expenses, groups, getTotalExpenses, getBalances } = useExpenseStore();
+  const [showExpenseForm, setShowExpenseForm] = useState(false);
+  const [showUserProfile, setShowUserProfile] = useState(false);
 
-  const totalExpenses = getTotalExpenses();
-  const balances = getBalances();
-
-  const handleGroupClick = (group: Group) => {
-    setSelectedGroup(group);
+  const handleLogout = async () => {
+    try {
+      await logout();
+    } catch (error) {
+      console.error('Error logging out:', error);
+    }
   };
 
-  const handleBackToMain = () => {
-    setSelectedGroup(null);
-  };
+  if (showUserProfile) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-blue-50 to-green-50">
+        <UserProfile onClose={() => setShowUserProfile(false)} />
+      </div>
+    );
+  }
 
-  // Show group detail view if a group is selected
   if (selectedGroup) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-blue-50 to-green-50">
-        <div className="max-w-7xl mx-auto px-4 py-8">
-          <GroupDetailView group={selectedGroup} onBack={handleBackToMain} />
-        </div>
+        <GroupDetailView />
       </div>
     );
   }
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-green-50">
-      {/* Header */}
-      <header className="bg-white shadow-sm border-b">
-        <div className="max-w-7xl mx-auto px-4 py-6">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center space-x-3">
-              <div className="w-10 h-10 bg-gradient-to-r from-blue-500 to-green-500 rounded-full flex items-center justify-center">
-                <DollarSign className="w-6 h-6 text-white" />
-              </div>
-              <h1 className="text-2xl font-bold text-gray-900">SplitSmart</h1>
+      <div className="container mx-auto px-4 py-8">
+        {/* Header */}
+        <div className="flex justify-between items-center mb-8">
+          <div>
+            <h1 className="text-3xl font-bold text-gray-900">SplitWize</h1>
+            <p className="text-gray-600">Split expenses with friends and family</p>
+          </div>
+          <div className="flex items-center gap-3">
+            <Button
+              onClick={() => setShowUserProfile(true)}
+              variant="outline"
+              size="sm"
+            >
+              <User className="h-4 w-4 mr-2" />
+              Profile
+            </Button>
+            <Button
+              onClick={() => setShowGroupForm(true)}
+              className="bg-blue-600 hover:bg-blue-700"
+            >
+              <Plus className="h-4 w-4 mr-2" />
+              New Group
+            </Button>
+            <Button
+              onClick={handleLogout}
+              variant="outline"
+              size="sm"
+            >
+              <Settings className="h-4 w-4 mr-2" />
+              Logout
+            </Button>
+          </div>
+        </div>
+
+        {/* Welcome Message */}
+        <div className="mb-8">
+          <Card className="bg-white/80 backdrop-blur-sm">
+            <CardHeader>
+              <CardTitle className="text-xl">
+                Welcome back, {userProfile?.displayName || 'User'}! 👋
+              </CardTitle>
+              <CardDescription>
+                Here's your expense overview
+              </CardDescription>
+            </CardHeader>
+          </Card>
+        </div>
+
+        {/* Main Content */}
+        <Tabs defaultValue="overview" className="space-y-6">
+          <TabsList className="grid w-full grid-cols-4">
+            <TabsTrigger value="overview">Overview</TabsTrigger>
+            <TabsTrigger value="groups">Groups</TabsTrigger>
+            <TabsTrigger value="expenses">Expenses</TabsTrigger>
+            <TabsTrigger value="analytics">Analytics</TabsTrigger>
+          </TabsList>
+
+          <TabsContent value="overview" className="space-y-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              <BalanceCard />
+              <Card>
+                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                  <CardTitle className="text-sm font-medium">Total Groups</CardTitle>
+                  <Users className="h-4 w-4 text-muted-foreground" />
+                </CardHeader>
+                <CardContent>
+                  <div className="text-2xl font-bold">{groups.length}</div>
+                  <p className="text-xs text-muted-foreground">
+                    Active groups
+                  </p>
+                </CardContent>
+              </Card>
+              <Card>
+                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                  <CardTitle className="text-sm font-medium">Total Expenses</CardTitle>
+                  <Receipt className="h-4 w-4 text-muted-foreground" />
+                </CardHeader>
+                <CardContent>
+                  <div className="text-2xl font-bold">{expenses.length}</div>
+                  <p className="text-xs text-muted-foreground">
+                    All time
+                  </p>
+                </CardContent>
+              </Card>
             </div>
-            <div className="flex space-x-3">
+            <RecentExpenses />
+          </TabsContent>
+
+          <TabsContent value="groups" className="space-y-6">
+            <GroupList />
+          </TabsContent>
+
+          <TabsContent value="expenses" className="space-y-6">
+            <div className="flex justify-between items-center">
+              <h2 className="text-2xl font-bold">All Expenses</h2>
               <Button
                 onClick={() => setShowExpenseForm(true)}
-                className="bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 text-white"
+                className="bg-green-600 hover:bg-green-700"
               >
-                <Plus className="w-4 h-4 mr-2" />
+                <Plus className="h-4 w-4 mr-2" />
                 Add Expense
               </Button>
-              <Button
-                onClick={() => setShowGroupForm(true)}
-                variant="outline"
-                className="border-blue-200 text-blue-600 hover:bg-blue-50"
-              >
-                <Users className="w-4 h-4 mr-2" />
-                New Group
-              </Button>
-              <ExportDialog>
-                <Button variant="outline" className="border-green-200 text-green-600 hover:bg-green-50">
-                  <Receipt className="w-4 h-4 mr-2" />
-                  Export
-                </Button>
-              </ExportDialog>
-              <ImportDialog>
-                <Button variant="outline" className="border-purple-200 text-purple-600 hover:bg-purple-50">
-                  <Plus className="w-4 h-4 mr-2" />
-                  Import
-                </Button>
-              </ImportDialog>
             </div>
-          </div>
-        </div>
-      </header>
+            <RecentExpenses showAll />
+          </TabsContent>
 
-      {/* Main Content */}
-      <main className="max-w-7xl mx-auto px-4 py-8">
-        {/* Stats Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-          <Card className="bg-white shadow-lg border-0 hover:shadow-xl transition-shadow">
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium text-gray-600">Total Expenses</CardTitle>
-              <Receipt className="w-4 h-4 text-blue-500" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold text-gray-900">${totalExpenses.toFixed(2)}</div>
-              <p className="text-xs text-gray-500">Across {groups.length} groups</p>
-            </CardContent>
-          </Card>
-
-          <Card className="bg-white shadow-lg border-0 hover:shadow-xl transition-shadow">
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium text-gray-600">Active Groups</CardTitle>
-              <Users className="w-4 h-4 text-green-500" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold text-gray-900">{groups.length}</div>
-              <p className="text-xs text-gray-500">With {expenses.length} expenses</p>
-            </CardContent>
-          </Card>
-
-          <Card className="bg-white shadow-lg border-0 hover:shadow-xl transition-shadow">
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium text-gray-600">This Month</CardTitle>
-              <TrendingUp className="w-4 h-4 text-purple-500" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold text-gray-900">${(totalExpenses * 0.7).toFixed(2)}</div>
-              <p className="text-xs text-green-600">+12% from last month</p>
-            </CardContent>
-          </Card>
-        </div>
-
-        {/* Main Dashboard Grid */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-          {/* Left Column - Balances and Groups */}
-          <div className="lg:col-span-1 space-y-6">
-            <BalanceCard balances={balances} />
-            <GroupList groups={groups} onGroupClick={handleGroupClick} />
-          </div>
-
-          {/* Right Column - Expenses and Chart */}
-          <div className="lg:col-span-2 space-y-6">
-            <ExpenseChart expenses={expenses} />
-            <RecentExpenses expenses={expenses} />
-            <SettlementHistory />
-          </div>
-        </div>
-      </main>
+          <TabsContent value="analytics" className="space-y-6">
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              <ExpenseChart />
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <TrendingUp className="h-5 w-5" />
+                    Spending Trends
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <p className="text-muted-foreground">
+                    Analytics coming soon...
+                  </p>
+                </CardContent>
+              </Card>
+            </div>
+          </TabsContent>
+        </Tabs>
+      </div>
 
       {/* Modals */}
-      <ExpenseForm
-        isOpen={showExpenseForm}
-        onClose={() => setShowExpenseForm(false)}
-      />
-      <GroupForm
-        isOpen={showGroupForm}
-        onClose={() => setShowGroupForm(false)}
-      />
+      {showGroupForm && (
+        <GroupForm onClose={() => setShowGroupForm(false)} />
+      )}
+      {showExpenseForm && (
+        <ExpenseForm onClose={() => setShowExpenseForm(false)} />
+      )}
     </div>
   );
 };
