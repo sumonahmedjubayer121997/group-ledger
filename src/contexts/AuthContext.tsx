@@ -73,6 +73,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           await fetchUserProfile(firebaseUser.uid);
         } catch (error) {
           console.log('Error fetching user profile:', error);
+          // If profile doesn't exist, create it
+          try {
+            console.log('Creating missing user profile...');
+            await createUserProfile(firebaseUser);
+          } catch (createError) {
+            console.error('Error creating user profile:', createError);
+          }
         }
       } else {
         setUserProfile(null);
