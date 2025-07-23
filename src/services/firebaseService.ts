@@ -1,3 +1,4 @@
+
 import { 
   collection, 
   doc, 
@@ -82,6 +83,7 @@ export const updateGroup = async (groupId: string, updates: Partial<Group>) => {
 
 export const getUserGroups = async (userId: string) => {
   try {
+    console.log('Fetching groups for user:', userId);
     const groupsRef = collection(db, 'groups');
     const q = query(
       groupsRef,
@@ -91,10 +93,14 @@ export const getUserGroups = async (userId: string) => {
     const querySnapshot = await getDocs(q);
     const groups: Group[] = [];
     
+    console.log('Found groups:', querySnapshot.size);
+    
     querySnapshot.forEach((doc) => {
       const data = doc.data();
-      // Transform members object back to array
-      const membersArray = Object.keys(data.members).map(memberId => ({
+      console.log('Processing group:', doc.id, data);
+      
+      // Transform members object back to array - handle both old and new format
+      const membersArray = Object.keys(data.members || {}).map(memberId => ({
         id: memberId,
         name: data.memberNames?.[memberId] || 'Unknown',
         email: data.memberEmails?.[memberId] || '',
@@ -102,14 +108,31 @@ export const getUserGroups = async (userId: string) => {
         joinedAt: data.joinedAt?.[memberId]?.toDate() || new Date(),
       }));
 
-      groups.push({
+      const group: Group = {
         id: doc.id,
-        ...data,
+        name: data.name || 'Unnamed Group',
+        description: data.description || '',
         members: membersArray,
         createdAt: data.createdAt?.toDate() || new Date(),
-      } as Group);
+        groupType: data.groupType || 'private',
+        inviteCode: data.inviteCode || '',
+        settings: data.settings || {
+          currency: 'USD',
+          simplifyDebts: true,
+          notifications: true,
+          recurringBills: false,
+        },
+        tags: data.tags || [],
+        location: data.location || '',
+        isArchived: data.isArchived || false,
+        photo: data.photo,
+        coverImage: data.coverImage,
+      };
+
+      groups.push(group);
     });
     
+    console.log('Processed groups:', groups.length);
     return groups;
   } catch (error) {
     console.error('Error fetching groups:', error);
@@ -200,6 +223,7 @@ export const getGroupExpenses = async (groupId: string) => {
 
 // Real-time listeners
 export const subscribeToUserGroups = (userId: string, callback: (groups: Group[]) => void) => {
+  console.log('Setting up groups subscription for user:', userId);
   const groupsRef = collection(db, 'groups');
   const q = query(
     groupsRef,
@@ -207,9 +231,13 @@ export const subscribeToUserGroups = (userId: string, callback: (groups: Group[]
   );
   
   return onSnapshot(q, (snapshot) => {
+    console.log('Groups snapshot received, size:', snapshot.size);
     const groups: Group[] = [];
+    
     snapshot.forEach((doc) => {
       const data = doc.data();
+      console.log('Processing group from subscription:', doc.id, data);
+      
       // Transform members object back to array
       const membersArray = Object.keys(data.members || {}).map(memberId => ({
         id: memberId,
@@ -219,15 +247,31 @@ export const subscribeToUserGroups = (userId: string, callback: (groups: Group[]
         joinedAt: data.joinedAt?.[memberId]?.toDate() || new Date(),
       }));
 
-      groups.push({
+      const group: Group = {
         id: doc.id,
-        ...data,
+        name: data.name || 'Unnamed Group',
+        description: data.description || '',
         members: membersArray,
         createdAt: data.createdAt?.toDate() || new Date(),
-      } as Group);
+        groupType: data.groupType || 'private',
+        inviteCode: data.inviteCode || '',
+        settings: data.settings || {
+          currency: 'USD',
+          simplifyDebts: true,
+          notifications: true,
+          recurringBills: false,
+        },
+        tags: data.tags || [],
+        location: data.location || '',
+        isArchived: data.isArchived || false,
+        photo: data.photo,
+        coverImage: data.coverImage,
+      };
+
+      groups.push(group);
     });
     
-    console.log('Firebase groups subscription updated:', groups);
+    console.log('Firebase groups subscription updated with groups:', groups.length);
     callback(groups);
   }, (error) => {
     console.error('Error in groups subscription:', error);
