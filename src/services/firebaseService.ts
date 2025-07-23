@@ -166,74 +166,27 @@ console.log("📌 IsArray?", Array.isArray(groupData.members));
     // Process members - ensure it's an array
     const membersArray = Array.isArray(groupData.members) ? groupData.members : [];
     
-    // Also initialize pendingInvitations object
-    const pendingInvitations: Record<string, any> = {};
-
     for (const member of membersArray) {
-      const memberId = member.id;
-      const isEmailInvitation = memberId.includes('@');
-      
-      if (isEmailInvitation) {
-        // Check if user already exists in Firebase Auth
-        let existingUserUID: string | null = null;
-        
-        try {
-          const usersRef = collection(db, 'users');
-          const q = query(usersRef, where('email', '==', member.email));
-          const querySnapshot = await getDocs(q);
-          
-          if (!querySnapshot.empty) {
-            existingUserUID = querySnapshot.docs[0].id;
-          }
-        } catch (error) {
-          console.log('Error checking for existing user during group creation:', error);
-        }
-        
-        if (existingUserUID) {
-          // User exists - add them directly
-          users[existingUserUID] = {
-            name: member.name,
-            email: member.email,
-            role: member.role || 'member',
-            joinedAt: serverTimestamp(),
-          };
-        } else {
-          // Store as pending invitation with tempId
-          const tempId = crypto.randomUUID();
-          pendingInvitations[member.email] = {
-            tempId,
-            name: member.name,
-            email: member.email,
-            uid: null,
-            role: member.role || 'member',
-            status: 'invited',
-            invitedAt: serverTimestamp(),
-            invitedBy: userId,
-          };
-        }
-      } else {
-        // Regular UID-based member
-        const existingUser = await getUserProfile(memberId);
-        console.log("👤 Checking user profile for memberId:", memberId);
+  const memberId = member.id;
+  const existingUser = await getUserProfile(memberId);
+  console.log("👤 Checking user profile for memberId:", memberId);
 
-        const name = (member.name || existingUser?.name || 'Unknown').trim();
-        const email = (member.email || existingUser?.email || '').trim(); 
+  const name = (member.name || existingUser?.name || 'Unknown').trim();
+  const email = (member.email || existingUser?.email || '').trim(); 
 
-        users[memberId] = {
-          name,
-          email,
-          role: member.role,
-          joinedAt: serverTimestamp(),
-          isTemporary: !existingUser
-        };
-      }
-    }
+  users[memberId] = {
+    name,
+    email,
+    role: member.role,
+    joinedAt: serverTimestamp(),
+    isTemporary: !existingUser
+  };
+}
 
     const firestoreGroup = {
       name: groupData.name.trim(),
       description: groupData.description?.trim() || '',
       users,
-      pendingInvitations,
       createdBy: userId,
       createdAt: serverTimestamp(),
       groupType: groupData.groupType || 'private',
@@ -528,292 +481,64 @@ export const subscribeToGroupExpenses = (groupId: string, callback: (expenses: E
   });
 };
 
-// Enhanced member management with UID-first approach
+// Member management with new structure
 export const addMemberToGroup = async (groupId: string, member: Member, userId: string) => {
   try {
-    // Check if member.id looks like an email
-    const isEmailInvitation = member.id.includes('@');
+    // Check if user exists in users collection
+    let userProfile = await getUserProfile(member.id);
     
-    if (isEmailInvitation) {
-      // First, try to find if user already exists in Firebase Auth
-      let existingUserUID: string | null = null;
-      
-      try {
-        // Query Firebase Auth to see if this email is already registered
-        const usersRef = collection(db, 'users');
-        const q = query(usersRef, where('email', '==', member.email));
-        const querySnapshot = await getDocs(q);
-        
-        if (!querySnapshot.empty) {
-          existingUserUID = querySnapshot.docs[0].id;
-          console.log('Found existing user with UID:', existingUserUID, 'for email:', member.email);
-        }
-      } catch (error) {
-        console.log('Error checking for existing user:', error);
-      }
-      
-      if (existingUserUID) {
-        // User exists - add them directly with their UID
-        const groupRef = doc(db, 'groups', groupId);
-        await updateDoc(groupRef, {
-          [`users.${existingUserUID}`]: {
-            name: member.name,
-            email: member.email,
-            role: member.role || 'member',
-            joinedAt: serverTimestamp(),
-          },
-        });
-        
-        // Add to user's groups subcollection
-        const userGroupRef = doc(db, 'users', existingUserUID, 'groups', groupId);
-        await setDoc(userGroupRef, {
-          groupId,
-          role: member.role || 'member',
-          joinedAt: serverTimestamp(),
-        });
-        
-        console.log('Added existing user directly to group');
-      } else {
-        // User doesn't exist - store as pending invitation with tempId
-        const tempId = crypto.randomUUID();
-        
-        const groupRef = doc(db, 'groups', groupId);
-        await updateDoc(groupRef, {
-          [`pendingInvitations.${member.email}`]: {
-            tempId,
-            name: member.name,
-            email: member.email,
-            uid: null,
-            role: member.role || 'member',
-            status: 'invited',
-            invitedAt: serverTimestamp(),
-            invitedBy: userId,
-          },
-        });
-        
-        // Store in global pending invitations collection
-        const invitationRef = doc(db, 'pendingInvitations', member.email);
-        await setDoc(invitationRef, {
-          email: member.email,
-          groups: {
-            [groupId]: {
-              tempId,
-              name: member.name,
-              role: member.role || 'member',
-              invitedAt: serverTimestamp(),
-              invitedBy: userId,
-            }
-          }
-        }, { merge: true });
-        
-        console.log('Created pending invitation for non-existing user');
-      }
-    } else {
-      // Regular UID-based member addition
-      let userProfile = await getUserProfile(member.id);
-      
-      // If user doesn't exist, create their profile
-      if (!userProfile) {
-        userProfile = await createUserProfile({
-          uid: member.id,
-          name: member.name,
-          email: member.email,
-          verified: false,
-          preferences: {
-            currency: 'USD',
-            theme: 'light',
-            language: 'en',
-          },
-        });
-      }
-      
-      // Update group's users object
-      const groupRef = doc(db, 'groups', groupId);
-      await updateDoc(groupRef, {
-        [`users.${member.id}`]: {
-          name: userProfile.name,
-          email: userProfile.email,
-          role: member.role || 'member',
-          joinedAt: serverTimestamp(),
+    // If user doesn't exist, create their profile
+    if (!userProfile) {
+      userProfile = await createUserProfile({
+        uid: member.id,
+        name: member.name,
+        email: member.email,
+        verified: false,
+        preferences: {
+          currency: 'USD',
+          theme: 'light',
+          language: 'en',
         },
       });
-      
-      // Add to members subcollection
-      const memberRef = doc(db, 'groups', groupId, 'members', member.id);
-      await setDoc(memberRef, {
-        role: member.role || 'member',
-        joinedAt: serverTimestamp(),
-      });
-      
-      // Add to user's groups subcollection
-      const userGroupRef = doc(db, 'users', member.id, 'groups', groupId);
-      await setDoc(userGroupRef, {
-        groupId,
+    }
+    
+    // Update group's users object
+    const groupRef = doc(db, 'groups', groupId);
+    await updateDoc(groupRef, {
+      [`users.${member.id}`]: {
+        name: userProfile.name,
+        email: userProfile.email,
         role: 'member',
         joinedAt: serverTimestamp(),
+      },
+    });
+    
+    // Add to members subcollection
+    const memberRef = doc(db, 'groups', groupId, 'members', member.id);
+    await setDoc(memberRef, {
+      role: 'member',
+      joinedAt: serverTimestamp(),
+    });
+    
+    // Add to user's groups subcollection
+    const userGroupRef = doc(db, 'users', member.id, 'groups', groupId);
+    await setDoc(userGroupRef, {
+      groupId,
+      role: 'member',
+      joinedAt: serverTimestamp(),
+    });
+    
+    // Update user stats
+    if (userProfile) {
+      await updateUserProfile(member.id, {
+        stats: {
+          ...userProfile.stats,
+          groupsJoined: userProfile.stats.groupsJoined + 1,
+        },
       });
-      
-      // Update user stats
-      if (userProfile) {
-        await updateUserProfile(member.id, {
-          stats: {
-            ...userProfile.stats,
-            groupsJoined: userProfile.stats.groupsJoined + 1,
-          },
-        });
-      }
     }
   } catch (error) {
     console.error('Error adding member to group:', error);
-    throw error;
-  }
-};
-
-// Enhanced function to link pending email invitations to UID when user signs up
-export const linkPendingInvitationsToUser = async (email: string, uid: string) => {
-  try {
-    console.log('Linking pending invitations for email:', email, 'to UID:', uid);
-    
-    // Get pending invitations for this email
-    const invitationRef = doc(db, 'pendingInvitations', email);
-    const invitationDoc = await getDoc(invitationRef);
-    
-    if (!invitationDoc.exists()) {
-      console.log('No pending invitations found for email:', email);
-      return;
-    }
-    
-    const invitationData = invitationDoc.data();
-    const groups = invitationData?.groups || {};
-    
-    console.log('Found pending invitations for groups:', Object.keys(groups));
-    
-    // Process each group invitation
-    for (const [groupId, invitation] of Object.entries(groups)) {
-      try {
-        const groupRef = doc(db, 'groups', groupId);
-        const groupDoc = await getDoc(groupRef);
-        
-        if (!groupDoc.exists()) {
-          console.log('Group not found:', groupId);
-          continue;
-        }
-        
-        const invitationInfo = invitation as any;
-        
-        // Add user to the group's users object with their actual UID
-        await updateDoc(groupRef, {
-          [`users.${uid}`]: {
-            name: invitationInfo.name,
-            email: email,
-            role: invitationInfo.role,
-            joinedAt: serverTimestamp(),
-          },
-          // Remove from pending invitations
-          [`pendingInvitations.${email}`]: null,
-        });
-        
-        // Add to members subcollection
-        const memberRef = doc(db, 'groups', groupId, 'members', uid);
-        await setDoc(memberRef, {
-          role: invitationInfo.role,
-          joinedAt: serverTimestamp(),
-        });
-        
-        // Add to user's groups subcollection
-        const userGroupRef = doc(db, 'users', uid, 'groups', groupId);
-        await setDoc(userGroupRef, {
-          groupId,
-          role: invitationInfo.role,
-          joinedAt: serverTimestamp(),
-        });
-        
-        console.log('Successfully linked user to group:', groupId);
-      } catch (error) {
-        console.error('Error linking user to group:', groupId, error);
-      }
-    }
-    
-    // Clean up the pending invitations document
-    await deleteDoc(invitationRef);
-    console.log('Cleaned up pending invitations for:', email);
-    
-  } catch (error) {
-    console.error('Error linking pending invitations:', error);
-    throw error;
-  }
-};
-
-// Backfill function to fix existing data where users exist but weren't linked
-export const backfillExistingUserInvitations = async () => {
-  try {
-    console.log('Starting backfill process for existing user invitations...');
-    
-    // Get all groups
-    const groupsRef = collection(db, 'groups');
-    const groupsSnapshot = await getDocs(groupsRef);
-    
-    const updatePromises = [];
-    
-    for (const groupDoc of groupsSnapshot.docs) {
-      const groupData = groupDoc.data();
-      const pendingInvitations = groupData.pendingInvitations || {};
-      
-      // Check each pending invitation
-      for (const [email, invitationData] of Object.entries(pendingInvitations)) {
-        const invitation = invitationData as any;
-        
-        // Skip if already has UID
-        if (invitation.uid) {
-          continue;
-        }
-        
-        try {
-          // Try to find existing user with this email
-          const usersRef = collection(db, 'users');
-          const q = query(usersRef, where('email', '==', email));
-          const userSnapshot = await getDocs(q);
-          
-          if (!userSnapshot.empty) {
-            const existingUserUID = userSnapshot.docs[0].id;
-            console.log('Found existing user for backfill:', email, '->', existingUserUID);
-            
-            // Convert pending invitation to actual membership
-            const groupRef = doc(db, 'groups', groupDoc.id);
-            updatePromises.push(
-              updateDoc(groupRef, {
-                [`users.${existingUserUID}`]: {
-                  name: invitation.name,
-                  email: email,
-                  role: invitation.role,
-                  joinedAt: invitation.invitedAt || serverTimestamp(),
-                },
-                [`pendingInvitations.${email}`]: null, // Remove pending invitation
-              })
-            );
-            
-            // Add to user's groups subcollection
-            const userGroupRef = doc(db, 'users', existingUserUID, 'groups', groupDoc.id);
-            updatePromises.push(
-              setDoc(userGroupRef, {
-                groupId: groupDoc.id,
-                role: invitation.role,
-                joinedAt: invitation.invitedAt || serverTimestamp(),
-              })
-            );
-          }
-        } catch (error) {
-          console.error('Error processing backfill for email:', email, error);
-        }
-      }
-    }
-    
-    // Execute all updates
-    await Promise.all(updatePromises);
-    console.log('Backfill process completed. Updated', updatePromises.length / 2, 'user memberships.');
-    
-  } catch (error) {
-    console.error('Error during backfill process:', error);
     throw error;
   }
 };
