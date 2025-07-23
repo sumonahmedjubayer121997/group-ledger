@@ -1,3 +1,4 @@
+
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { 
   User,
@@ -56,16 +57,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       
       if (firebaseUser) {
         try {
-          await fetchUserProfile(firebaseUser.uid);
+          await ensureUserProfileExists(firebaseUser);
         } catch (error) {
-          console.log('Error fetching user profile:', error);
-          // If profile doesn't exist, create it
-          try {
-            console.log('Creating missing user profile...');
-            await createUserProfileFromFirebaseUser(firebaseUser);
-          } catch (createError) {
-            console.error('Error creating user profile:', createError);
-          }
+          console.error('Error ensuring user profile exists:', error);
         }
       } else {
         setUserProfile(null);
@@ -76,6 +70,37 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
     return unsubscribe;
   }, []);
+
+  const ensureUserProfileExists = async (firebaseUser: User) => {
+    try {
+      // First, try to fetch existing profile
+      const existingProfile = await getUserProfile(firebaseUser.uid);
+      if (existingProfile) {
+        console.log('Found existing user profile:', existingProfile.email);
+        setUserProfile(existingProfile);
+        return;
+      }
+    } catch (error) {
+      console.log('No existing profile found, will create one');
+    }
+
+    // If no profile exists, create one
+    try {
+      console.log('Creating user profile for:', firebaseUser.email);
+      await createUserProfileFromFirebaseUser(firebaseUser);
+      
+      // Link any pending email invitations to this user
+      if (firebaseUser.email) {
+        try {
+          await linkPendingInvitationsToUser(firebaseUser.email, firebaseUser.uid);
+        } catch (error) {
+          console.error('Error linking pending invitations during sign-in:', error);
+        }
+      }
+    } catch (createError) {
+      console.error('Error creating user profile during sign-in:', createError);
+    }
+  };
 
   const fetchUserProfile = async (uid: string) => {
     try {
@@ -107,8 +132,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         ...additionalData,
       });
       
-      // Note: Pending email invitations will be linked via the Firebase sync in useExpenseStore
-      
       setUserProfile(profile);
     } catch (error) {
       console.error('Error creating user profile:', error);
@@ -119,6 +142,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setLoading(true);
     try {
       await signInWithEmailAndPassword(auth, email, password);
+      // Profile creation will be handled by onAuthStateChanged
     } finally {
       setLoading(false);
     }
@@ -150,16 +174,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setLoading(true);
     try {
       const provider = new GoogleAuthProvider();
-      const { user: firebaseUser } = await signInWithPopup(auth, provider);
-      
-      try {
-        const profile = await getUserProfile(firebaseUser.uid);
-        if (!profile) {
-          await createUserProfileFromFirebaseUser(firebaseUser);
-        }
-      } catch (error) {
-        console.error('Error checking/creating user profile:', error);
-      }
+      await signInWithPopup(auth, provider);
+      // Profile creation will be handled by onAuthStateChanged
     } finally {
       setLoading(false);
     }
