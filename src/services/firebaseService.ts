@@ -19,7 +19,10 @@ import {
 import { User } from 'firebase/auth';
 import { db } from '@/lib/firebase';
 import { Group, Expense, Member, Settlement } from '@/stores/expenseStore';
-
+import { getSimilarEmails } from '@/components/firebaseComponents/FindSimilarEmails';
+import { findSimilarEmails } from '@/components/firebaseComponents/FindSimilarEmails';
+import { logAllUserEmails } from '@/components/firebaseComponents/LogAllUserEmail';
+import { findSimilarEmailUIDs } from '@/components/firebaseComponents/FindSimilarUIDs';
 // User Profile Interface
 export interface UserProfile {
   uid: string;
@@ -150,7 +153,7 @@ export const mergeTemporaryUserWithRealUser = async (realUser: User) => {
   }
 
   if (!email) return;
-console.log("Merging temp user for:", realUser.email, realUser.uid);
+  console.log("Merging temp user for:", realUser.email, realUser.uid);
 
   // 🔎 STEP 1: Look for any temp user by email
   const groupsSnapshot = await getDocs(collection(db, 'groups'));
@@ -229,9 +232,15 @@ export const createGroup = async (groupData: Omit<Group, 'id'>, userId: string) 
       role: 'admin',
       joinedAt: serverTimestamp(),
     };
+    findSimilarEmails(groupData.members.map(m => m.email).join(', '))
+   
+     findSimilarEmailUIDs(groupData.members.map(m => m.email).join(', '));
+ 
+
 console.log("🔍 groupData.members", groupData.members);
 console.log("📌 Type:", typeof groupData.members);
 console.log("📌 IsArray?", Array.isArray(groupData.members));
+console.log("users:", users);
 
     // Process members - ensure it's an array
     const membersArray = Array.isArray(groupData.members) ? groupData.members : [];
@@ -554,20 +563,15 @@ export const subscribeToGroupExpenses = (groupId: string, callback: (expenses: E
 // Member management with new structure
 export const addMemberToGroup = async (groupId: string, member: Member, userId: string) => {
   try {
-    // 🔍 Step 1: Check if user with the given email already exists
-    const matchingUserSnapshot = await getDocs(
-      query(collection(db, 'users'), where('email', '==', member.email))
-    );
-
     let userIdToUse = '';
     let isTemporary = false;
 
-    if (!matchingUserSnapshot.empty) {
-      // ✅ Use real Firebase UID
-      const matchedUserDoc = matchingUserSnapshot.docs[0];
-      userIdToUse = matchedUserDoc.id;
+    // 🔍 Step 1: First try to find a similar or exact user
+    const similarUsers = await findSimilarEmailUIDs(member.email);
+    if (similarUsers.length > 0) {
+      userIdToUse = similarUsers[0].uid;
       isTemporary = false;
-      console.log(`✔️ Existing user found: ${userIdToUse}`);
+      console.log(`✔️ Similar or existing user found: ${userIdToUse}`);
     } else {
       // 🆕 Generate a UUID for temporary user
       userIdToUse = crypto.randomUUID();
@@ -580,7 +584,7 @@ export const addMemberToGroup = async (groupId: string, member: Member, userId: 
     if (!userProfile) {
       await createUserProfile({
         uid: userIdToUse,
-        email: member.email,
+        email: member.email.trim().toLowerCase(),
         name: member.name,
         verified: false,
         preferences: {
@@ -621,7 +625,7 @@ export const addMemberToGroup = async (groupId: string, member: Member, userId: 
       await updateUserProfile(userIdToUse, {
         stats: {
           ...userProfile.stats,
-          groupsJoined: userProfile.stats.groupsJoined + 1,
+          groupsJoined: (userProfile.stats?.groupsJoined || 0) + 1,
         },
       });
     }
@@ -632,7 +636,6 @@ export const addMemberToGroup = async (groupId: string, member: Member, userId: 
     throw error;
   }
 };
-
 
 export const getGroupMembers = async (groupId: string): Promise<Member[]> => {
   try {
