@@ -21,36 +21,63 @@ import { Group, Expense, Member, Settlement } from '@/stores/expenseStore';
 // Group Operations
 export const createGroup = async (groupData: Omit<Group, 'id'>, userId: string) => {
   try {
+    console.log('Creating group with userId:', userId);
+    console.log('Group data members:', groupData.members);
+    
     // Transform members array to object for Firestore rules
-    const membersObj = groupData.members.reduce((acc, member) => {
-      acc[member.id] = member.id === userId ? 'admin' : 'member';
-      return acc;
-    }, {} as Record<string, string>);
-
-    // Create member names and emails objects
-    const memberNames = groupData.members.reduce((acc, member) => {
-      acc[member.id] = member.name;
-      return acc;
-    }, {} as Record<string, string>);
-
-    const memberEmails = groupData.members.reduce((acc, member) => {
-      acc[member.id] = member.email;
-      return acc;
-    }, {} as Record<string, string>);
-
-    const joinedAt = groupData.members.reduce((acc, member) => {
-      acc[member.id] = serverTimestamp();
-      return acc;
-    }, {} as Record<string, any>);
+    // Ensure the current user (userId) is included as admin
+    const membersObj: Record<string, string> = {};
+    const memberNames: Record<string, string> = {};
+    const memberEmails: Record<string, string> = {};
+    const joinedAt: Record<string, any> = {};
+    
+    // First, add the current user as admin
+    membersObj[userId] = 'admin';
+    
+    // Find the current user in the members array to get their name and email
+    const currentUserMember = groupData.members.find(member => member.id === userId);
+    if (currentUserMember) {
+      memberNames[userId] = currentUserMember.name;
+      memberEmails[userId] = currentUserMember.email;
+    } else {
+      // If current user is not in members array, this shouldn't happen but add fallback
+      memberNames[userId] = 'Current User';
+      memberEmails[userId] = '';
+    }
+    joinedAt[userId] = serverTimestamp();
+    
+    // Add other members (excluding the current user to avoid duplicates)
+    groupData.members.forEach(member => {
+      if (member.id !== userId) {
+        membersObj[member.id] = member.role || 'member';
+        memberNames[member.id] = member.name;
+        memberEmails[member.id] = member.email;
+        joinedAt[member.id] = serverTimestamp();
+      }
+    });
 
     const firestoreGroup = {
-      ...groupData,
+      name: groupData.name,
+      description: groupData.description,
       members: membersObj,
       memberNames,
       memberEmails,
       joinedAt,
       createdAt: serverTimestamp(),
-      createdBy: userId,
+      createdBy: userId, // Use the authenticated user's uid
+      groupType: groupData.groupType || 'private',
+      inviteCode: groupData.inviteCode || crypto.randomUUID(),
+      settings: groupData.settings || {
+        currency: 'USD',
+        simplifyDebts: true,
+        notifications: true,
+        recurringBills: false,
+      },
+      tags: groupData.tags || [],
+      location: groupData.location || '',
+      isArchived: groupData.isArchived || false,
+      photo: groupData.photo,
+      coverImage: groupData.coverImage,
     };
 
     console.log('Creating group with data:', firestoreGroup);
