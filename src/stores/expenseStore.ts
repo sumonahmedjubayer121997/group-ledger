@@ -12,6 +12,7 @@ import {
   getUserGroups,
   addMemberToGroup as addMemberToGroupFirebase,
   removeMemberFromGroup as removeMemberFromGroupFirebase,
+  linkPendingInvitationsToUser,
 } from '@/services/firebaseService';
 
 export interface Member {

@@ -15,7 +15,7 @@ import {
   EmailAuthProvider
 } from 'firebase/auth';
 import { auth } from '@/lib/firebase';
-import { createUserProfile, getUserProfile, updateUserProfile as updateFirebaseUserProfile, UserProfile } from '@/services/firebaseService';
+import { createUserProfile, getUserProfile, updateUserProfile as updateFirebaseUserProfile, UserProfile, linkPendingInvitationsToUser } from '@/services/firebaseService';
 
 // Export the UserProfile interface for use in other components
 export type { UserProfile };
@@ -107,15 +107,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         ...additionalData,
       });
       
-      // Link any pending email invitations to this user
-      if (firebaseUser.email) {
-        try {
-          const { linkPendingInvitationsToUser } = await import('@/services/firebaseService');
-          await linkPendingInvitationsToUser(firebaseUser.email, firebaseUser.uid);
-        } catch (error) {
-          console.error('Error linking pending invitations:', error);
-        }
-      }
+      // Note: Pending email invitations will be linked via the Firebase sync in useExpenseStore
       
       setUserProfile(profile);
     } catch (error) {
@@ -140,6 +132,15 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       await updateProfile(firebaseUser, { displayName });
       await sendEmailVerification(firebaseUser);
       await createUserProfileFromFirebaseUser(firebaseUser, { name: displayName });
+      
+      // Link any pending email invitations to this user
+      if (firebaseUser.email) {
+        try {
+          await linkPendingInvitationsToUser(firebaseUser.email, firebaseUser.uid);
+        } catch (error) {
+          console.error('Error linking pending invitations during registration:', error);
+        }
+      }
     } finally {
       setLoading(false);
     }
