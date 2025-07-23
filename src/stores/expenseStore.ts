@@ -106,6 +106,8 @@ interface ExpenseStore {
   selectedGroup: Group | null;
   loading: boolean;
   error: string | null;
+  isInitialized: boolean;
+  currentUserId: string | null;
   
   // Firebase integration methods
   initializeFirebaseSync: (userId: string) => void;
@@ -156,8 +158,18 @@ export const useExpenseStore = create<ExpenseStore>()(
         selectedGroup: null,
         loading: false,
         error: null,
+        isInitialized: false,
+        currentUserId: null,
         
         initializeFirebaseSync: (userId: string) => {
+          const { currentUserId, isInitialized } = get();
+          
+          // Don't re-initialize if already initialized for the same user
+          if (isInitialized && currentUserId === userId) {
+            console.log('Firebase sync already initialized for user:', userId);
+            return;
+          }
+          
           console.log('Initializing Firebase sync for user:', userId);
           
           // Clean up existing subscriptions first
@@ -168,11 +180,16 @@ export const useExpenseStore = create<ExpenseStore>()(
           expenseUnsubscribers.forEach(unsubscribe => unsubscribe());
           expenseUnsubscribers.clear();
           
-          set({ loading: true, error: null });
+          set({ 
+            loading: true, 
+            error: null, 
+            currentUserId: userId,
+            isInitialized: true
+          });
           
           // Subscribe to user's groups
           groupsUnsubscriber = subscribeToUserGroups(userId, (groups) => {
-            console.log('Groups updated from Firebase:', groups);
+            console.log('Groups updated from Firebase:', groups.length, 'groups');
             set({ groups, loading: false });
             
             // Clean up old expense subscriptions for groups that no longer exist
@@ -189,7 +206,7 @@ export const useExpenseStore = create<ExpenseStore>()(
               // Only subscribe if we don't already have a subscription for this group
               if (!expenseUnsubscribers.has(group.id)) {
                 const expensesUnsubscriber = subscribeToGroupExpenses(group.id, (expenses) => {
-                  console.log('Expenses updated for group:', group.id, expenses);
+                  console.log('Expenses updated for group:', group.id, expenses.length, 'expenses');
                   set(state => ({
                     expenses: [
                       ...state.expenses.filter(e => e.groupId !== group.id),
@@ -211,6 +228,7 @@ export const useExpenseStore = create<ExpenseStore>()(
           }
           expenseUnsubscribers.forEach(unsubscribe => unsubscribe());
           expenseUnsubscribers.clear();
+          set({ isInitialized: false, currentUserId: null });
         },
         
         addExpense: async (expense, userId) => {
@@ -248,12 +266,7 @@ export const useExpenseStore = create<ExpenseStore>()(
             const newGroup = await createGroupFirebase(completeGroup, userId);
             console.log('Group created successfully:', newGroup);
             
-            // The real-time listener should update the state, but let's add a manual update
-            // to ensure immediate UI feedback
-            set(state => ({
-              groups: [...state.groups, newGroup as Group],
-              loading: false
-            }));
+            set({ loading: false });
             
             get().addActivity({
               type: 'group_updated',
@@ -272,6 +285,7 @@ export const useExpenseStore = create<ExpenseStore>()(
           try {
             set({ loading: true, error: null });
             await updateGroupFirebase(id, updates);
+            set({ loading: false });
             // Firebase listener will update the state
           } catch (error) {
             console.error('Error updating group:', error);
@@ -283,6 +297,7 @@ export const useExpenseStore = create<ExpenseStore>()(
           try {
             set({ loading: true, error: null });
             await addMemberToGroupFirebase(groupId, member, userId);
+            set({ loading: false });
             // Firebase listener will update the state
             
             get().addActivity({
@@ -304,6 +319,7 @@ export const useExpenseStore = create<ExpenseStore>()(
             const member = group?.members.find(m => m.id === memberId);
             
             await removeMemberFromGroupFirebase(groupId, memberId);
+            set({ loading: false });
             // Firebase listener will update the state
             
             if (member) {
@@ -326,6 +342,7 @@ export const useExpenseStore = create<ExpenseStore>()(
             const expense = get().expenses.find(e => e.id === id);
             if (expense) {
               await updateExpenseFirebase(expense.groupId, id, updatedExpense);
+              set({ loading: false });
               // Firebase listener will update the state
               
               get().addActivity({
@@ -347,6 +364,7 @@ export const useExpenseStore = create<ExpenseStore>()(
             const expense = get().expenses.find(e => e.id === id);
             
             await deleteExpenseFirebase(groupId, id);
+            set({ loading: false });
             // Firebase listener will update the state
             
             if (expense) {
@@ -602,6 +620,12 @@ export const useExpenseStore = create<ExpenseStore>()(
     },
     {
       name: 'expense-store',
+      partialize: (state) => ({
+        // Don't persist Firebase-related state
+        settlements: state.settlements,
+        activities: state.activities,
+        recurringExpenses: state.recurringExpenses,
+      }),
     }
   )
 );

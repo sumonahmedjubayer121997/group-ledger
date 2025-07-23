@@ -1,5 +1,4 @@
-
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Plus, Settings, Users, Receipt, TrendingUp, User } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -17,10 +16,19 @@ import { UserProfile } from "@/components/UserProfile";
 
 const Index = () => {
   const { user, userProfile, logout } = useAuth();
-  const { groups, expenses, selectedGroup, setSelectedGroup, getBalances } = useExpenseStore();
+  const { groups, expenses, selectedGroup, setSelectedGroup, getBalances, initializeFirebaseSync } = useExpenseStore();
   const [showGroupForm, setShowGroupForm] = useState(false);
   const [showExpenseForm, setShowExpenseForm] = useState(false);
   const [showUserProfile, setShowUserProfile] = useState(false);
+
+  // Initialize Firebase sync when user is authenticated
+  useEffect(() => {
+    console.log('Index useEffect - user:', user?.uid, 'groups length:', groups.length);
+    if (user?.uid) {
+      console.log('Initializing Firebase sync for user:', user.uid);
+      initializeFirebaseSync(user.uid);
+    }
+  }, [user?.uid, initializeFirebaseSync]);
 
   const handleLogout = async () => {
     try {
@@ -101,6 +109,11 @@ const Index = () => {
           </Card>
         </div>
 
+        {/* Debug info */}
+        <div className="mb-4 text-sm text-gray-600">
+          Groups: {groups.length} | Expenses: {expenses.length} | User: {user?.uid}
+        </div>
+
         {/* Main Content */}
         <Tabs defaultValue="overview" className="space-y-6">
           <TabsList className="grid w-full grid-cols-4">
@@ -142,7 +155,7 @@ const Index = () => {
           </TabsContent>
 
           <TabsContent value="groups" className="space-y-6">
-            <GroupList groups={groups} />
+            <GroupList groups={groups} onGroupClick={setSelectedGroup} />
           </TabsContent>
 
           <TabsContent value="expenses" className="space-y-6">
