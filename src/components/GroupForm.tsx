@@ -91,7 +91,7 @@ export const GroupForm: React.FC<GroupFormProps> = ({ isOpen, onClose }) => {
     // Create complete group object with all required properties
     const completeGroup: Omit<Group, 'id'> = {
       name: formData.name,
-      description: formData.description,
+      description: formData.description || '',
       members: membersWithIds,
       createdAt: new Date(),
       groupType: 'private',
@@ -103,6 +103,7 @@ export const GroupForm: React.FC<GroupFormProps> = ({ isOpen, onClose }) => {
         recurringBills: false,
       },
       isArchived: false,
+      // Explicitly exclude undefined optional fields
     };
     
     console.log('🏗️ Creating group with current user UID:', user.uid);
