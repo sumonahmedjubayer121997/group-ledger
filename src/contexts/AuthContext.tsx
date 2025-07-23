@@ -107,6 +107,16 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         ...additionalData,
       });
       
+      // Link any pending email invitations to this user
+      if (firebaseUser.email) {
+        try {
+          const { linkPendingInvitationsToUser } = await import('@/services/firebaseService');
+          await linkPendingInvitationsToUser(firebaseUser.email, firebaseUser.uid);
+        } catch (error) {
+          console.error('Error linking pending invitations:', error);
+        }
+      }
+      
       setUserProfile(profile);
     } catch (error) {
       console.error('Error creating user profile:', error);

@@ -80,7 +80,7 @@ export const GroupForm: React.FC<GroupFormProps> = ({ isOpen, onClose }) => {
       ...validMembers
         .filter((m) => m.email !== user.email)
         .map((m) => ({
-          id: crypto.randomUUID(),
+          id: m.email.trim(), // Use email as ID for email invitations
           name: m.name.trim(),
           email: m.email.trim(),
           role: 'member' as const,
