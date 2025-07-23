@@ -1,4 +1,5 @@
-import React, { createContext, useContext, useEffect, useState } from 'react';
+
+import React, { createContext, useContext, useEffect, useState, useRef } from 'react';
 import { 
   User,
   onAuthStateChanged,
@@ -14,17 +15,14 @@ import {
   reauthenticateWithCredential,
   EmailAuthProvider
 } from 'firebase/auth';
+import { auth } from '@/lib/firebase';
 import { 
-  collection, 
-  query, 
-  where, 
-  getDocs, 
-  deleteDoc, 
-  doc 
-} from 'firebase/firestore';
-import { auth, db } from '@/lib/firebase';
-import { createUserProfile, getUserProfile, updateUserProfile as updateFirebaseUserProfile, UserProfile } from '@/services/firebaseService';
-import { mergeTemporaryUserWithRealUser } from '@/services/firebaseService';
+  createUserProfile, 
+  getUserProfile, 
+  updateUserProfile as updateFirebaseUserProfile, 
+  UserProfile,
+  mergeTemporaryUserWithRealUser 
+} from '@/services/firebaseService';
 
 // Export the UserProfile interface for use in other components
 export type { UserProfile };
@@ -57,117 +55,90 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [user, setUser] = useState<User | null>(null);
   const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
   const [loading, setLoading] = useState(true);
+  const processingAuthChange = useRef(false);
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
-      console.log('Auth state changed:', firebaseUser?.uid);
-      setUser(firebaseUser);
-      
-      if (firebaseUser) {
-        // Always ensure user profile exists and handle duplicates
-        await ensureUserProfileExists(firebaseUser);
-      } else {
-        setUserProfile(null);
+      // Prevent multiple simultaneous auth state changes
+      if (processingAuthChange.current) {
+        console.log('🔄 Auth change already in progress, skipping...');
+        return;
       }
+
+      console.log('🔐 Auth state changed:', firebaseUser?.uid || 'logged out');
+      processingAuthChange.current = true;
       
-      setLoading(false);
+      try {
+        setUser(firebaseUser);
+        
+        if (firebaseUser) {
+          // Check and merge any duplicate users first
+          await mergeTemporaryUserWithRealUser(firebaseUser);
+          
+          // Then ensure profile exists
+          await ensureUserProfileExists(firebaseUser);
+        } else {
+          setUserProfile(null);
+        }
+      } catch (error) {
+        console.error('❌ Error in auth state change:', error);
+      } finally {
+        setLoading(false);
+        processingAuthChange.current = false;
+      }
     });
 
     return unsubscribe;
   }, []);
 
-  const fetchUserProfile = async (uid: string) => {
+  const ensureUserProfileExists = async (firebaseUser: User, additionalData: any = {}) => {
     try {
-      const profile = await getUserProfile(uid);
-      if (profile) {
-        setUserProfile(profile);
-      } else {
-        throw new Error('User profile does not exist');
-      }
-    } catch (error) {
-      console.error('Error fetching user profile:', error);
-      throw error;
-    }
-  };
-
-const ensureUserProfileExists = async (firebaseUser: User, additionalData: any = {}) => {
-  try {
-    if (!firebaseUser.email) {
-      console.error('❌ No email found for user');
-      return;
-    }
-
-    // 🔍 Check if user already exists by email in users collection
-    const existingUserSnapshot = await getDocs(query(
-      collection(db, 'users'),
-      where('email', '==', firebaseUser.email)
-    ));
-
-    if (!existingUserSnapshot.empty) {
-      const existingUser = existingUserSnapshot.docs[0];
-      const existingUid = existingUser.id;
-
-      console.log(`📧 Found existing user by email: ${existingUid}`);
-
-      // If this is a different UID, we need to merge
-      if (existingUid !== firebaseUser.uid) {
-        console.log(`🔁 Merging temporary user ${existingUid} → real user ${firebaseUser.uid}`);
-        
-        // Merge the temporary user with the real user
-        await mergeTemporaryUserWithRealUser(firebaseUser);
-        
-        // Delete the old temporary user document
-        try {
-          await deleteDoc(doc(db, 'users', existingUid));
-          console.log(`🗑️ Deleted temporary user document: ${existingUid}`);
-        } catch (deleteError) {
-          console.error('Error deleting temporary user:', deleteError);
-        }
+      if (!firebaseUser.email) {
+        console.error('❌ No email found for user');
+        return;
       }
 
-      // Try to get the profile with the real UID
-      const profile = await getUserProfile(firebaseUser.uid);
+      console.log(`👤 Ensuring profile exists for user: ${firebaseUser.uid}`);
+      
+      // Try to get the profile with the current UID
+      let profile = await getUserProfile(firebaseUser.uid);
+      
       if (profile) {
+        console.log('✅ Profile found for current UID');
         setUserProfile(profile);
         return;
       }
+
+      // If no profile exists, create a new one
+      console.log('🆕 Creating new user profile...');
+      profile = await createUserProfile({
+        uid: firebaseUser.uid,
+        email: firebaseUser.email,
+        displayName: firebaseUser.displayName || additionalData.displayName || 'User',
+        photoURL: firebaseUser.photoURL || null,
+        emailVerified: firebaseUser.emailVerified,
+        role: 'user',
+        preferences: {
+          currency: 'USD',
+          theme: 'light',
+          notifications: true,
+        },
+        ...additionalData,
+      });
+
+      setUserProfile(profile);
+      console.log('✅ User profile created and set');
+      
+    } catch (error) {
+      console.error('❌ Error ensuring user profile exists:', error);
     }
-
-    // ✅ Check if profile exists for current UID (fallback)
-    const currentProfile = await getUserProfile(firebaseUser.uid);
-    if (currentProfile) {
-      setUserProfile(currentProfile);
-      return;
-    }
-
-    // 🆕 Create new profile if none exists
-    console.log('Creating new user profile...');
-    const profile = await createUserProfile({
-      uid: firebaseUser.uid,
-      name: firebaseUser.displayName || additionalData.displayName || 'User',
-      email: firebaseUser.email,
-      photoURL: firebaseUser.photoURL || null,
-      verified: firebaseUser.emailVerified,
-      preferences: {
-        currency: 'USD',
-        theme: 'light',
-        language: 'en',
-      },
-      ...additionalData,
-    });
-
-    setUserProfile(profile);
-  } catch (error) {
-    console.error('Error ensuring user profile exists:', error);
-  }
-};
-
+  };
 
   const login = async (email: string, password: string) => {
     setLoading(true);
     try {
-      const { user: firebaseUser } = await signInWithEmailAndPassword(auth, email, password);
-      await mergeTemporaryUserWithRealUser(firebaseUser);
+      await signInWithEmailAndPassword(auth, email, password);
+      // Profile will be handled by onAuthStateChanged
     } finally {
       setLoading(false);
     }
@@ -179,7 +150,7 @@ const ensureUserProfileExists = async (firebaseUser: User, additionalData: any =
       const { user: firebaseUser } = await createUserWithEmailAndPassword(auth, email, password);
       await updateProfile(firebaseUser, { displayName });
       await sendEmailVerification(firebaseUser);
-      await ensureUserProfileExists(firebaseUser, { name: displayName });
+      // Profile will be created by onAuthStateChanged
     } finally {
       setLoading(false);
     }
@@ -189,15 +160,15 @@ const ensureUserProfileExists = async (firebaseUser: User, additionalData: any =
     setLoading(true);
     try {
       const provider = new GoogleAuthProvider();
-      const { user: firebaseUser } = await signInWithPopup(auth, provider);
-      await ensureUserProfileExists(firebaseUser);
+      provider.setCustomParameters({
+        prompt: 'select_account'
+      });
+      await signInWithPopup(auth, provider);
+      // Profile will be handled by onAuthStateChanged
     } finally {
       setLoading(false);
     }
   };
-
-
-
 
   const logout = async () => {
     setLoading(true);
