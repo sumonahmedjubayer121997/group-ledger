@@ -1,3 +1,4 @@
+
 import { 
   collection, 
   doc, 
@@ -11,15 +12,19 @@ import {
   writeBatch,
   arrayUnion,
   arrayRemove,
-  Timestamp 
+  Timestamp,
+  onSnapshot,
+  orderBy 
 } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { User } from 'firebase/auth';
+import { v4 as uuidv4 } from 'uuid';
 
 export interface UserProfile {
   uid: string;
   email: string;
   displayName?: string;
+  name?: string;
   photoURL?: string;
   phoneNumber?: string;
   emailVerified?: boolean;
@@ -66,6 +71,7 @@ export const createUserProfile = async (userData: Partial<UserProfile> & { uid: 
       uid: userData.uid,
       email: userData.email,
       displayName: userData.displayName || 'User',
+      name: userData.name || userData.displayName || 'User',
       photoURL: userData.photoURL || null,
       phoneNumber: userData.phoneNumber || null,
       emailVerified: userData.emailVerified || false,
@@ -103,8 +109,8 @@ export const getUserProfile = async (uid: string): Promise<UserProfile | null> =
       const data = docSnap.data();
       return {
         ...data,
-        createdAt: data.createdAt?.toDate() || new Date(),
-        lastLoginAt: data.lastLoginAt?.toDate() || new Date(),
+        createdAt: data.createdAt?.toDate?.() || new Date(),
+        lastLoginAt: data.lastLoginAt?.toDate?.() || new Date(),
       } as UserProfile;
     }
     
@@ -122,10 +128,10 @@ export const updateUserProfile = async (uid: string, updates: Partial<UserProfil
     
     // Convert dates to Timestamps if present
     if (updateData.createdAt) {
-      updateData.createdAt = Timestamp.fromDate(updateData.createdAt);
+      updateData.createdAt = Timestamp.fromDate(updateData.createdAt) as any;
     }
     if (updateData.lastLoginAt) {
-      updateData.lastLoginAt = Timestamp.fromDate(updateData.lastLoginAt);
+      updateData.lastLoginAt = Timestamp.fromDate(updateData.lastLoginAt) as any;
     }
     
     await updateDoc(docRef, updateData);
@@ -148,8 +154,8 @@ export const findUserByEmail = async (email: string): Promise<{ uid: string; dat
         uid: doc.id,
         data: {
           ...data,
-          createdAt: data.createdAt?.toDate() || new Date(),
-          lastLoginAt: data.lastLoginAt?.toDate() || new Date(),
+          createdAt: data.createdAt?.toDate?.() || new Date(),
+          lastLoginAt: data.lastLoginAt?.toDate?.() || new Date(),
         } as UserProfile
       };
     }
@@ -193,6 +199,7 @@ export const mergeTemporaryUserWithRealUser = async (realUser: User): Promise<vo
       emailVerified: realUser.emailVerified,
       photoURL: realUser.photoURL || existingUser.data.photoURL,
       displayName: realUser.displayName || existingUser.data.displayName,
+      name: realUser.displayName || existingUser.data.name || existingUser.data.displayName,
     };
     
     batch.set(doc(db, 'users', realUid), {
@@ -311,7 +318,7 @@ export const getGroup = async (groupId: string): Promise<Group | null> => {
       const data = docSnap.data();
       return {
         ...data,
-        createdAt: data.createdAt?.toDate() || new Date(),
+        createdAt: data.createdAt?.toDate?.() || new Date(),
       } as Group;
     }
     
@@ -329,7 +336,7 @@ export const updateGroup = async (groupId: string, updates: Partial<Group>): Pro
     
     // Convert dates to Timestamps if present
     if (updateData.createdAt) {
-      updateData.createdAt = Timestamp.fromDate(updateData.createdAt);
+      updateData.createdAt = Timestamp.fromDate(updateData.createdAt) as any;
     }
     
     await updateDoc(docRef, updateData);
@@ -346,6 +353,29 @@ export const deleteGroup = async (groupId: string): Promise<void> => {
     console.log('✅ Group deleted successfully:', groupId);
   } catch (error) {
     console.error('❌ Error deleting group:', error);
+    throw error;
+  }
+};
+
+export const createExpense = async (expenseData: Omit<Expense, 'id' | 'createdAt'>, userId: string): Promise<Expense> => {
+  try {
+    const expenseId = generateId();
+    const newExpense: Expense = {
+      id: expenseId,
+      createdAt: new Date(),
+      ...expenseData,
+    };
+
+    await setDoc(doc(db, 'expenses', expenseId), {
+      ...newExpense,
+      date: Timestamp.fromDate(newExpense.date),
+      createdAt: Timestamp.fromDate(newExpense.createdAt),
+    });
+
+    console.log('✅ Expense added successfully:', expenseId);
+    return newExpense;
+  } catch (error) {
+    console.error('❌ Error adding expense:', error);
     throw error;
   }
 };
@@ -382,8 +412,8 @@ export const getExpense = async (expenseId: string): Promise<Expense | null> => 
       const data = docSnap.data();
       return {
         ...data,
-        date: data.date?.toDate() || new Date(),
-        createdAt: data.createdAt?.toDate() || new Date(),
+        date: data.date?.toDate?.() || new Date(),
+        createdAt: data.createdAt?.toDate?.() || new Date(),
       } as Expense;
     }
     
@@ -394,17 +424,17 @@ export const getExpense = async (expenseId: string): Promise<Expense | null> => 
   }
 };
 
-export const updateExpense = async (expenseId: string, updates: Partial<Expense>): Promise<void> => {
+export const updateExpense = async (groupId: string, expenseId: string, updates: Partial<Expense>): Promise<void> => {
   try {
     const docRef = doc(db, 'expenses', expenseId);
     const updateData = { ...updates };
     
     // Convert dates to Timestamps if present
     if (updateData.date) {
-      updateData.date = Timestamp.fromDate(updateData.date);
+      updateData.date = Timestamp.fromDate(updateData.date) as any;
     }
     if (updateData.createdAt) {
-      updateData.createdAt = Timestamp.fromDate(updateData.createdAt);
+      updateData.createdAt = Timestamp.fromDate(updateData.createdAt) as any;
     }
     
     await updateDoc(docRef, updateData);
@@ -415,7 +445,7 @@ export const updateExpense = async (expenseId: string, updates: Partial<Expense>
   }
 };
 
-export const deleteExpense = async (expenseId: string): Promise<void> => {
+export const deleteExpense = async (groupId: string, expenseId: string): Promise<void> => {
   try {
     await deleteDoc(doc(db, 'expenses', expenseId));
     console.log('✅ Expense deleted successfully:', expenseId);
@@ -447,6 +477,64 @@ export const removeUserFromGroup = async (groupId: string, userId: string): Prom
     console.log(`✅ User ${userId} removed from group ${groupId}`);
   } catch (error) {
     console.error('❌ Error removing user from group:', error);
+    throw error;
+  }
+};
+
+// Aliases for compatibility
+export const addMemberToGroup = addUserToGroup;
+export const removeMemberFromGroup = removeUserFromGroup;
+
+// Real-time subscription functions
+export const subscribeToUserGroups = (userId: string, callback: (groups: any[]) => void): (() => void) => {
+  const q = query(
+    collection(db, 'groups'),
+    where('members', 'array-contains', userId)
+  );
+  
+  return onSnapshot(q, (snapshot) => {
+    const groups = snapshot.docs.map(doc => ({
+      id: doc.id,
+      ...doc.data(),
+      createdAt: doc.data().createdAt?.toDate?.() || new Date(),
+    }));
+    callback(groups);
+  });
+};
+
+export const subscribeToGroupExpenses = (groupId: string, callback: (expenses: any[]) => void): (() => void) => {
+  const q = query(
+    collection(db, 'expenses'),
+    where('groupId', '==', groupId),
+    orderBy('createdAt', 'desc')
+  );
+  
+  return onSnapshot(q, (snapshot) => {
+    const expenses = snapshot.docs.map(doc => ({
+      id: doc.id,
+      ...doc.data(),
+      date: doc.data().date?.toDate?.() || new Date(),
+      createdAt: doc.data().createdAt?.toDate?.() || new Date(),
+    }));
+    callback(expenses);
+  });
+};
+
+export const getUserGroups = async (userId: string): Promise<any[]> => {
+  try {
+    const q = query(
+      collection(db, 'groups'),
+      where('members', 'array-contains', userId)
+    );
+    const snapshot = await getDocs(q);
+    
+    return snapshot.docs.map(doc => ({
+      id: doc.id,
+      ...doc.data(),
+      createdAt: doc.data().createdAt?.toDate?.() || new Date(),
+    }));
+  } catch (error) {
+    console.error('Error getting user groups:', error);
     throw error;
   }
 };
