@@ -5,7 +5,6 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { AuthProvider, useAuth } from "@/contexts/AuthContext";
-import { AuthForm } from "@/components/AuthForm";
 import { useExpenseStore } from "@/stores/expenseStore";
 import { useEffect } from "react";
 import Index from "./pages/Index";
@@ -47,10 +46,7 @@ const AppContent = () => {
     );
   }
 
-  if (!user) {
-    return <AuthForm />;
-  }
-
+  // Always show the Index component, which will handle showing landing page vs main app
   return (
     <BrowserRouter>
       <Routes>
