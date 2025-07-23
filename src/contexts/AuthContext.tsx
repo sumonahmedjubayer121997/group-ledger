@@ -1,4 +1,3 @@
-
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { 
   User,
@@ -52,11 +51,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
-      console.log('Auth state changed:', firebaseUser?.uid);
+      console.log('Auth state changed:', firebaseUser?.uid, firebaseUser?.email);
       setUser(firebaseUser);
       
       if (firebaseUser) {
         try {
+          console.log('Ensuring user profile exists for:', firebaseUser.email);
           await ensureUserProfileExists(firebaseUser);
         } catch (error) {
           console.error('Error ensuring user profile exists:', error);
@@ -73,6 +73,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const ensureUserProfileExists = async (firebaseUser: User) => {
     try {
+      console.log('Checking for existing profile for UID:', firebaseUser.uid);
       // First, try to fetch existing profile
       const existingProfile = await getUserProfile(firebaseUser.uid);
       if (existingProfile) {
@@ -81,17 +82,32 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         return;
       }
     } catch (error) {
-      console.log('No existing profile found, will create one');
+      console.log('No existing profile found, will create one:', error);
     }
 
     // If no profile exists, create one
     try {
-      console.log('Creating user profile for:', firebaseUser.email);
-      await createUserProfileFromFirebaseUser(firebaseUser);
+      console.log('Creating user profile for:', firebaseUser.email, 'with UID:', firebaseUser.uid);
+      const newProfile = await createUserProfile({
+        uid: firebaseUser.uid,
+        name: firebaseUser.displayName || 'User',
+        email: firebaseUser.email!,
+        photoURL: firebaseUser.photoURL || undefined,
+        verified: firebaseUser.emailVerified,
+        preferences: {
+          currency: 'USD',
+          theme: 'light',
+          language: 'en',
+        },
+      });
+      
+      console.log('Successfully created user profile:', newProfile);
+      setUserProfile(newProfile);
       
       // Link any pending email invitations to this user
       if (firebaseUser.email) {
         try {
+          console.log('Linking pending invitations for:', firebaseUser.email);
           await linkPendingInvitationsToUser(firebaseUser.email, firebaseUser.uid);
         } catch (error) {
           console.error('Error linking pending invitations during sign-in:', error);
@@ -99,6 +115,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       }
     } catch (createError) {
       console.error('Error creating user profile during sign-in:', createError);
+      // Set user profile to null if creation fails
+      setUserProfile(null);
     }
   };
 
@@ -141,8 +159,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const login = async (email: string, password: string) => {
     setLoading(true);
     try {
-      await signInWithEmailAndPassword(auth, email, password);
+      console.log('Logging in user:', email);
+      const result = await signInWithEmailAndPassword(auth, email, password);
+      console.log('Login successful for:', result.user.email);
       // Profile creation will be handled by onAuthStateChanged
+    } catch (error) {
+      console.error('Login error:', error);
+      throw error;
     } finally {
       setLoading(false);
     }
@@ -151,10 +174,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const register = async (email: string, password: string, displayName: string) => {
     setLoading(true);
     try {
+      console.log('Registering new user:', email);
       const { user: firebaseUser } = await createUserWithEmailAndPassword(auth, email, password);
       
       await updateProfile(firebaseUser, { displayName });
       await sendEmailVerification(firebaseUser);
+      
+      // Create profile directly here for registration
       await createUserProfileFromFirebaseUser(firebaseUser, { name: displayName });
       
       // Link any pending email invitations to this user
@@ -165,6 +191,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           console.error('Error linking pending invitations during registration:', error);
         }
       }
+    } catch (error) {
+      console.error('Registration error:', error);
+      throw error;
     } finally {
       setLoading(false);
     }
@@ -173,9 +202,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const loginWithGoogle = async () => {
     setLoading(true);
     try {
+      console.log('Logging in with Google');
       const provider = new GoogleAuthProvider();
-      await signInWithPopup(auth, provider);
+      const result = await signInWithPopup(auth, provider);
+      console.log('Google login successful for:', result.user.email);
       // Profile creation will be handled by onAuthStateChanged
+    } catch (error) {
+      console.error('Google login error:', error);
+      throw error;
     } finally {
       setLoading(false);
     }
