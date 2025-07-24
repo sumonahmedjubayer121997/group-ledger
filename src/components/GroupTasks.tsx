@@ -67,7 +67,7 @@ export const GroupTasks: React.FC<GroupTasksProps> = ({ groupId, members }) => {
       const taskData = {
         title: formData.title,
         description: formData.description,
-        assignedTo: formData.assignedTo || undefined,
+        assignedTo: formData.assignedTo && formData.assignedTo !== 'unassigned' ? formData.assignedTo : undefined,
         assignedToName: assignedMember?.name || undefined,
         createdBy: user.uid,
         createdByName: userProfile.name,
@@ -169,7 +169,7 @@ export const GroupTasks: React.FC<GroupTasksProps> = ({ groupId, members }) => {
             <SelectValue placeholder="Assign to member" />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="">No assignment</SelectItem>
+            <SelectItem value="unassigned">No assignment</SelectItem>
             {members.map((member) => (
               <SelectItem key={member.id} value={member.id}>
                 {member.name}
