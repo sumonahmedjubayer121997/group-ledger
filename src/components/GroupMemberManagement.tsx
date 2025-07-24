@@ -155,7 +155,7 @@ export const GroupMemberManagement: React.FC<GroupMemberManagementProps> = ({ gr
           <div className="space-y-3 sm:space-y-4">
             {group.members.map((member) => (
               <div key={member.id} className="flex flex-col sm:flex-row sm:items-center sm:justify-between p-3 sm:p-4 border rounded-lg space-y-3 sm:space-y-0">
-                <div className="flex items-center space-x-3 sm:space-x-4 min-w-0 flex-1">
+                <div className="flex -space-x-1 sm:-space-x-2">
                   <Avatar
                       key={member.id}
                       className="relative flex shrink-0 overflow-hidden rounded-full h-16 w-16 sm:h-10 sm:w-10 border-2 border-white"
