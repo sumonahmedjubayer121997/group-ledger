@@ -76,6 +76,9 @@ export const GroupForm = ({ isOpen, onClose }: GroupFormProps) => {
         ...resolvedMembers,
       ];
 
+      console.log('Creating group with members:', members);
+      console.log('Current user:', user.uid, user.email, user.displayName);
+      
       await addGroup({
         name: groupName,
         description: description,

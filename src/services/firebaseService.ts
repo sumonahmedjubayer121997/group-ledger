@@ -16,7 +16,7 @@ import {
   setDoc,
   deleteField
 } from 'firebase/firestore';
-import { User } from 'firebase/auth';
+import { User, getAuth } from 'firebase/auth';
 import { db } from '@/lib/firebase';
 import { Group, Expense, Member, Settlement } from '@/stores/expenseStore';
 import { findSimilarEmails } from '@/components/firebaseComponents/FindSimilarEmails';
@@ -50,8 +50,29 @@ export interface UserProfile {
 }
 
 // User Operations
-export const createUserProfile = async (userProfile: Omit<UserProfile, 'joinedAt' | 'lastActivity' | 'stats'>): Promise<UserProfile> => {
+export const createUserProfile = async (userProfileOrUid: Omit<UserProfile, 'joinedAt' | 'lastActivity' | 'stats'> | string, data?: { email: string; name: string; verified: boolean }): Promise<UserProfile> => {
   try {
+    // Handle both old and new function signatures
+    let userProfile: Omit<UserProfile, 'joinedAt' | 'lastActivity' | 'stats'>;
+    
+    if (typeof userProfileOrUid === 'string' && data) {
+      // New signature: uid and data object
+      userProfile = {
+        uid: userProfileOrUid,
+        email: data.email,
+        name: data.name,
+        verified: data.verified,
+        preferences: {
+          currency: 'USD',
+          theme: 'light',
+          language: 'en',
+        },
+      };
+    } else {
+      // Old signature: complete userProfile object
+      userProfile = userProfileOrUid as Omit<UserProfile, 'joinedAt' | 'lastActivity' | 'stats'>;
+    }
+    
     const userRef = doc(db, 'users', userProfile.uid);
     const userData = {
       ...userProfile,
@@ -249,10 +270,25 @@ export const createGroup = async (groupData: Omit<Group, 'id'>, userId: string) 
   try {
     console.log('Creating group with userId:', userId);
 
-    // Get current user's profile
-    const currentUserProfile = await getUserProfile(userId);
+    // Get current user's profile, create if it doesn't exist
+    let currentUserProfile = await getUserProfile(userId);
     if (!currentUserProfile) {
-      throw new Error('User profile not found');
+      console.log('User profile not found, attempting to create it from auth...');
+      // Try to get the user from Firebase Auth to create profile
+      const auth = getAuth();
+      const currentUser = auth.currentUser;
+      if (currentUser) {
+        await createUserProfile(currentUser.uid, {
+          email: currentUser.email || '',
+          name: currentUser.displayName || currentUser.email?.split('@')[0] || 'User',
+          verified: currentUser.emailVerified
+        });
+        currentUserProfile = await getUserProfile(userId);
+      }
+      
+      if (!currentUserProfile) {
+        throw new Error('Unable to create or retrieve user profile');
+      }
     }
 
     // Create users object with safe structure
