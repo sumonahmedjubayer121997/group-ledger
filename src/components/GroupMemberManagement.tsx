@@ -158,10 +158,10 @@ export const GroupMemberManagement: React.FC<GroupMemberManagementProps> = ({ gr
                 <div className="flex items-center space-x-3 sm:space-x-4 min-w-0 flex-1">
                   <Avatar
                       key={member.id}
-                      className="w-6 h-6 sm:w-8 sm:h-8 border-2 border-white"
+                      className="relative flex shrink-0 overflow-hidden rounded-full h-16 w-16 sm:h-10 sm:w-10 border-2 border-white"
                     >
                       {member.photoURL ? (
-                        <AvatarImage src={member.photoURL} alt={member.name} />
+                        <AvatarImage className='aspect-square h-10 w-10' src={member.photoURL} alt={member.name} />
                       ) : null}
                       <AvatarFallback className="text-xs bg-primary/10 text-primary">
                         {member.name.charAt(0).toUpperCase()}
