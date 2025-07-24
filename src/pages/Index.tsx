@@ -265,6 +265,7 @@ const Index = () => {
             )}
 
           <AnimatePresence mode="wait">
+            <div className=""></div>
             {/* Overview */}
             <TabsContent value="overview" className="space-y-4 sm:space-y-6">
               <motion.div
@@ -417,14 +418,15 @@ const Index = () => {
 
         
 {isMobile && (
+   
     <div className="fixed bottom-0 inset-x-0 z-50 bg-white border-t shadow-sm px-4 py-2 max-w-[100%] w-full sm:max-w-md mx-auto overflow-x-hidden">
-      <GroupDetailMobileNav
-        tabs={tabItems}
-        activeTab={activeTab}
-        onTabChange={(tabId) => setActiveTab(tabId)}
-       
-      />
-  </div>
+  <GroupDetailMobileNav
+    tabs={tabItems}
+    activeTab={activeTab}
+    onTabChange={(tabId) => setActiveTab(tabId)}
+  />
+</div>
+
 )}
 
 

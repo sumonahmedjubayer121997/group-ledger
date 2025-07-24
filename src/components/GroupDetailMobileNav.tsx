@@ -27,7 +27,7 @@ export const GroupDetailMobileNav: React.FC<GroupDetailMobileNavProps> = ({
 
   return (
     <div className="w-full sm:max-w-full px-4 py-3">
-  <div className="flex w-full overflow-x-auto scrollbar-hide space-x-2">
+  <div className="flex w-full overflow-x-auto scrollbar-hide space-x-2 justify-between">
     {tabs.map((tab) => {
       const Icon = tab.icon;
       const isActive = activeTab === tab.id;
@@ -38,7 +38,7 @@ export const GroupDetailMobileNav: React.FC<GroupDetailMobileNavProps> = ({
           variant={isActive ? "default" : "ghost"}
           size="sm"
           onClick={() => onTabChange(tab.id || tab.label)}
-          className="flex items-center space-x-2 min-w-fit px-3 h-9"
+          className="flex items-center space-x-2 min-w-fit px-3 h-9 justify-center"
         >
           <Icon className="w-4 h-4" />
           {isActive ? (
