@@ -284,9 +284,28 @@ export const ImportDialog: React.FC<ImportDialogProps> = ({ children }) => {
               <Alert>
                 <AlertTriangle className="h-4 w-4" />
                 <AlertDescription>
-                  Expected CSV format: Date, Description, Amount, Paid By, Shared With, Category
-                  <br />
-                  Example: 2024-01-15, "Lunch", 25.50, "John Doe", "Jane;Bob", "food"
+                  <div className="space-y-3">
+                    <div>
+                      <p className="font-semibold text-sm">Required Fields (Mandatory):</p>
+                      <ul className="text-sm text-gray-600 ml-4 list-disc">
+                        <li><strong>Date</strong> - Format: YYYY-MM-DD or MM/DD/YYYY</li>
+                        <li><strong>Description</strong> - Expense description</li>
+                        <li><strong>Amount</strong> - Numeric value (e.g., 25.50)</li>
+                        <li><strong>Paid By</strong> - Name or email of person who paid</li>
+                      </ul>
+                    </div>
+                    <div>
+                      <p className="font-semibold text-sm">Optional Fields:</p>
+                      <ul className="text-sm text-gray-600 ml-4 list-disc">
+                        <li><strong>Shared With</strong> - Semicolon-separated names/emails (e.g., "Jane;Bob")</li>
+                        <li><strong>Category</strong> - One of: food, travel, entertainment, utilities, shopping, rent, healthcare, other</li>
+                      </ul>
+                    </div>
+                    <div className="bg-gray-50 p-2 rounded text-xs">
+                      <p className="font-medium">Example CSV row:</p>
+                      <code>2024-01-15, "Dinner at restaurant", 45.50, "john@email.com", "jane@email.com;bob@email.com", "food"</code>
+                    </div>
+                  </div>
                 </AlertDescription>
               </Alert>
             </>

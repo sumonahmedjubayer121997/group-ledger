@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Plus, Settings, Users, Receipt, TrendingUp, User, BarChart3, Wallet } from "lucide-react";
+import { Plus, Settings, Users, Receipt, TrendingUp, User, BarChart3, Wallet, Upload } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -21,6 +21,7 @@ import { useIsMobile } from "@/hooks/use-mobile";
 import { motion, AnimatePresence } from "framer-motion";
 import { GroupDetailMobileNav } from "@/components/GroupDetailMobileNav";
 import { fetchGroupMembersWithPhotos } from "@/components/firebaseComponents/FetchGroupMembersWithPhotos";
+import { ImportDialog } from "@/components/ImportDialog";
 const Index = () => {
   const { user, userProfile, logout } = useAuth();
   const { groups, expenses, selectedGroup, setSelectedGroup, getBalances, initializeFirebaseSync } = useExpenseStore();
@@ -176,6 +177,16 @@ const Index = () => {
                     <Plus className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-2" />
                     Add Expense
                   </Button>
+                  <ImportDialog>
+                    <Button
+                      variant="outline"
+                      className="text-xs sm:text-sm"
+                      size="sm"
+                    >
+                      <Upload className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-2" />
+                      Import CSV
+                    </Button>
+                  </ImportDialog>
               <Button
                 onClick={() => setShowGroupForm(true)}
                 className="bg-blue-600 hover:bg-blue-700 text-xs sm:text-sm"
