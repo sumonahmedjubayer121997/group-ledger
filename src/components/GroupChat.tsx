@@ -8,11 +8,13 @@ import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { useAuth } from '@/contexts/AuthContext';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { format } from 'date-fns';
-import { Send, MessageCircle } from 'lucide-react';
+import { Send, MessageCircle, ChevronUp } from 'lucide-react';
+import { motion, AnimatePresence } from 'framer-motion';
 import { 
   ChatMessage, 
   sendChatMessage, 
-  subscribeToGroupChat 
+  subscribeToGroupChat,
+  getMessageCount
 } from '@/services/groupCommunicationService';
 
 interface GroupChatProps {
@@ -23,21 +25,36 @@ export const GroupChat: React.FC<GroupChatProps> = ({ groupId }) => {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [newMessage, setNewMessage] = useState('');
   const [sending, setSending] = useState(false);
+  const [showMore, setShowMore] = useState(false);
+  const [totalMessageCount, setTotalMessageCount] = useState(0);
+  const [messageLimit, setMessageLimit] = useState(10);
+  const [hoveredMessage, setHoveredMessage] = useState<string | null>(null);
   const { user, userProfile } = useAuth();
   const isMobile = useIsMobile();
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const scrollAreaRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (!groupId) return;
     
-    const unsubscribe = subscribeToGroupChat(groupId, (updatedMessages) => {
+    const unsubscribe = subscribeToGroupChat(groupId, messageLimit, (updatedMessages) => {
       setMessages(updatedMessages);
     });
 
     return unsubscribe;
-  }, [groupId]);
+  }, [groupId, messageLimit]);
 
   useEffect(() => {
+    const fetchMessageCount = async () => {
+      const count = await getMessageCount(groupId);
+      setTotalMessageCount(count);
+    };
+    
+    fetchMessageCount();
+  }, [groupId, messages]);
+
+  useEffect(() => {
+    // Scroll to bottom when new messages arrive
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
 
@@ -62,79 +79,125 @@ export const GroupChat: React.FC<GroupChatProps> = ({ groupId }) => {
     }
   };
 
+  const handleShowMore = () => {
+    setMessageLimit(100);
+    setShowMore(true);
+  };
+
+  const canShowMore = totalMessageCount > 10 && !showMore;
+
   return (
     <Card className="h-full flex flex-col">
       <CardHeader className={`${isMobile ? 'p-3' : 'p-4'} border-b`}>
         <CardTitle className={`${isMobile ? 'text-lg' : 'text-xl'} flex items-center gap-2`}>
           <MessageCircle className="w-5 h-5" />
           Group Chat
+          {totalMessageCount > 0 && (
+            <span className="text-sm text-muted-foreground">
+              ({totalMessageCount} messages)
+            </span>
+          )}
         </CardTitle>
       </CardHeader>
       
       <CardContent className="flex-1 flex flex-col p-0">
-        <ScrollArea className="flex-1 p-4">
+        <ScrollArea className="flex-1 p-4" ref={scrollAreaRef}>
           <div className="space-y-4">
+            {canShowMore && (
+              <div className="text-center">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={handleShowMore}
+                  className="text-xs"
+                >
+                  <ChevronUp className="w-4 h-4 mr-2" />
+                  Show More Messages
+                </Button>
+              </div>
+            )}
+            
             {messages.length === 0 ? (
-              <div className="text-center text-gray-500 py-8">
-                <MessageCircle className="w-12 h-12 mx-auto mb-4 text-gray-300" />
+              <div className="text-center text-muted-foreground py-8">
+                <MessageCircle className="w-12 h-12 mx-auto mb-4 text-muted-foreground/30" />
                 <p>No messages yet. Start a conversation!</p>
               </div>
             ) : (
-              messages.map((message) => (
-                <div
-                  key={message.id}
-                  className={`flex gap-3 ${
-                    message.senderId === user?.uid ? 'justify-end' : 'justify-start'
-                  }`}
-                >
-                  {message.senderId !== user?.uid && (
-                    <Avatar className="w-8 h-8">
-                      <AvatarFallback className="text-xs">
-                        {message.senderName.charAt(0)}
-                      </AvatarFallback>
-                    </Avatar>
-                  )}
-                  
-                  <div
-                    className={`max-w-[70%] ${
-                      message.senderId === user?.uid
-                        ? 'bg-blue-500 text-white'
-                        : 'bg-gray-100 text-gray-900'
-                    } rounded-lg p-3`}
+              <AnimatePresence>
+                {messages.map((message, index) => (
+                  <motion.div
+                    key={message.id}
+                    initial={{ opacity: 0, y: 10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: -10 }}
+                    transition={{ duration: 0.2, delay: index * 0.02 }}
+                    className={`flex gap-3 ${
+                      message.senderId === user?.uid ? 'justify-end' : 'justify-start'
+                    }`}
+                    onMouseEnter={() => setHoveredMessage(message.id)}
+                    onMouseLeave={() => setHoveredMessage(null)}
                   >
                     {message.senderId !== user?.uid && (
-                      <div className="text-xs font-medium mb-1">
-                        {message.senderName}
-                      </div>
+                      <Avatar className="w-8 h-8 flex-shrink-0">
+                        <AvatarFallback className="text-xs bg-primary/10 text-primary">
+                          {message.senderName.charAt(0).toUpperCase()}
+                        </AvatarFallback>
+                      </Avatar>
                     )}
-                    <div className="text-sm whitespace-pre-wrap">
-                      {message.content}
+                    
+                    <div className="relative max-w-[70%] group">
+                      <div
+                        className={`${
+                          message.senderId === user?.uid
+                            ? 'bg-primary text-primary-foreground'
+                            : 'bg-muted text-foreground'
+                        } rounded-lg p-3 relative`}
+                      >
+                        {message.senderId !== user?.uid && (
+                          <div className="text-xs font-medium mb-1 opacity-70">
+                            {message.senderName}
+                          </div>
+                        )}
+                        <div className="text-sm whitespace-pre-wrap">
+                          {message.text}
+                        </div>
+                      </div>
+                      
+                      {/* Timestamp tooltip */}
+                      <AnimatePresence>
+                        {hoveredMessage === message.id && (
+                          <motion.div
+                            initial={{ opacity: 0, scale: 0.8 }}
+                            animate={{ opacity: 1, scale: 1 }}
+                            exit={{ opacity: 0, scale: 0.8 }}
+                            className={`absolute z-10 px-2 py-1 bg-popover text-popover-foreground text-xs rounded shadow-md border ${
+                              message.senderId === user?.uid
+                                ? 'right-0 -top-8'
+                                : 'left-0 -top-8'
+                            }`}
+                          >
+                            {format(message.createdAt, 'MMM d, HH:mm')}
+                          </motion.div>
+                        )}
+                      </AnimatePresence>
                     </div>
-                    <div className={`text-xs mt-1 ${
-                      message.senderId === user?.uid
-                        ? 'text-blue-100'
-                        : 'text-gray-500'
-                    }`}>
-                      {format(message.timestamp, 'HH:mm')}
-                      {message.edited && ' (edited)'}
-                    </div>
-                  </div>
-                  
-                  {message.senderId === user?.uid && (
-                    <Avatar className="w-8 h-8">
-                      <AvatarFallback className="text-xs">
-                        {message.senderName.charAt(0)}
-                      </AvatarFallback>
-                    </Avatar>
-                  )}
-                </div>
-              ))
+                    
+                    {message.senderId === user?.uid && (
+                      <Avatar className="w-8 h-8 flex-shrink-0">
+                        <AvatarFallback className="text-xs bg-primary/10 text-primary">
+                          {message.senderName.charAt(0).toUpperCase()}
+                        </AvatarFallback>
+                      </Avatar>
+                    )}
+                  </motion.div>
+                ))}
+              </AnimatePresence>
             )}
             <div ref={messagesEndRef} />
           </div>
         </ScrollArea>
         
-        <div className="p-4 border-t">
+        <div className="p-4 border-t bg-background">
           <div className="flex gap-2">
             <Input
               value={newMessage}
@@ -148,6 +211,7 @@ export const GroupChat: React.FC<GroupChatProps> = ({ groupId }) => {
               onClick={handleSendMessage}
               disabled={!newMessage.trim() || sending}
               size={isMobile ? "sm" : "default"}
+              className="flex-shrink-0"
             >
               <Send className="w-4 h-4" />
             </Button>

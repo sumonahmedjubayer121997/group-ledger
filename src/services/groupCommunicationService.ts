@@ -1,4 +1,3 @@
-
 import { 
   collection, 
   doc, 
@@ -13,7 +12,11 @@ import {
   serverTimestamp,
   arrayUnion,
   arrayRemove,
-  increment
+  increment,
+  limit,
+  startAfter,
+  QueryDocumentSnapshot,
+  DocumentData
 } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 
@@ -22,22 +25,33 @@ export interface ChatMessage {
   id: string;
   senderId: string;
   senderName: string;
-  content: string;
-  timestamp: Date;
-  edited?: boolean;
-  editedAt?: Date;
+  text: string;
+  createdAt: Date;
 }
 
-export const sendChatMessage = async (groupId: string, senderId: string, senderName: string, content: string) => {
+export const sendChatMessage = async (groupId: string, senderId: string, senderName: string, text: string) => {
   try {
     const messagesRef = collection(db, 'groups', groupId, 'messages');
+    
+    // First, check if we have more than 100 messages
+    const allMessagesQuery = query(messagesRef, orderBy('createdAt', 'desc'));
+    const allMessagesSnapshot = await getDocs(allMessagesQuery);
+    
+    // If we have 100 or more messages, delete the oldest ones
+    if (allMessagesSnapshot.size >= 100) {
+      const messagesToDelete = allMessagesSnapshot.docs.slice(99); // Keep latest 99, delete the rest
+      const deletePromises = messagesToDelete.map(doc => deleteDoc(doc.ref));
+      await Promise.all(deletePromises);
+    }
+    
+    // Add the new message
     const docRef = await addDoc(messagesRef, {
       senderId,
       senderName,
-      content: content.trim(),
-      timestamp: serverTimestamp(),
-      edited: false,
+      text: text.trim(),
+      createdAt: serverTimestamp(),
     });
+    
     return docRef.id;
   } catch (error) {
     console.error('Error sending message:', error);
@@ -45,9 +59,13 @@ export const sendChatMessage = async (groupId: string, senderId: string, senderN
   }
 };
 
-export const subscribeToGroupChat = (groupId: string, callback: (messages: ChatMessage[]) => void) => {
+export const subscribeToGroupChat = (
+  groupId: string, 
+  messageLimit: number = 10,
+  callback: (messages: ChatMessage[]) => void
+) => {
   const messagesRef = collection(db, 'groups', groupId, 'messages');
-  const q = query(messagesRef, orderBy('timestamp', 'desc'));
+  const q = query(messagesRef, orderBy('createdAt', 'desc'), limit(messageLimit));
   
   return onSnapshot(q, (snapshot) => {
     const messages: ChatMessage[] = [];
@@ -57,14 +75,25 @@ export const subscribeToGroupChat = (groupId: string, callback: (messages: ChatM
         id: doc.id,
         senderId: data.senderId,
         senderName: data.senderName,
-        content: data.content,
-        timestamp: data.timestamp?.toDate() || new Date(),
-        edited: data.edited,
-        editedAt: data.editedAt?.toDate(),
+        text: data.text,
+        createdAt: data.createdAt?.toDate() || new Date(),
       });
     });
-    callback(messages);
+    
+    // Reverse to show oldest first, newest last
+    callback(messages.reverse());
   });
+};
+
+export const getMessageCount = async (groupId: string): Promise<number> => {
+  try {
+    const messagesRef = collection(db, 'groups', groupId, 'messages');
+    const snapshot = await getDocs(messagesRef);
+    return snapshot.size;
+  } catch (error) {
+    console.error('Error getting message count:', error);
+    return 0;
+  }
 };
 
 // Pinned Notes
