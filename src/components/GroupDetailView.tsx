@@ -300,7 +300,7 @@ export const GroupDetailView: React.FC<GroupDetailViewProps> = ({ group, onBack 
       )}
 
       {/* Tab Content */}
-      <div className={`${isMobile ? 'px-4 py-4' : 'p-6'} space-y-6`}>
+      <div className={`${isMobile ? 'px-4 py-4' : 'p-6'} space-y-6`} style={{ paddingBottom: isMobile ? '80px' : '24px' }}>
         <AnimatePresence mode="wait">
           <motion.div
             key={activeTab}

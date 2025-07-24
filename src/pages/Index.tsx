@@ -147,7 +147,7 @@ const Index = () => {
         />
       )}
 
-      <div className="container mx-auto px-3 py-4 sm:px-4 sm:py-6">
+      <div className="container mx-auto px-3 py-4 sm:px-4 sm:py-6" style={{ paddingBottom: isMobile ? '80px' : '24px' }}>
         {/* Desktop Header */}
         {!isMobile && (
           <div className="flex flex-col gap-3 sm:flex-row sm:justify-between sm:items-center mb-4 sm:mb-6">
