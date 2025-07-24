@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -18,7 +17,8 @@ import {
   User,
   MoreVertical,
   Archive,
-  ArrowLeft
+  ArrowLeft,
+  MessageCircle
 } from 'lucide-react';
 import { GroupSettings } from './GroupSettings';
 import { GroupActivityFeed } from './GroupActivityFeed';
@@ -28,6 +28,7 @@ import { GroupInviteDialog } from './GroupInviteDialog';
 import { ExpenseForm } from './ExpenseForm';
 import { RecurringExpenseDialog } from './RecurringExpenseDialog';
 import { GroupDetailMobileNav } from './GroupDetailMobileNav';
+import { GroupCommunicationHub } from './GroupCommunicationHub';
 
 interface GroupDetailViewProps {
   group: Group;
@@ -35,7 +36,7 @@ interface GroupDetailViewProps {
 }
 
 export const GroupDetailView: React.FC<GroupDetailViewProps> = ({ group, onBack }) => {
-  const [activeTab, setActiveTab] = useState<'overview' | 'analytics' | 'activity' | 'members' | 'settings'>('overview');
+  const [activeTab, setActiveTab] = useState<'overview' | 'analytics' | 'activity' | 'members' | 'settings' | 'communication'>('overview');
   const [showExpenseForm, setShowExpenseForm] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
   const [showInvite, setShowInvite] = useState(false);
@@ -73,6 +74,7 @@ export const GroupDetailView: React.FC<GroupDetailViewProps> = ({ group, onBack 
     { id: 'analytics', label: 'Analytics', icon: BarChart3 },
     { id: 'activity', label: 'Activity', icon: Activity },
     { id: 'members', label: 'Members', icon: Users },
+    { id: 'communication', label: 'Communication', icon: MessageCircle },
     { id: 'settings', label: 'Settings', icon: Settings },
   ];
 
@@ -368,6 +370,9 @@ export const GroupDetailView: React.FC<GroupDetailViewProps> = ({ group, onBack 
             {activeTab === 'analytics' && <GroupAnalytics group={group} />}
             {activeTab === 'activity' && <GroupActivityFeed group={group} />}
             {activeTab === 'members' && <GroupMemberManagement group={group} />}
+            {activeTab === 'communication' && (
+              <GroupCommunicationHub group={group} isAdmin={isUserAdmin} />
+            )}
             {activeTab === 'settings' && isUserAdmin && <GroupSettings group={group} />}
           </motion.div>
         </AnimatePresence>
