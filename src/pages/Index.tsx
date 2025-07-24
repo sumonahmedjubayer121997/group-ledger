@@ -19,6 +19,7 @@ import { MobileNavbar } from "@/components/MobileNavbar";
 import { NotificationBell } from "@/components/NotificationBell";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { motion, AnimatePresence } from "framer-motion";
+import { GroupDetailMobileNav } from "@/components/GroupDetailMobileNav";
 import { fetchGroupMembersWithPhotos } from "@/components/firebaseComponents/FetchGroupMembersWithPhotos";
 const Index = () => {
   const { user, userProfile, logout } = useAuth();
@@ -123,10 +124,10 @@ const Index = () => {
   const balances = getBalances();
 
   const tabItems = [
-    { value: "overview", label: "Overview", icon: BarChart3 },
-    { value: "groups", label: "Groups", icon: Users },
-    { value: "expenses", label: "Expenses", icon: Receipt },
-    { value: "analytics", label: "Analytics", icon: TrendingUp },
+    { value: "overview",id:"overview", label: "Overview", icon: BarChart3 },
+    { value: "groups",id:"groups", label: "Groups", icon: Users },
+    { value: "expenses", id:"expenses",label: "Expenses", icon: Receipt },
+    { value: "analytics",id:"analytics", label: "Analytics", icon: TrendingUp },
   ];
 
   const contentVariants = {
@@ -416,28 +417,13 @@ const Index = () => {
 
         
 {isMobile && (
-  <div className="fixed bottom-0 left-0 right-0  z-50 bg-white border-t shadow-sm p-2">
-    <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-      <TabsList className="grid grid-cols-4 text-center p-0">
-        {tabItems.map((item) => {
-          const Icon = item.icon;
-          const isActive = activeTab === item.value;
-
-          return (
-            <TabsTrigger
-              key={item.value}
-              value={item.value}
-              className={`flex flex-col items-center justify-center py-2 transition-all duration-150 ${
-                isActive ? "text-blue-600 font-semibold" : "text-gray-500"
-              }`}
-            >
-              <Icon className="h-5 w-5 mb-0.5" />
-              <span className="text-[10px] leading-none">{item.label}</span>
-            </TabsTrigger>
-          );
-        })}
-      </TabsList>
-    </Tabs>
+    <div className="fixed bottom-0 inset-x-0 z-50 bg-white border-t shadow-sm px-4 py-2 max-w-[100%] w-full sm:max-w-md mx-auto overflow-x-hidden">
+      <GroupDetailMobileNav
+        tabs={tabItems}
+        activeTab={activeTab}
+        onTabChange={(tabId) => setActiveTab(tabId)}
+       
+      />
   </div>
 )}
 

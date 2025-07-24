@@ -417,13 +417,14 @@ export const GroupDetailView: React.FC<GroupDetailViewProps> = ({ group, onBack 
       <RecurringExpenseDialog group={group}>
         <div />
       </RecurringExpenseDialog>
-      <div className="fixed bottom-0 left-0 right-0  z-50 bg-white border-t shadow-sm p-2 sm:w-full sm:max-w-md mx-auto">
-         <GroupDetailMobileNav
-        tabs={tabs}
-        activeTab={activeTab}
-        onTabChange={(tabId) => setActiveTab(tabId as any)}
-      />
-      </div>
+     <div className="fixed bottom-0 inset-x-0 z-50 bg-white border-t shadow-sm px-4 py-2 max-w-[100%] w-full sm:max-w-md mx-auto overflow-x-hidden">
+  <GroupDetailMobileNav
+    tabs={tabs}
+    activeTab={activeTab}
+    onTabChange={(tabId) => setActiveTab(tabId as any)}
+  />
+</div>
+
       
     </div>
   );

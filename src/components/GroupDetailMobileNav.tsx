@@ -34,10 +34,10 @@ export const GroupDetailMobileNav: React.FC<GroupDetailMobileNavProps> = ({
 
       return (
         <Button
-          key={tab.id}
+          key={tab.id || tab.label}
           variant={isActive ? "default" : "ghost"}
           size="sm"
-          onClick={() => onTabChange(tab.id)}
+          onClick={() => onTabChange(tab.id || tab.label)}
           className="flex items-center space-x-2 min-w-fit px-3 h-9"
         >
           <Icon className="w-4 h-4" />
