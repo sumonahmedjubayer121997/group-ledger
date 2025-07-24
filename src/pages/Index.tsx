@@ -1,6 +1,6 @@
 
 import { useState, useEffect } from "react";
-import { Plus, Settings, Users, Receipt, TrendingUp, User } from "lucide-react";
+import { Plus, Settings, Users, Receipt, TrendingUp, User, BarChart3, Wallet } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -18,6 +18,7 @@ import { LandingPage } from "@/components/LandingPage";
 import { AuthPage } from "./AuthPage";
 import { MobileNavbar } from "@/components/MobileNavbar";
 import { useIsMobile } from "@/hooks/use-mobile";
+import { motion, AnimatePresence } from "framer-motion";
 
 const Index = () => {
   const { user, userProfile, logout } = useAuth();
@@ -27,6 +28,7 @@ const Index = () => {
   const [showUserProfile, setShowUserProfile] = useState(false);
   const [showLanding, setShowLanding] = useState(false);
   const [showAuth, setShowAuth] = useState(false);
+  const [activeTab, setActiveTab] = useState("overview");
   const isMobile = useIsMobile();
 
   // Initialize Firebase sync when user is authenticated
@@ -96,6 +98,32 @@ const Index = () => {
 
   const balances = getBalances();
 
+  const tabItems = [
+    { value: "overview", label: "Overview", icon: BarChart3 },
+    { value: "groups", label: "Groups", icon: Users },
+    { value: "expenses", label: "Expenses", icon: Receipt },
+    { value: "analytics", label: "Analytics", icon: TrendingUp },
+  ];
+
+  const tabVariants = {
+    inactive: { 
+      scale: 0.95, 
+      opacity: 0.7,
+      transition: { duration: 0.2 }
+    },
+    active: { 
+      scale: 1, 
+      opacity: 1,
+      transition: { duration: 0.2 }
+    }
+  };
+
+  const contentVariants = {
+    initial: { opacity: 0, y: 20 },
+    animate: { opacity: 1, y: 0 },
+    exit: { opacity: 0, y: -20 }
+  };
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-green-50">
       {/* Mobile Navbar */}
@@ -149,7 +177,12 @@ const Index = () => {
         )}
 
         {/* Welcome Message */}
-        <div className="mb-4 sm:mb-6">
+        <motion.div 
+          className="mb-4 sm:mb-6"
+          initial={{ opacity: 0, y: -20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.5 }}
+        >
           <Card className="bg-white/80 backdrop-blur-sm">
             <CardHeader className="pb-3 sm:pb-6">
               <CardTitle className="text-base sm:text-lg md:text-xl">
@@ -160,7 +193,7 @@ const Index = () => {
               </CardDescription>
             </CardHeader>
           </Card>
-        </div>
+        </motion.div>
 
         {/* Debug info - Hidden on mobile */}
         {!isMobile && (
@@ -170,115 +203,177 @@ const Index = () => {
         )}
 
         {/* Tabs */}
-        <Tabs defaultValue="overview" className="space-y-4 sm:space-y-6">
-          <TabsList className="grid w-full grid-cols-2 sm:grid-cols-4 gap-1 sm:gap-2 p-1">
-            <TabsTrigger value="overview" className="text-xs sm:text-sm px-2 py-2">
-              Overview
-            </TabsTrigger>
-            <TabsTrigger value="groups" className="text-xs sm:text-sm px-2 py-2">
-              Groups
-            </TabsTrigger>
-            <TabsTrigger value="expenses" className="text-xs sm:text-sm px-2 py-2">
-              Expenses
-            </TabsTrigger>
-            <TabsTrigger value="analytics" className="text-xs sm:text-sm px-2 py-2">
-              Analytics
-            </TabsTrigger>
+        <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4 sm:space-y-6">
+          <TabsList className="grid w-full grid-cols-4 gap-1 sm:gap-2 p-1">
+            {tabItems.map((item) => (
+              <motion.div
+                key={item.value}
+                variants={tabVariants}
+                animate={activeTab === item.value ? "active" : "inactive"}
+                whileHover={{ scale: 1.05 }}
+                whileTap={{ scale: 0.95 }}
+              >
+                <TabsTrigger 
+                  value={item.value} 
+                  className="flex items-center justify-center gap-1 sm:gap-2 px-2 py-2 text-xs sm:text-sm min-h-[48px] sm:min-h-auto"
+                >
+                  <item.icon className="h-4 w-4 sm:h-4 sm:w-4" />
+                  {/* Show label only on desktop or for active tab on mobile */}
+                  <span className={`${isMobile && activeTab !== item.value ? 'hidden' : 'block'} truncate`}>
+                    {item.label}
+                  </span>
+                </TabsTrigger>
+              </motion.div>
+            ))}
           </TabsList>
 
-          {/* Overview */}
-          <TabsContent value="overview" className="space-y-4 sm:space-y-6">
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
-              <BalanceCard balances={balances} />
-              <Card>
-                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                  <CardTitle className="text-xs sm:text-sm font-medium">Total Groups</CardTitle>
-                  <Users className="h-3 w-3 sm:h-4 sm:w-4 text-muted-foreground" />
-                </CardHeader>
-                <CardContent>
-                  <div className="text-lg sm:text-2xl font-bold">{groups.length}</div>
-                  <p className="text-xs text-muted-foreground">Active groups</p>
-                </CardContent>
-              </Card>
-              <Card>
-                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                  <CardTitle className="text-xs sm:text-sm font-medium">Total Expenses</CardTitle>
-                  <Receipt className="h-3 w-3 sm:h-4 sm:w-4 text-muted-foreground" />
-                </CardHeader>
-                <CardContent>
-                  <div className="text-lg sm:text-2xl font-bold">{expenses.length}</div>
-                  <p className="text-xs text-muted-foreground">All time</p>
-                </CardContent>
-              </Card>
-            </div>
-            <RecentExpenses expenses={expenses} />
-          </TabsContent>
-
-          {/* Groups */}
-          <TabsContent value="groups" className="space-y-4 sm:space-y-6">
-            <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3 sm:gap-4 mb-4">
-              <h2 className="text-lg sm:text-xl font-bold">Your Groups</h2>
-              <Button
-                onClick={() => setShowGroupForm(true)}
-                className="bg-blue-600 hover:bg-blue-700 text-xs sm:text-sm"
-                size="sm"
+          <AnimatePresence mode="wait">
+            {/* Overview */}
+            <TabsContent value="overview" className="space-y-4 sm:space-y-6">
+              <motion.div
+                key="overview"
+                variants={contentVariants}
+                initial="initial"
+                animate="animate"
+                exit="exit"
+                transition={{ duration: 0.3 }}
               >
-                <Plus className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-2" />
-                New Group
-              </Button>
-            </div>
-            <GroupList groups={groups} onGroupClick={setSelectedGroup} />
-          </TabsContent>
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
+                  <BalanceCard balances={balances} />
+                  <Card>
+                    <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                      <CardTitle className="text-xs sm:text-sm font-medium">Total Groups</CardTitle>
+                      <Users className="h-3 w-3 sm:h-4 sm:w-4 text-muted-foreground" />
+                    </CardHeader>
+                    <CardContent>
+                      <div className="text-lg sm:text-2xl font-bold">{groups.length}</div>
+                      <p className="text-xs text-muted-foreground">Active groups</p>
+                    </CardContent>
+                  </Card>
+                  <Card>
+                    <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                      <CardTitle className="text-xs sm:text-sm font-medium">Total Expenses</CardTitle>
+                      <Receipt className="h-3 w-3 sm:h-4 sm:w-4 text-muted-foreground" />
+                    </CardHeader>
+                    <CardContent>
+                      <div className="text-lg sm:text-2xl font-bold">{expenses.length}</div>
+                      <p className="text-xs text-muted-foreground">All time</p>
+                    </CardContent>
+                  </Card>
+                </div>
+                <RecentExpenses expenses={expenses} />
+              </motion.div>
+            </TabsContent>
 
-          {/* Expenses */}
-          <TabsContent value="expenses" className="space-y-4 sm:space-y-6">
-            <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3 sm:gap-4">
-              <h2 className="text-lg sm:text-xl font-bold">All Expenses</h2>
-              <Button
-                onClick={() => setShowExpenseForm(true)}
-                className="bg-green-600 hover:bg-green-700 text-xs sm:text-sm"
-                size="sm"
+            {/* Groups */}
+            <TabsContent value="groups" className="space-y-4 sm:space-y-6">
+              <motion.div
+                key="groups"
+                variants={contentVariants}
+                initial="initial"
+                animate="animate"
+                exit="exit"
+                transition={{ duration: 0.3 }}
               >
-                <Plus className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-2" />
-                Add Expense
-              </Button>
-            </div>
-            <RecentExpenses expenses={expenses} />
-          </TabsContent>
+                <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3 sm:gap-4 mb-4">
+                  <h2 className="text-lg sm:text-xl font-bold">Your Groups</h2>
+                  <Button
+                    onClick={() => setShowGroupForm(true)}
+                    className="bg-blue-600 hover:bg-blue-700 text-xs sm:text-sm"
+                    size="sm"
+                  >
+                    <Plus className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-2" />
+                    New Group
+                  </Button>
+                </div>
+                <GroupList groups={groups} onGroupClick={setSelectedGroup} />
+              </motion.div>
+            </TabsContent>
 
-          {/* Analytics */}
-          <TabsContent value="analytics" className="space-y-4 sm:space-y-6">
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6">
-              <ExpenseChart expenses={expenses} />
-              <Card>
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2 text-base sm:text-lg">
-                    <TrendingUp className="h-4 w-4 sm:h-5 sm:w-5" />
-                    Spending Trends
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <p className="text-muted-foreground text-sm">Analytics coming soon...</p>
-                </CardContent>
-              </Card>
-            </div>
-          </TabsContent>
+            {/* Expenses */}
+            <TabsContent value="expenses" className="space-y-4 sm:space-y-6">
+              <motion.div
+                key="expenses"
+                variants={contentVariants}
+                initial="initial"
+                animate="animate"
+                exit="exit"
+                transition={{ duration: 0.3 }}
+              >
+                <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3 sm:gap-4">
+                  <h2 className="text-lg sm:text-xl font-bold">All Expenses</h2>
+                  <Button
+                    onClick={() => setShowExpenseForm(true)}
+                    className="bg-green-600 hover:bg-green-700 text-xs sm:text-sm"
+                    size="sm"
+                  >
+                    <Plus className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-2" />
+                    Add Expense
+                  </Button>
+                </div>
+                <RecentExpenses expenses={expenses} />
+              </motion.div>
+            </TabsContent>
+
+            {/* Analytics */}
+            <TabsContent value="analytics" className="space-y-4 sm:space-y-6">
+              <motion.div
+                key="analytics"
+                variants={contentVariants}
+                initial="initial"
+                animate="animate"
+                exit="exit"
+                transition={{ duration: 0.3 }}
+              >
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6">
+                  <ExpenseChart expenses={expenses} />
+                  <Card>
+                    <CardHeader>
+                      <CardTitle className="flex items-center gap-2 text-base sm:text-lg">
+                        <TrendingUp className="h-4 w-4 sm:h-5 sm:w-5" />
+                        Spending Trends
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      <p className="text-muted-foreground text-sm">Analytics coming soon...</p>
+                    </CardContent>
+                  </Card>
+                </div>
+              </motion.div>
+            </TabsContent>
+          </AnimatePresence>
         </Tabs>
       </div>
 
       {/* Modals */}
-      {showGroupForm && (
-        <GroupForm
-          isOpen={showGroupForm}
-          onClose={() => setShowGroupForm(false)}
-        />
-      )}
-      {showExpenseForm && (
-        <ExpenseForm
-          isOpen={showExpenseForm}
-          onClose={() => setShowExpenseForm(false)}
-        />
-      )}
+      <AnimatePresence>
+        {showGroupForm && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.2 }}
+          >
+            <GroupForm
+              isOpen={showGroupForm}
+              onClose={() => setShowGroupForm(false)}
+            />
+          </motion.div>
+        )}
+        {showExpenseForm && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.2 }}
+          >
+            <ExpenseForm
+              isOpen={showExpenseForm}
+              onClose={() => setShowExpenseForm(false)}
+            />
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 };
