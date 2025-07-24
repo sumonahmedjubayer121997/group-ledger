@@ -20,13 +20,26 @@ export const GroupCommunicationHub: React.FC<GroupCommunicationHubProps> = ({ gr
   const isMobile = useIsMobile();
 
   const tabs = [
-    { id: 'chat', label: 'Chat', icon: MessageCircle, component: GroupChat },
-    { id: 'notes', label: 'Notes', icon: Pin, component: GroupPinnedNotes },
-    { id: 'tasks', label: 'Tasks', icon: CheckSquare, component: GroupTasks },
-    { id: 'polls', label: 'Polls', icon: BarChart3, component: GroupPolls },
+    { id: 'chat', label: 'Chat', icon: MessageCircle },
+    { id: 'notes', label: 'Notes', icon: Pin },
+    { id: 'tasks', label: 'Tasks', icon: CheckSquare },
+    { id: 'polls', label: 'Polls', icon: BarChart3 },
   ];
 
-  const ActiveComponent = tabs.find(tab => tab.id === activeTab)?.component;
+  const renderActiveComponent = () => {
+    switch (activeTab) {
+      case 'chat':
+        return <GroupChat groupId={group.id} />;
+      case 'notes':
+        return <GroupPinnedNotes groupId={group.id} isAdmin={isAdmin} />;
+      case 'tasks':
+        return <GroupTasks groupId={group.id} members={group.members} />;
+      case 'polls':
+        return <GroupPolls groupId={group.id} />;
+      default:
+        return <GroupChat groupId={group.id} />;
+    }
+  };
 
   return (
     <Card className="h-full">
@@ -55,13 +68,7 @@ export const GroupCommunicationHub: React.FC<GroupCommunicationHubProps> = ({ gr
       
       <CardContent className="p-0 h-full">
         <div className="h-full">
-          {ActiveComponent && (
-            <ActiveComponent
-              groupId={group.id}
-              isAdmin={isAdmin}
-              members={group.members}
-            />
-          )}
+          {renderActiveComponent()}
         </div>
       </CardContent>
     </Card>
