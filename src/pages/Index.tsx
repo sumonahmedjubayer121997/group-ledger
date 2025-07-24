@@ -416,46 +416,34 @@ const Index = () => {
 
         
 {isMobile && (
-  <div className="fixed bottom-5 left-0 right-0 z-50 bg-gray border-t shadow-md p-2 sm:p-2 rounded-t-lg mx-3 sm:mx-4">
+  <div className="fixed bottom-0 left-0 right-0  z-50 bg-white border-t shadow-sm p-2">
     <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-    <TabsList className="grid grid-cols-4 text-center text-gray-700 p-0">
-       {tabItems.map((item) => {
-              const Icon = item.icon;
-              const isActive = activeTab === item.value;
-              
-              return (
-                <TabsTrigger 
-                  key={item.value}
-                  value={item.value} 
-            className={`flex flex-col items-center justify-center px-2 py-1 text-xs ${
-              isActive ? "text-blue-600 font-medium" : "text-gray-500"
-            }`}
-          >
-             <Icon className="h-4 w-4" />
-                  {isActive && isMobile && (
-                    <motion.span
-                      initial={{ opacity: 0, width: 0 }}
-                      animate={{ opacity: 1, width: "auto" }}
-                      exit={{ opacity: 0, width: 0 }}
-                      className="text-xs font-medium"
-                    >
-                      {item.label}
-                    </motion.span>
-                  )}
-                  {!isActive && isMobile && (
-                    <span className="sr-only">{item.label}</span>
-                  )}
-            
-          </TabsTrigger>
-        
-        );
-      })}
-    </TabsList>
+      <TabsList className="grid grid-cols-4 text-center p-0">
+        {tabItems.map((item) => {
+          const Icon = item.icon;
+          const isActive = activeTab === item.value;
+
+          return (
+            <TabsTrigger
+              key={item.value}
+              value={item.value}
+              className={`flex flex-col items-center justify-center py-2 transition-all duration-150 ${
+                isActive ? "text-blue-600 font-semibold" : "text-gray-500"
+              }`}
+            >
+              <Icon className="h-5 w-5 mb-0.5" />
+              <span className="text-[10px] leading-none">{item.label}</span>
+            </TabsTrigger>
+          );
+        })}
+      </TabsList>
     </Tabs>
   </div>
 )}
 
+
       </AnimatePresence>
+     
     </div>
   );
 };

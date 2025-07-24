@@ -156,17 +156,23 @@ export const GroupMemberManagement: React.FC<GroupMemberManagementProps> = ({ gr
             {group.members.map((member) => (
               <div key={member.id} className="flex flex-col sm:flex-row sm:items-center sm:justify-between p-3 sm:p-4 border rounded-lg space-y-3 sm:space-y-0">
                 <div className="flex items-center space-x-3 sm:space-x-4 min-w-0 flex-1">
-                  <Avatar
-                      key={member.id}
-                      className="relative flex shrink-0 overflow-hidden rounded-full h-16 w-16 sm:h-10 sm:w-10 border-2 border-white"
-                    >
-                      {member.photoURL ? (
-                        <AvatarImage className='aspect-square h-10 w-10' src={member.photoURL} alt={member.name} />
-                      ) : null}
-                      <AvatarFallback className="text-xs bg-primary/10 text-primary">
-                        {member.name.charAt(0).toUpperCase()}
-                      </AvatarFallback>
-                    </Avatar>
+                 <Avatar
+  key={member.id}
+  className="relative flex shrink-0 overflow-hidden rounded-full border-2 border-white w-12 h-12 sm:w-10 sm:h-10"
+>
+  {member.photoURL ? (
+    <AvatarImage
+      src={member.photoURL}
+      alt={member.name}
+      className="object-cover w-full h-full"
+    />
+  ) : (
+    <AvatarFallback className="text-xs bg-primary/10 text-primary w-full h-full flex items-center justify-center">
+      {member.name?.charAt(0)?.toUpperCase()}
+    </AvatarFallback>
+  )}
+</Avatar>
+
                   <div className="min-w-0 flex-1">
                     <div className="flex items-center space-x-2">
                       <span className="font-medium text-sm sm:text-base truncate">{member.name}</span>

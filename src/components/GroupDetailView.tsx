@@ -273,11 +273,7 @@ export const GroupDetailView: React.FC<GroupDetailViewProps> = ({ group, onBack 
       </div>
 
       {/* Mobile Navigation */}
-      <GroupDetailMobileNav
-        tabs={tabs}
-        activeTab={activeTab}
-        onTabChange={(tabId) => setActiveTab(tabId as any)}
-      />
+     
 
       {/* Desktop Navigation Tabs */}
       {!isMobile && (
@@ -421,6 +417,14 @@ export const GroupDetailView: React.FC<GroupDetailViewProps> = ({ group, onBack 
       <RecurringExpenseDialog group={group}>
         <div />
       </RecurringExpenseDialog>
+      <div className="fixed bottom-0 left-0 right-0  z-50 bg-white border-t shadow-sm p-2 sm:w-full sm:max-w-md mx-auto">
+         <GroupDetailMobileNav
+        tabs={tabs}
+        activeTab={activeTab}
+        onTabChange={(tabId) => setActiveTab(tabId as any)}
+      />
+      </div>
+      
     </div>
   );
 };
