@@ -76,7 +76,7 @@ export const GroupDetailView: React.FC<GroupDetailViewProps> = ({ group, onBack 
     { id: 'activity', label: 'Activity', icon: Activity },
     { id: 'members', label: 'Members', icon: Users },
     { id: 'settings', label: 'Settings', icon: Settings },
-    { id: 'communication', label: 'Com', icon: Users },
+    { id: 'communication', label: 'Com', icon: MessageCircle },
   ];
 
   return (
