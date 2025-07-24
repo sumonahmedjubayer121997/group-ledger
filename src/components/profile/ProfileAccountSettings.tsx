@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -135,31 +136,34 @@ export const ProfileAccountSettings: React.FC<ProfileAccountSettingsProps> = ({ 
   };
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4 sm:space-y-6">
       {/* Profile Information */}
       <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <UserIcon className="h-5 w-5" />
+        <CardHeader className="pb-3 sm:pb-6">
+          <CardTitle className="flex items-center gap-2 text-base sm:text-lg">
+            <UserIcon className="h-4 w-4 sm:h-5 sm:w-5" />
             Profile Information
           </CardTitle>
-          <CardDescription>
+          <CardDescription className="text-sm">
             Update your display name and profile photo
           </CardDescription>
         </CardHeader>
-        <CardContent className="space-y-4">
+        <CardContent className="space-y-4 pt-0">
           <div className="space-y-2">
-            <Label htmlFor="displayName">Display Name</Label>
-            <div className="flex gap-2">
+            <Label htmlFor="displayName" className="text-sm">Display Name</Label>
+            <div className="flex flex-col sm:flex-row gap-2">
               <Input
                 id="displayName"
                 value={displayName}
                 onChange={(e) => setDisplayName(e.target.value)}
                 placeholder="Enter your display name"
+                className="flex-1"
               />
               <Button 
                 onClick={handleUpdateDisplayName}
                 disabled={isLoading || displayName === userProfile.displayName}
+                className="w-full sm:w-auto"
+                size="sm"
               >
                 Update
               </Button>
@@ -167,8 +171,8 @@ export const ProfileAccountSettings: React.FC<ProfileAccountSettingsProps> = ({ 
           </div>
           
           <div className="space-y-2">
-            <Label>Profile Photo</Label>
-            <div className="flex items-center gap-4">
+            <Label className="text-sm">Profile Photo</Label>
+            <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4">
               <div className="text-sm text-muted-foreground">
                 Upload a custom photo or choose from our collection
               </div>
@@ -183,27 +187,27 @@ export const ProfileAccountSettings: React.FC<ProfileAccountSettingsProps> = ({ 
 
       {/* Email Verification */}
       <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Mail className="h-5 w-5" />
+        <CardHeader className="pb-3 sm:pb-6">
+          <CardTitle className="flex items-center gap-2 text-base sm:text-lg">
+            <Mail className="h-4 w-4 sm:h-5 sm:w-5" />
             Email Verification
           </CardTitle>
-          <CardDescription>
+          <CardDescription className="text-sm">
             Verify your email address for enhanced security
           </CardDescription>
         </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="flex items-center justify-between">
-            <div className="space-y-1">
-              <p className="font-medium">{userProfile.email}</p>
+        <CardContent className="space-y-4 pt-0">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+            <div className="space-y-2 min-w-0 flex-1">
+              <p className="font-medium text-sm sm:text-base truncate">{userProfile.email}</p>
               <div className="flex items-center gap-2">
                 {userProfile.emailVerified ? (
-                  <Badge variant="outline" className="text-green-600">
+                  <Badge variant="outline" className="text-green-600 text-xs">
                     <CheckCircle className="h-3 w-3 mr-1" />
                     Verified
                   </Badge>
                 ) : (
-                  <Badge variant="outline" className="text-orange-600">
+                  <Badge variant="outline" className="text-orange-600 text-xs">
                     Pending Verification
                   </Badge>
                 )}
@@ -214,6 +218,8 @@ export const ProfileAccountSettings: React.FC<ProfileAccountSettingsProps> = ({ 
                 onClick={handleResendVerification}
                 disabled={isLoading}
                 variant="outline"
+                size="sm"
+                className="w-full sm:w-auto"
               >
                 Resend Verification
               </Button>
@@ -224,18 +230,18 @@ export const ProfileAccountSettings: React.FC<ProfileAccountSettingsProps> = ({ 
 
       {/* Password Settings */}
       <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Key className="h-5 w-5" />
+        <CardHeader className="pb-3 sm:pb-6">
+          <CardTitle className="flex items-center gap-2 text-base sm:text-lg">
+            <Key className="h-4 w-4 sm:h-5 sm:w-5" />
             Password Settings
           </CardTitle>
-          <CardDescription>
+          <CardDescription className="text-sm">
             Change your account password
           </CardDescription>
         </CardHeader>
-        <CardContent className="space-y-4">
+        <CardContent className="space-y-4 pt-0">
           <div className="space-y-2">
-            <Label htmlFor="currentPassword">Current Password</Label>
+            <Label htmlFor="currentPassword" className="text-sm">Current Password</Label>
             <Input
               id="currentPassword"
               type="password"
@@ -246,7 +252,7 @@ export const ProfileAccountSettings: React.FC<ProfileAccountSettingsProps> = ({ 
           </div>
           
           <div className="space-y-2">
-            <Label htmlFor="newPassword">New Password</Label>
+            <Label htmlFor="newPassword" className="text-sm">New Password</Label>
             <Input
               id="newPassword"
               type="password"
@@ -257,7 +263,7 @@ export const ProfileAccountSettings: React.FC<ProfileAccountSettingsProps> = ({ 
           </div>
           
           <div className="space-y-2">
-            <Label htmlFor="confirmPassword">Confirm New Password</Label>
+            <Label htmlFor="confirmPassword" className="text-sm">Confirm New Password</Label>
             <Input
               id="confirmPassword"
               type="password"
@@ -271,6 +277,7 @@ export const ProfileAccountSettings: React.FC<ProfileAccountSettingsProps> = ({ 
             onClick={handleUpdatePassword}
             disabled={isLoading || !currentPassword || !newPassword || !confirmPassword}
             className="w-full"
+            size="sm"
           >
             Update Password
           </Button>
@@ -279,25 +286,25 @@ export const ProfileAccountSettings: React.FC<ProfileAccountSettingsProps> = ({ 
 
       {/* Connected Accounts */}
       <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Link className="h-5 w-5" />
+        <CardHeader className="pb-3 sm:pb-6">
+          <CardTitle className="flex items-center gap-2 text-base sm:text-lg">
+            <Link className="h-4 w-4 sm:h-5 sm:w-5" />
             Connected Accounts
           </CardTitle>
-          <CardDescription>
+          <CardDescription className="text-sm">
             Manage your connected social accounts
           </CardDescription>
         </CardHeader>
-        <CardContent>
+        <CardContent className="pt-0">
           <div className="space-y-3">
             <div className="flex items-center justify-between p-3 border rounded-lg">
-              <div className="flex items-center gap-3">
-                <div className="w-8 h-8 bg-red-500 rounded-full flex items-center justify-center">
+              <div className="flex items-center gap-3 min-w-0 flex-1">
+                <div className="w-8 h-8 bg-red-500 rounded-full flex items-center justify-center flex-shrink-0">
                   <span className="text-white text-sm font-bold">G</span>
                 </div>
-                <div>
-                  <p className="font-medium">Google</p>
-                  <p className="text-sm text-muted-foreground">
+                <div className="min-w-0 flex-1">
+                  <p className="font-medium text-sm sm:text-base">Google</p>
+                  <p className="text-xs sm:text-sm text-muted-foreground">
                     {user.providerData.some(provider => provider.providerId === 'google.com') 
                       ? 'Connected' 
                       : 'Not connected'
