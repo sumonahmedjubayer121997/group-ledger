@@ -142,6 +142,14 @@ const Index = () => {
                 Profile
               </Button>
               <Button
+                    onClick={() => setShowExpenseForm(true)}
+                    className="bg-green-600 hover:bg-green-700 text-xs sm:text-sm"
+                    size="sm"
+                  >
+                    <Plus className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-2" />
+                    Add Expense
+                  </Button>
+              <Button
                 onClick={() => setShowGroupForm(true)}
                 className="bg-blue-600 hover:bg-blue-700 text-xs sm:text-sm"
                 size="sm"
