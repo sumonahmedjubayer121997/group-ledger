@@ -142,8 +142,8 @@ interface ExpenseStore {
   getGroupAnalytics: (groupId: string) => any;
   getSettlementHistory: () => Settlement[];
   simplifyDebts: () => void;
-  archiveGroup: (groupId: string) => void;
-  unarchiveGroup: (groupId: string) => void;
+  archiveGroup: (groupId: string) => Promise<void>;
+  unarchiveGroup: (groupId: string) => Promise<void>;
 }
 
 export const useExpenseStore = create<ExpenseStore>()(
@@ -676,20 +676,24 @@ export const useExpenseStore = create<ExpenseStore>()(
           console.log('Debt simplification would be implemented here');
         },
 
-        archiveGroup: (groupId) => {
-          set((state) => ({
-            groups: state.groups.map((group) =>
-              group.id === groupId ? { ...group, isArchived: true } : group
-            ),
-          }));
+        archiveGroup: async (groupId) => {
+          try {
+            await updateGroupFirebase(groupId, { isArchived: true });
+            // Firebase listener will update the state
+          } catch (error) {
+            console.error('Error archiving group:', error);
+            throw error;
+          }
         },
 
-        unarchiveGroup: (groupId) => {
-          set((state) => ({
-            groups: state.groups.map((group) =>
-              group.id === groupId ? { ...group, isArchived: false } : group
-            ),
-          }));
+        unarchiveGroup: async (groupId) => {
+          try {
+            await updateGroupFirebase(groupId, { isArchived: false });
+            // Firebase listener will update the state
+          } catch (error) {
+            console.error('Error unarchiving group:', error);
+            throw error;
+          }
         },
       };
     },

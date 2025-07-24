@@ -9,7 +9,7 @@ import { Switch } from '@/components/ui/switch';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useExpenseStore, Group } from '@/stores/expenseStore';
 import { Settings, Upload, Save } from 'lucide-react';
-import { useToast } from '@/hooks/use-toast';
+import { toast } from "sonner";
 
 interface GroupSettingsProps {
   group: Group;
@@ -41,7 +41,6 @@ export const GroupSettings: React.FC<GroupSettingsProps> = ({ group }) => {
   const [groupType, setGroupType] = useState<'private' | 'public'>(group.groupType || 'private');
 
   const { updateGroup } = useExpenseStore();
-  const { toast } = useToast();
 
   const handleSave = () => {
     updateGroup(group.id, {
@@ -58,10 +57,7 @@ export const GroupSettings: React.FC<GroupSettingsProps> = ({ group }) => {
       },
     });
 
-    toast({
-      title: "Settings Updated",
-      description: "Group settings have been saved successfully.",
-    });
+    toast.success("Group settings updated successfully!");
   };
 
   return (
