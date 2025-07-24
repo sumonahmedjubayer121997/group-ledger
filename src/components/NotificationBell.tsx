@@ -1,5 +1,6 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Bell, X, Settings, Trash2 } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
@@ -10,10 +11,13 @@ import { Switch } from '@/components/ui/switch';
 import { useNotificationStore } from '@/stores/notificationStore';
 import { formatDistanceToNow } from 'date-fns';
 import { toast } from '@/hooks/use-toast';
+import { useAuth } from '@/contexts/AuthContext';
 
 export const NotificationBell = () => {
   const [showSettings, setShowSettings] = useState(false);
   const [isOpen, setIsOpen] = useState(false);
+  const navigate = useNavigate();
+  const { user } = useAuth();
   
   const {
     notifications,
@@ -25,9 +29,22 @@ export const NotificationBell = () => {
     clearAllNotifications,
     updatePreferences,
     getRecentNotifications,
+    startListening,
+    stopListening,
   } = useNotificationStore();
 
   const recentNotifications = getRecentNotifications(10);
+
+  // Start listening for notifications when user is authenticated
+  useEffect(() => {
+    if (user?.uid) {
+      startListening(user.uid);
+    }
+
+    return () => {
+      stopListening();
+    };
+  }, [user?.uid, startListening, stopListening]);
 
   const handleNotificationClick = (notification: any) => {
     if (!notification.read) {
@@ -35,8 +52,8 @@ export const NotificationBell = () => {
     }
     
     if (notification.actionUrl) {
-      // Handle navigation if needed
-      console.log('Navigate to:', notification.actionUrl);
+      navigate(notification.actionUrl);
+      setIsOpen(false); // Close the popover after navigation
     }
   };
 
@@ -177,7 +194,7 @@ export const NotificationBell = () => {
                   size="sm"
                   className="w-full justify-start text-sm"
                   onClick={() => {
-                    markAllAsRead();
+                    markAllAsRead(user?.uid);
                     toast({ title: "All notifications marked as read" });
                   }}
                 >

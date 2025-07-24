@@ -7,6 +7,7 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { useAuth } from '@/contexts/AuthContext';
 import { useIsMobile } from '@/hooks/use-mobile';
+import { useExpenseStore } from '@/stores/expenseStore';
 import { format } from 'date-fns';
 import { Send, MessageCircle, ChevronUp } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -58,12 +59,26 @@ export const GroupChat: React.FC<GroupChatProps> = ({ groupId }) => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
 
+  const { groups } = useExpenseStore();
+  const currentGroup = groups.find(g => g.id === groupId);
+
   const handleSendMessage = async () => {
     if (!newMessage.trim() || !user || !userProfile || sending) return;
 
     setSending(true);
     try {
-      await sendChatMessage(groupId, user.uid, userProfile.name, newMessage, userProfile.photoURL);
+      const groupName = currentGroup?.name;
+      const groupMemberIds = currentGroup?.members.map(m => m.id);
+      
+      await sendChatMessage(
+        groupId, 
+        user.uid, 
+        userProfile.name, 
+        newMessage, 
+        userProfile.photoURL,
+        groupName,
+        groupMemberIds
+      );
       setNewMessage('');
     } catch (error) {
       console.error('Error sending message:', error);

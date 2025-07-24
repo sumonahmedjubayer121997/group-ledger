@@ -19,6 +19,7 @@ import {
   DocumentData
 } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
+import { notificationFirebaseService } from './notificationFirebaseService';
 
 // Chat Messages
 export interface ChatMessage {
@@ -30,7 +31,7 @@ export interface ChatMessage {
   createdAt: Date;
 }
 
-export const sendChatMessage = async (groupId: string, senderId: string, senderName: string, text: string, senderPhotoURL?: string) => {
+export const sendChatMessage = async (groupId: string, senderId: string, senderName: string, text: string, senderPhotoURL?: string, groupName?: string, groupMembers?: string[]) => {
   try {
     const messagesRef = collection(db, 'groups', groupId, 'messages');
     
@@ -53,6 +54,26 @@ export const sendChatMessage = async (groupId: string, senderId: string, senderN
       text: text.trim(),
       createdAt: serverTimestamp(),
     });
+    
+    // Send notifications to group members (except the sender)
+    if (groupName && groupMembers) {
+      const membersToNotify = groupMembers.filter(memberId => memberId !== senderId);
+      
+      for (const memberId of membersToNotify) {
+        try {
+          await notificationFirebaseService.notifyChatMessage(
+            memberId,
+            groupId,
+            groupName,
+            senderName,
+            text
+          );
+        } catch (notificationError) {
+          console.error('Error sending chat notification:', notificationError);
+          // Don't throw - let the message be sent even if notification fails
+        }
+      }
+    }
     
     return docRef.id;
   } catch (error) {

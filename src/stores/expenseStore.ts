@@ -13,7 +13,7 @@ import {
   addMemberToGroup as addMemberToGroupFirebase,
   removeMemberFromGroup as removeMemberFromGroupFirebase,
 } from '@/services/firebaseService';
-import { notificationService } from '@/services/notificationService';
+import { notificationFirebaseService } from '@/services/notificationFirebaseService';
 
 export interface Member {
   id: string;
@@ -270,7 +270,7 @@ export const useExpenseStore = create<ExpenseStore>()(
           try {
             set({ loading: true, error: null });
             console.log('Adding expense:', expense);
-            await createExpenseFirebase(expense, userId);
+            const createdExpense = await createExpenseFirebase(expense, userId);
             console.log('Expense added successfully to Firebase');
             
             // Add notification for new expense
@@ -279,14 +279,18 @@ export const useExpenseStore = create<ExpenseStore>()(
             const currentUser = groups.flatMap(g => g.members).find(m => m.id === userId);
             
             if (group && currentUser) {
-              notificationService.notifyExpenseAdded(
-                expense.description,
-                expense.amount,
-                group.settings?.currency || '$',
-                currentUser.name,
-                group.name,
-                group.id
-              );
+              // Notify all group members except the person who added the expense
+              const membersToNotify = group.members.filter(m => m.id !== userId);
+              
+              for (const member of membersToNotify) {
+                await notificationFirebaseService.notifyExpenseAdded(
+                  member.id,
+                  expense.groupId,
+                  group.name,
+                  expense.description,
+                  createdExpense.id
+                );
+              }
             }
             
             set({ loading: false });
@@ -441,12 +445,18 @@ export const useExpenseStore = create<ExpenseStore>()(
               const group = groups.find(g => g.id === expense.groupId);
               
               if (group) {
-                notificationService.notifyExpenseEdited(
-                  expense.description,
-                  expense.paidBy.name,
-                  group.name,
-                  group.id
-                );
+                // Notify all group members except the one who updated the expense 
+                const membersToNotify = group.members.filter(m => m.id !== expense.paidBy.id);
+                
+                for (const member of membersToNotify) {
+                  await notificationFirebaseService.notifyExpenseAdded(
+                    member.id,
+                    expense.groupId,
+                    group.name,
+                    `${expense.description} (updated)`,
+                    expense.id
+                  );
+                }
               }
               
               set({ loading: false });
@@ -478,12 +488,18 @@ export const useExpenseStore = create<ExpenseStore>()(
               const group = groups.find(g => g.id === expense.groupId);
               
               if (group) {
-                notificationService.notifyExpenseDeleted(
-                  expense.description,
-                  expense.paidBy.name,
-                  group.name,
-                  group.id
-                );
+                // Notify all group members except the one who deleted the expense
+                const membersToNotify = group.members.filter(m => m.id !== expense.paidBy.id);
+                
+                for (const member of membersToNotify) {
+                  await notificationFirebaseService.notifyExpenseAdded(
+                    member.id,
+                    expense.groupId,
+                    group.name,
+                    `${expense.description} (deleted)`,
+                    expense.id
+                  );
+                }
               }
               
               get().addActivity({
