@@ -15,6 +15,20 @@ interface GroupSettingsProps {
   group: Group;
 }
 
+const validCurrencies = [
+  { value: 'USD', label: '$ USD' },
+  { value: 'EUR', label: '€ EUR' },
+  { value: 'GBP', label: '£ GBP' },
+  { value: 'CAD', label: '$ CAD' },
+  { value: 'AUD', label: '$ AUD' },
+  { value: 'JPY', label: '¥ JPY' },
+];
+
+const validGroupTypes = [
+  { value: 'private', label: 'Private (Invite Only)' },
+  { value: 'public', label: 'Public (Join with link)' },
+];
+
 export const GroupSettings: React.FC<GroupSettingsProps> = ({ group }) => {
   const [name, setName] = useState(group.name);
   const [description, setDescription] = useState(group.description);
@@ -49,20 +63,6 @@ export const GroupSettings: React.FC<GroupSettingsProps> = ({ group }) => {
       description: "Group settings have been saved successfully.",
     });
   };
-
-  const validCurrencies = [
-    { value: 'USD', label: '$ USD' },
-    { value: 'EUR', label: '€ EUR' },
-    { value: 'GBP', label: '£ GBP' },
-    { value: 'CAD', label: '$ CAD' },
-    { value: 'AUD', label: '$ AUD' },
-    { value: 'JPY', label: '¥ JPY' },
-  ].filter(curr => curr.value && curr.value.trim() !== '');
-
-  const validGroupTypes = [
-    { value: 'private', label: 'Private (Invite Only)' },
-    { value: 'public', label: 'Public (Join with link)' },
-  ].filter(type => type.value && type.value.trim() !== '');
 
   return (
     <div className="space-y-6">
