@@ -26,7 +26,7 @@ export const GroupDetailMobileNav: React.FC<GroupDetailMobileNavProps> = ({
   if (!isMobile) return null;
 
   return (
-    <div className="sticky top-0 z-10 bg-white/90 backdrop-blur-sm border-b px-4 py-2">
+    <div className="px-4 py-3">
       <div className="flex space-x-1 overflow-x-auto scrollbar-hide">
         {tabs.map((tab) => {
           const Icon = tab.icon;
@@ -38,15 +38,15 @@ export const GroupDetailMobileNav: React.FC<GroupDetailMobileNavProps> = ({
               variant={isActive ? "default" : "ghost"}
               size="sm"
               onClick={() => onTabChange(tab.id)}
-              className="relative flex items-center space-x-2 whitespace-nowrap min-w-fit"
+              className="relative flex items-center space-x-2 whitespace-nowrap min-w-fit h-8 px-3"
             >
-              <Icon className="w-4 h-4" />
+              <Icon className="w-4 h-4 flex-shrink-0" />
               {isActive && (
                 <motion.span
                   initial={{ opacity: 0, width: 0 }}
                   animate={{ opacity: 1, width: "auto" }}
                   exit={{ opacity: 0, width: 0 }}
-                  className="text-sm font-medium"
+                  className="text-xs font-medium"
                 >
                   {tab.label}
                 </motion.span>

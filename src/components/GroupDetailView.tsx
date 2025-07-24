@@ -79,7 +79,7 @@ export const GroupDetailView: React.FC<GroupDetailViewProps> = ({ group, onBack 
   ];
 
   return (
-    <div className="min-h-screen bg-gray-50/50">
+    <div className="min-h-screen bg-background">
       {/* Mobile Header */}
       {isMobile && (
         <div className="sticky top-0 z-20 bg-background/95 backdrop-blur-sm border-b border-border px-4 py-3">
@@ -250,11 +250,15 @@ export const GroupDetailView: React.FC<GroupDetailViewProps> = ({ group, onBack 
       </div>
 
       {/* Mobile Navigation */}
-      <GroupDetailMobileNav
-        tabs={tabs}
-        activeTab={activeTab}
-        onTabChange={(tabId) => setActiveTab(tabId as any)}
-      />
+      {isMobile && (
+        <div className="sticky top-0 z-10 bg-background/95 backdrop-blur-sm border-b border-border">
+          <GroupDetailMobileNav
+            tabs={tabs}
+            activeTab={activeTab}
+            onTabChange={(tabId) => setActiveTab(tabId as any)}
+          />
+        </div>
+      )}
 
       {/* Desktop Navigation Tabs */}
       {!isMobile && (
@@ -382,6 +386,29 @@ export const GroupDetailView: React.FC<GroupDetailViewProps> = ({ group, onBack 
           </motion.div>
         </AnimatePresence>
       </div>
+
+      {/* Mobile Bottom Navigation for Quick Actions */}
+      {isMobile && (
+        <div className="fixed bottom-0 left-0 right-0 z-20 bg-background/95 backdrop-blur-sm border-t border-border p-3">
+          <div className="flex items-center justify-center space-x-3 max-w-sm mx-auto">
+            <Button
+              onClick={() => setShowExpenseForm(true)}
+              className="flex-1 bg-primary hover:bg-primary/90 text-primary-foreground h-10"
+            >
+              <Plus className="w-4 h-4 mr-2" />
+              Add Expense
+            </Button>
+            <Button
+              variant="outline"
+              onClick={() => setShowInvite(true)}
+              className="flex-1 h-10"
+            >
+              <Users className="w-4 h-4 mr-2" />
+              Invite
+            </Button>
+          </div>
+        </div>
+      )}
 
       {/* Modals */}
       <ExpenseForm
