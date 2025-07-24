@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
@@ -143,28 +144,29 @@ export const ExpenseForm: React.FC<ExpenseFormProps> = ({ isOpen, onClose }) => 
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="sm:max-w-[500px]">
-        <DialogHeader>
-          <DialogTitle className="flex items-center space-x-2">
+      <DialogContent className="w-[95vw] max-w-2xl mx-auto max-h-[90vh] overflow-y-auto">
+        <DialogHeader className="px-1 sm:px-0">
+          <DialogTitle className="flex items-center space-x-2 text-lg sm:text-xl">
             <DollarSign className="w-5 h-5 text-blue-500" />
             <span>Add New Expense</span>
           </DialogTitle>
         </DialogHeader>
         
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <div className="grid grid-cols-2 gap-4">
+        <form onSubmit={handleSubmit} className="space-y-4 sm:space-y-6 px-1 sm:px-0">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
-              <Label htmlFor="description">Description</Label>
+              <Label htmlFor="description" className="text-sm font-medium">Description</Label>
               <Input
                 id="description"
                 value={formData.description}
                 onChange={(e) => setFormData({ ...formData, description: e.target.value })}
                 placeholder="What was this expense for?"
                 required
+                className="mt-1"
               />
             </div>
             <div>
-              <Label htmlFor="amount">Amount ($)</Label>
+              <Label htmlFor="amount" className="text-sm font-medium">Amount ($)</Label>
               <Input
                 id="amount"
                 type="number"
@@ -173,15 +175,16 @@ export const ExpenseForm: React.FC<ExpenseFormProps> = ({ isOpen, onClose }) => 
                 onChange={(e) => setFormData({ ...formData, amount: e.target.value })}
                 placeholder="0.00"
                 required
+                className="mt-1"
               />
             </div>
           </div>
 
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
-              <Label htmlFor="group">Group</Label>
+              <Label htmlFor="group" className="text-sm font-medium">Group</Label>
               <Select value={formData.groupId} onValueChange={(value) => setFormData({ ...formData, groupId: value, paidBy: '' })}>
-                <SelectTrigger>
+                <SelectTrigger className="mt-1">
                   <SelectValue placeholder="Select a group" />
                 </SelectTrigger>
                 <SelectContent>
@@ -197,9 +200,9 @@ export const ExpenseForm: React.FC<ExpenseFormProps> = ({ isOpen, onClose }) => 
               </Select>
             </div>
             <div>
-              <Label htmlFor="paidBy">Paid by</Label>
+              <Label htmlFor="paidBy" className="text-sm font-medium">Paid by</Label>
               <Select value={formData.paidBy} onValueChange={(value) => setFormData({ ...formData, paidBy: value })}>
-                <SelectTrigger>
+                <SelectTrigger className="mt-1">
                   <SelectValue placeholder="Who paid?" />
                 </SelectTrigger>
                 <SelectContent>
@@ -213,11 +216,11 @@ export const ExpenseForm: React.FC<ExpenseFormProps> = ({ isOpen, onClose }) => 
             </div>
           </div>
 
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
-              <Label htmlFor="category">Category</Label>
+              <Label htmlFor="category" className="text-sm font-medium">Category</Label>
               <Select value={formData.category} onValueChange={(value) => setFormData({ ...formData, category: value })}>
-                <SelectTrigger>
+                <SelectTrigger className="mt-1">
                   <SelectValue placeholder="Select category" />
                 </SelectTrigger>
                 <SelectContent>
@@ -233,43 +236,44 @@ export const ExpenseForm: React.FC<ExpenseFormProps> = ({ isOpen, onClose }) => 
               </Select>
             </div>
             <div>
-              <Label htmlFor="date">Date</Label>
+              <Label htmlFor="date" className="text-sm font-medium">Date</Label>
               <Input
                 id="date"
                 type="date"
                 value={formData.date}
                 onChange={(e) => setFormData({ ...formData, date: e.target.value })}
                 required
+                className="mt-1"
               />
             </div>
           </div>
 
           <div className="space-y-4">
-            <Label>How should this be split?</Label>
+            <Label className="text-sm font-medium">How should this be split?</Label>
             <RadioGroup 
               value={formData.splitType} 
               onValueChange={(value: 'equal' | 'exact' | 'percentage') => 
                 setFormData({ ...formData, splitType: value })
               }
-              className="flex space-x-6"
+              className="grid grid-cols-1 sm:grid-cols-3 gap-4"
             >
               <div className="flex items-center space-x-2">
                 <RadioGroupItem value="equal" id="equal" />
-                <Label htmlFor="equal" className="flex items-center space-x-2">
+                <Label htmlFor="equal" className="flex items-center space-x-2 cursor-pointer">
                   <Users className="w-4 h-4" />
                   <span>Equal Split</span>
                 </Label>
               </div>
               <div className="flex items-center space-x-2">
                 <RadioGroupItem value="exact" id="exact" />
-                <Label htmlFor="exact" className="flex items-center space-x-2">
+                <Label htmlFor="exact" className="flex items-center space-x-2 cursor-pointer">
                   <Calculator className="w-4 h-4" />
                   <span>Exact Amounts</span>
                 </Label>
               </div>
               <div className="flex items-center space-x-2">
                 <RadioGroupItem value="percentage" id="percentage" />
-                <Label htmlFor="percentage" className="flex items-center space-x-2">
+                <Label htmlFor="percentage" className="flex items-center space-x-2 cursor-pointer">
                   <Percent className="w-4 h-4" />
                   <span>Percentages</span>
                 </Label>
@@ -285,16 +289,16 @@ export const ExpenseForm: React.FC<ExpenseFormProps> = ({ isOpen, onClose }) => 
                   onChange={(e) => setIncludeSelf(e.target.checked)}
                   className="rounded border-input"
                 />
-                <Label htmlFor="includeSelf">
+                <Label htmlFor="includeSelf" className="text-sm cursor-pointer">
                   Include {selectedPayer?.name || 'payer'} in the split
                 </Label>
               </div>
             )}
 
             {formData.splitType !== 'equal' && splitAmong.length > 0 && formData.amount && (
-              <div className="space-y-4 border rounded-lg p-4 bg-secondary/20">
-                <div className="flex justify-between items-center">
-                  <h4 className="font-medium">Split Details</h4>
+              <div className="space-y-4 border rounded-lg p-3 sm:p-4 bg-secondary/20">
+                <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center space-y-2 sm:space-y-0">
+                  <h4 className="font-medium text-sm sm:text-base">Split Details</h4>
                   {formData.splitType === 'percentage' && (
                     <span className={`text-sm ${getRemainingAmount() === 0 ? 'text-green-600' : 'text-orange-600'}`}>
                       Remaining: {getRemainingAmount()}%
@@ -307,7 +311,7 @@ export const ExpenseForm: React.FC<ExpenseFormProps> = ({ isOpen, onClose }) => 
                   )}
                 </div>
 
-                <div className="space-y-3">
+                <div className="space-y-4">
                   {splitAmong.map((member) => (
                     <div key={member.id} className="space-y-2">
                       <div className="flex justify-between items-center">
@@ -329,7 +333,7 @@ export const ExpenseForm: React.FC<ExpenseFormProps> = ({ isOpen, onClose }) => 
                           className="w-full"
                         />
                       ) : (
-                        <div className="flex items-center space-x-2">
+                        <div className="flex flex-col sm:flex-row items-stretch sm:items-center space-y-2 sm:space-y-0 sm:space-x-2">
                           <Slider
                             value={[splitData[member.id] || 0]}
                             onValueChange={([value]) => updateSplitAmount(member.id, value)}
@@ -342,7 +346,7 @@ export const ExpenseForm: React.FC<ExpenseFormProps> = ({ isOpen, onClose }) => 
                             step="0.01"
                             value={splitData[member.id] || 0}
                             onChange={(e) => updateSplitAmount(member.id, parseFloat(e.target.value) || 0)}
-                            className="w-20 text-xs"
+                            className="w-full sm:w-20 text-xs"
                           />
                         </div>
                       )}
@@ -353,14 +357,14 @@ export const ExpenseForm: React.FC<ExpenseFormProps> = ({ isOpen, onClose }) => 
             )}
           </div>
 
-          <div className="flex justify-end space-x-3 pt-4">
-            <Button type="button" variant="outline" onClick={onClose}>
+          <div className="flex flex-col sm:flex-row space-y-3 sm:space-y-0 sm:space-x-3 pt-4">
+            <Button type="button" variant="outline" onClick={onClose} className="w-full sm:w-auto">
               Cancel
             </Button>
             <Button 
               type="submit" 
               disabled={loading}
-              className="bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700"
+              className="w-full sm:w-auto bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700"
             >
               {loading ? 'Adding...' : 'Add Expense'}
             </Button>

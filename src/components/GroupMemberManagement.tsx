@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -26,17 +27,17 @@ export const GroupMemberManagement: React.FC<GroupMemberManagementProps> = ({ gr
 
   const getRoleIcon = (role?: string) => {
     switch (role) {
-      case 'admin': return <Crown className="w-4 h-4 text-yellow-500" />;
-      case 'viewer': return <Eye className="w-4 h-4 text-gray-500" />;
-      default: return <User className="w-4 h-4 text-blue-500" />;
+      case 'admin': return <Crown className="w-3 h-3 sm:w-4 sm:h-4 text-yellow-500" />;
+      case 'viewer': return <Eye className="w-3 h-3 sm:w-4 sm:h-4 text-gray-500" />;
+      default: return <User className="w-3 h-3 sm:w-4 sm:h-4 text-blue-500" />;
     }
   };
 
   const getRoleBadge = (role?: string) => {
     switch (role) {
-      case 'admin': return <Badge className="bg-yellow-100 text-yellow-800">Admin</Badge>;
-      case 'viewer': return <Badge variant="outline" className="text-gray-600">Viewer</Badge>;
-      default: return <Badge variant="outline" className="text-blue-600">Member</Badge>;
+      case 'admin': return <Badge className="bg-yellow-100 text-yellow-800 text-xs">Admin</Badge>;
+      case 'viewer': return <Badge variant="outline" className="text-gray-600 text-xs">Viewer</Badge>;
+      default: return <Badge variant="outline" className="text-blue-600 text-xs">Member</Badge>;
     }
   };
 
@@ -98,22 +99,22 @@ export const GroupMemberManagement: React.FC<GroupMemberManagementProps> = ({ gr
   const adminCount = group.members.filter(m => m.role === 'admin').length;
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4 sm:space-y-6">
       <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center justify-between">
+        <CardHeader className="px-4 py-4 sm:px-6 sm:py-6">
+          <CardTitle className="flex flex-col sm:flex-row sm:items-center sm:justify-between space-y-3 sm:space-y-0">
             <div className="flex items-center space-x-2">
-              <Users className="w-5 h-5" />
-              <span>Group Members ({group.members.length})</span>
+              <Users className="w-4 h-4 sm:w-5 sm:h-5" />
+              <span className="text-lg sm:text-2xl">Group Members ({group.members.length})</span>
             </div>
             <Dialog open={showAddMember} onOpenChange={setShowAddMember}>
               <DialogTrigger asChild>
-                <Button>
+                <Button className="w-full sm:w-auto">
                   <UserPlus className="w-4 h-4 mr-2" />
                   Add Member
                 </Button>
               </DialogTrigger>
-              <DialogContent>
+              <DialogContent className="w-[95vw] max-w-md mx-auto">
                 <DialogHeader>
                   <DialogTitle>Add New Member</DialogTitle>
                 </DialogHeader>
@@ -124,6 +125,7 @@ export const GroupMemberManagement: React.FC<GroupMemberManagementProps> = ({ gr
                       value={newMemberName}
                       onChange={(e) => setNewMemberName(e.target.value)}
                       placeholder="Enter member's name"
+                      className="mt-1"
                     />
                   </div>
                   <div>
@@ -133,6 +135,7 @@ export const GroupMemberManagement: React.FC<GroupMemberManagementProps> = ({ gr
                       value={newMemberEmail}
                       onChange={(e) => setNewMemberEmail(e.target.value)}
                       placeholder="Enter member's email"
+                      className="mt-1"
                     />
                   </div>
                   <div className="flex space-x-3 pt-4">
@@ -148,22 +151,22 @@ export const GroupMemberManagement: React.FC<GroupMemberManagementProps> = ({ gr
             </Dialog>
           </CardTitle>
         </CardHeader>
-        <CardContent>
-          <div className="space-y-4">
+        <CardContent className="px-4 py-0 pb-4 sm:px-6 sm:pb-6">
+          <div className="space-y-3 sm:space-y-4">
             {group.members.map((member) => (
-              <div key={member.id} className="flex items-center justify-between p-4 border rounded-lg">
-                <div className="flex items-center space-x-4">
-                  <Avatar className="w-10 h-10">
+              <div key={member.id} className="flex flex-col sm:flex-row sm:items-center sm:justify-between p-3 sm:p-4 border rounded-lg space-y-3 sm:space-y-0">
+                <div className="flex items-center space-x-3 sm:space-x-4 min-w-0 flex-1">
+                  <Avatar className="w-8 h-8 sm:w-10 sm:h-10 flex-shrink-0">
                     <AvatarFallback>{member.name.charAt(0)}</AvatarFallback>
                   </Avatar>
-                  <div>
+                  <div className="min-w-0 flex-1">
                     <div className="flex items-center space-x-2">
-                      <span className="font-medium">{member.name}</span>
+                      <span className="font-medium text-sm sm:text-base truncate">{member.name}</span>
                       {getRoleIcon(member.role)}
                     </div>
-                    <div className="flex items-center space-x-2 text-sm text-gray-600">
-                      <Mail className="w-3 h-3" />
-                      <span>{member.email}</span>
+                    <div className="flex items-center space-x-2 text-xs sm:text-sm text-gray-600">
+                      <Mail className="w-3 h-3 flex-shrink-0" />
+                      <span className="truncate">{member.email}</span>
                     </div>
                     {member.joinedAt && (
                       <div className="text-xs text-gray-500 mt-1">
@@ -173,31 +176,33 @@ export const GroupMemberManagement: React.FC<GroupMemberManagementProps> = ({ gr
                   </div>
                 </div>
 
-                <div className="flex items-center space-x-3">
-                  {getRoleBadge(member.role)}
-                  
-                  <Select
-                    value={member.role || 'member'}
-                    onValueChange={(value: Member['role']) => handleRoleChange(member, value)}
-                  >
-                    <SelectTrigger className="w-32">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="admin">Admin</SelectItem>
-                      <SelectItem value="member">Member</SelectItem>
-                      <SelectItem value="viewer">Viewer</SelectItem>
-                    </SelectContent>
-                  </Select>
+                <div className="flex items-center justify-between sm:justify-end space-x-2 sm:space-x-3">
+                  <div className="flex items-center space-x-2">
+                    {getRoleBadge(member.role)}
+                    
+                    <Select
+                      value={member.role || 'member'}
+                      onValueChange={(value: Member['role']) => handleRoleChange(member, value)}
+                    >
+                      <SelectTrigger className="w-24 sm:w-32 h-8 text-xs sm:text-sm">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="admin">Admin</SelectItem>
+                        <SelectItem value="member">Member</SelectItem>
+                        <SelectItem value="viewer">Viewer</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
 
                   <Button
                     variant="outline"
                     size="sm"
                     onClick={() => handleRemoveMember(member)}
                     disabled={adminCount === 1 && member.role === 'admin'}
-                    className="text-red-600 hover:text-red-700"
+                    className="text-red-600 hover:text-red-700 h-8 w-8 p-0"
                   >
-                    <UserMinus className="w-4 h-4" />
+                    <UserMinus className="w-3 h-3 sm:w-4 sm:h-4" />
                   </Button>
                 </div>
               </div>
@@ -205,21 +210,21 @@ export const GroupMemberManagement: React.FC<GroupMemberManagementProps> = ({ gr
           </div>
 
           {/* Role Descriptions */}
-          <div className="mt-6 p-4 bg-gray-50 rounded-lg">
-            <h4 className="font-medium mb-3">Role Permissions</h4>
-            <div className="space-y-2 text-sm">
+          <div className="mt-4 sm:mt-6 p-3 sm:p-4 bg-gray-50 rounded-lg">
+            <h4 className="font-medium mb-2 sm:mb-3 text-sm sm:text-base">Role Permissions</h4>
+            <div className="space-y-1 sm:space-y-2 text-xs sm:text-sm">
               <div className="flex items-center space-x-2">
-                <Crown className="w-4 h-4 text-yellow-500" />
+                <Crown className="w-3 h-3 sm:w-4 sm:h-4 text-yellow-500 flex-shrink-0" />
                 <span className="font-medium">Admin:</span>
                 <span className="text-gray-600">Full access, can manage members and settings</span>
               </div>
               <div className="flex items-center space-x-2">
-                <User className="w-4 h-4 text-blue-500" />
+                <User className="w-3 h-3 sm:w-4 sm:h-4 text-blue-500 flex-shrink-0" />
                 <span className="font-medium">Member:</span>
                 <span className="text-gray-600">Can add expenses and settle debts</span>
               </div>
               <div className="flex items-center space-x-2">
-                <Eye className="w-4 h-4 text-gray-500" />
+                <Eye className="w-3 h-3 sm:w-4 sm:h-4 text-gray-500 flex-shrink-0" />
                 <span className="font-medium">Viewer:</span>
                 <span className="text-gray-600">Read-only access, cannot add expenses</span>
               </div>
