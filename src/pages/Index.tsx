@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { Plus, Settings, Users, Receipt, TrendingUp, User, BarChart3, Wallet } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -105,19 +104,6 @@ const Index = () => {
     { value: "analytics", label: "Analytics", icon: TrendingUp },
   ];
 
-  const tabVariants = {
-    inactive: { 
-      scale: 0.95, 
-      opacity: 0.7,
-      transition: { duration: 0.2 }
-    },
-    active: { 
-      scale: 1, 
-      opacity: 1,
-      transition: { duration: 0.2 }
-    }
-  };
-
   const contentVariants = {
     initial: { opacity: 0, y: 20 },
     animate: { opacity: 1, y: 0 },
@@ -205,26 +191,36 @@ const Index = () => {
         {/* Tabs */}
         <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4 sm:space-y-6">
           <TabsList className="grid w-full grid-cols-4 gap-1 sm:gap-2 p-1">
-            {tabItems.map((item) => (
-              <motion.div
-                key={item.value}
-                variants={tabVariants}
-                animate={activeTab === item.value ? "active" : "inactive"}
-                whileHover={{ scale: 1.05 }}
-                whileTap={{ scale: 0.95 }}
-              >
+            {tabItems.map((item) => {
+              const Icon = item.icon;
+              const isActive = activeTab === item.value;
+              
+              return (
                 <TabsTrigger 
+                  key={item.value}
                   value={item.value} 
-                  className="flex items-center justify-center gap-1 sm:gap-2 px-2 py-2 text-xs sm:text-sm min-h-[48px] sm:min-h-auto"
+                  className="relative flex items-center justify-center space-x-2 px-2 py-2 text-xs sm:text-sm min-h-[48px] sm:min-h-auto whitespace-nowrap min-w-fit"
                 >
-                  <item.icon className="h-4 w-4 sm:h-4 sm:w-4" />
-                  {/* Show label only on desktop or for active tab on mobile */}
-                  <span className={`${isMobile && activeTab !== item.value ? 'hidden' : 'block'} truncate`}>
-                    {item.label}
-                  </span>
+                  <Icon className="h-4 w-4" />
+                  {isActive && isMobile && (
+                    <motion.span
+                      initial={{ opacity: 0, width: 0 }}
+                      animate={{ opacity: 1, width: "auto" }}
+                      exit={{ opacity: 0, width: 0 }}
+                      className="text-xs font-medium"
+                    >
+                      {item.label}
+                    </motion.span>
+                  )}
+                  {!isMobile && (
+                    <span className="truncate">{item.label}</span>
+                  )}
+                  {!isActive && isMobile && (
+                    <span className="sr-only">{item.label}</span>
+                  )}
                 </TabsTrigger>
-              </motion.div>
-            ))}
+              );
+            })}
           </TabsList>
 
           <AnimatePresence mode="wait">
