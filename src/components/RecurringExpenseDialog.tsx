@@ -163,7 +163,7 @@ export const RecurringExpenseDialog: React.FC<RecurringExpenseDialogProps> = ({ 
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  {categories.map(cat => (
+                  {categories.filter(cat => cat.value && cat.value.trim() !== '').map(cat => (
                     <SelectItem key={cat.value} value={cat.value}>
                       {cat.label}
                     </SelectItem>
@@ -182,7 +182,7 @@ export const RecurringExpenseDialog: React.FC<RecurringExpenseDialogProps> = ({ 
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  {frequencies.map(freq => (
+                  {frequencies.filter(freq => freq.value && freq.value.trim() !== '').map(freq => (
                     <SelectItem key={freq.value} value={freq.value}>
                       {freq.label}
                     </SelectItem>
@@ -214,7 +214,7 @@ export const RecurringExpenseDialog: React.FC<RecurringExpenseDialogProps> = ({ 
                 <SelectValue placeholder="Select who will pay" />
               </SelectTrigger>
               <SelectContent>
-                {group.members.map(member => (
+                {group.members.filter(member => member.id && member.id.trim() !== '').map(member => (
                   <SelectItem key={member.id} value={member.id}>
                     {member.name} ({member.email})
                   </SelectItem>

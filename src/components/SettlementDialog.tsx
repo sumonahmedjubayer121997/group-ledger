@@ -18,6 +18,14 @@ interface SettlementDialogProps {
   amount: number;
 }
 
+const paymentMethods = [
+  { value: 'cash', label: 'Cash' },
+  { value: 'bank_transfer', label: 'Bank Transfer' },
+  { value: 'paypal', label: 'PayPal' },
+  { value: 'venmo', label: 'Venmo' },
+  { value: 'other', label: 'Other' }
+];
+
 export const SettlementDialog: React.FC<SettlementDialogProps> = ({
   isOpen,
   onClose,
@@ -48,14 +56,6 @@ export const SettlementDialog: React.FC<SettlementDialogProps> = ({
     setNotes('');
   };
 
-  const paymentMethods = [
-    { value: 'cash', label: 'Cash' },
-    { value: 'bank_transfer', label: 'Bank Transfer' },
-    { value: 'paypal', label: 'PayPal' },
-    { value: 'venmo', label: 'Venmo' },
-    { value: 'other', label: 'Other' }
-  ];
-
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent className="sm:max-w-[400px]">
@@ -75,7 +75,7 @@ export const SettlementDialog: React.FC<SettlementDialogProps> = ({
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                {paymentMethods.map(method => (
+                {paymentMethods.filter(method => method.value && method.value.trim() !== '').map(method => (
                   <SelectItem key={method.value} value={method.value}>
                     {method.label}
                   </SelectItem>
