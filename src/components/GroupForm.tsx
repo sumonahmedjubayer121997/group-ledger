@@ -7,6 +7,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { useAuth } from "@/contexts/AuthContext";
 import { useExpenseStore } from "@/stores/expenseStore";
+import { getUserByEmail } from "@/services/firebaseService";
 import { toast } from "sonner";
 import { Plus, X, Users } from "lucide-react";
 import type { Member } from "@/types/index";
@@ -50,6 +51,21 @@ export const GroupForm = ({ isOpen, onClose }: GroupFormProps) => {
     setIsSubmitting(true);
 
     try {
+      // Look up existing users by email first
+      const memberPromises = memberInputs
+        .filter(member => member.email.trim() !== "")
+        .map(async (member) => {
+          const existingUser = await getUserByEmail(member.email.trim());
+          return {
+            id: existingUser ? existingUser.uid : `temp-${Date.now()}-${Math.random()}`,
+            email: member.email.trim(),
+            name: member.name.trim() || existingUser?.name || member.email.trim(),
+            role: "member" as const,
+          };
+        });
+
+      const resolvedMembers = await Promise.all(memberPromises);
+
       const members: Member[] = [
         {
           id: user.uid,
@@ -57,14 +73,7 @@ export const GroupForm = ({ isOpen, onClose }: GroupFormProps) => {
           name: user.displayName || "You",
           role: "admin" as const,
         },
-        ...memberInputs
-          .filter(member => member.email.trim() !== "")
-          .map(member => ({
-            id: `temp-${Date.now()}-${Math.random()}`,
-            email: member.email.trim(),
-            name: member.name.trim() || member.email.trim(),
-            role: "member" as const,
-          })),
+        ...resolvedMembers,
       ];
 
       await addGroup({

@@ -143,6 +143,40 @@ export const updateUserProfile = async (uid: string, updates: Partial<UserProfil
   }
 };
 
+export const getUserByEmail = async (email: string): Promise<UserProfile | null> => {
+  try {
+    const usersRef = collection(db, 'users');
+    const q = query(usersRef, where('email', '==', email));
+    const querySnapshot = await getDocs(q);
+    
+    if (!querySnapshot.empty) {
+      const userDoc = querySnapshot.docs[0];
+      const data = userDoc.data();
+      return {
+        uid: userDoc.id,
+        ...data,
+        joinedAt: data.joinedAt?.toDate() || new Date(),
+        lastActivity: data.lastActivity?.toDate() || new Date(),
+        stats: {
+          groupsJoined: data.stats?.groupsJoined || 0,
+          totalPaid: data.stats?.totalPaid || 0,
+          totalOwed: data.stats?.totalOwed || 0,
+        },
+        displayName: data.name,
+        emailVerified: data.verified,
+        role: 'user' as const,
+        createdAt: data.joinedAt?.toDate() || new Date(),
+        lastLoginAt: data.lastActivity?.toDate() || new Date(),
+      } as UserProfile;
+    }
+    
+    return null;
+  } catch (error) {
+    console.error('Error fetching user by email:', error);
+    return null;
+  }
+};
+
 export const mergeTemporaryUserWithRealUser = async (realUser: User) => {
   const userId = realUser.uid;
   const email = realUser.email;
