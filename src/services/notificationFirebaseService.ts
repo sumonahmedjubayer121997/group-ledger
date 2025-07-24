@@ -61,8 +61,7 @@ export class NotificationFirebaseService {
   ) {
     const q = query(
       collection(db, 'notifications'),
-      where('to', '==', userId),
-      orderBy('createdAt', 'desc')
+      where('to', '==', userId)
     );
 
     return onSnapshot(q, (snapshot) => {

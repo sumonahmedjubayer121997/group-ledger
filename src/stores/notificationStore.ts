@@ -160,21 +160,23 @@ export const useNotificationStore = create<NotificationStore>()(
       },
 
       setNotifications: (firebaseNotifications: FirebaseNotification[]) => {
-        const notifications: Notification[] = firebaseNotifications.map(fn => ({
-          id: fn.id || '',
-          type: fn.type as NotificationType,
-          title: fn.title,
-          message: fn.message,
-          groupId: fn.groupId,
-          groupName: '', // We don't store group name in Firebase notifications
-          userId: fn.to,
-          userName: '', // We don't store user name in Firebase notifications
-          amount: undefined,
-          currency: undefined,
-          timestamp: fn.createdAt.toDate(),
-          read: fn.isRead,
-          actionUrl: fn.route,
-        }));
+        const notifications: Notification[] = firebaseNotifications
+          .map(fn => ({
+            id: fn.id || '',
+            type: fn.type as NotificationType,
+            title: fn.title,
+            message: fn.message,
+            groupId: fn.groupId,
+            groupName: '', // We don't store group name in Firebase notifications
+            userId: fn.to,
+            userName: '', // We don't store user name in Firebase notifications
+            amount: undefined,
+            currency: undefined,
+            timestamp: fn.createdAt.toDate(),
+            read: fn.isRead,
+            actionUrl: fn.route,
+          }))
+          .sort((a, b) => b.timestamp.getTime() - a.timestamp.getTime()); // Sort by timestamp desc
 
         const unreadCount = notifications.filter(n => !n.read).length;
 
