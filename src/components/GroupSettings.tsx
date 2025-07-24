@@ -22,12 +22,12 @@ const validCurrencies = [
   { value: 'CAD', label: '$ CAD' },
   { value: 'AUD', label: '$ AUD' },
   { value: 'JPY', label: '¥ JPY' },
-];
+].filter(curr => curr.value && typeof curr.value === 'string' && curr.value.trim() !== '');
 
 const validGroupTypes = [
   { value: 'private', label: 'Private (Invite Only)' },
   { value: 'public', label: 'Public (Join with link)' },
-];
+].filter(type => type.value && typeof type.value === 'string' && type.value.trim() !== '');
 
 export const GroupSettings: React.FC<GroupSettingsProps> = ({ group }) => {
   const [name, setName] = useState(group.name);

@@ -25,13 +25,13 @@ const categories = [
   { value: 'rent', label: 'Rent' },
   { value: 'healthcare', label: 'Healthcare' },
   { value: 'other', label: 'Other' }
-];
+].filter(cat => cat.value && typeof cat.value === 'string' && cat.value.trim() !== '');
 
 const frequencies = [
   { value: 'weekly', label: 'Weekly' },
   { value: 'monthly', label: 'Monthly' },
   { value: 'yearly', label: 'Yearly' }
-];
+].filter(freq => freq.value && typeof freq.value === 'string' && freq.value.trim() !== '');
 
 export const RecurringExpenseDialog: React.FC<RecurringExpenseDialogProps> = ({ group, children }) => {
   const [open, setOpen] = useState(false);
@@ -107,12 +107,18 @@ export const RecurringExpenseDialog: React.FC<RecurringExpenseDialogProps> = ({ 
   };
 
   const selectAllMembers = () => {
-    setSplitAmong(group.members.map(m => m.id));
+    const validMembers = group.members.filter(m => m.id && typeof m.id === 'string' && m.id.trim() !== '');
+    setSplitAmong(validMembers.map(m => m.id));
   };
 
   const clearAllMembers = () => {
     setSplitAmong([]);
   };
+
+  // Filter members to ensure valid IDs
+  const validMembers = group.members.filter(member => 
+    member.id && typeof member.id === 'string' && member.id.trim() !== ''
+  );
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
@@ -163,7 +169,7 @@ export const RecurringExpenseDialog: React.FC<RecurringExpenseDialogProps> = ({ 
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  {categories.filter(cat => cat.value && cat.value.trim() !== '').map(cat => (
+                  {categories.map(cat => (
                     <SelectItem key={cat.value} value={cat.value}>
                       {cat.label}
                     </SelectItem>
@@ -182,7 +188,7 @@ export const RecurringExpenseDialog: React.FC<RecurringExpenseDialogProps> = ({ 
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  {frequencies.filter(freq => freq.value && freq.value.trim() !== '').map(freq => (
+                  {frequencies.map(freq => (
                     <SelectItem key={freq.value} value={freq.value}>
                       {freq.label}
                     </SelectItem>
@@ -214,7 +220,7 @@ export const RecurringExpenseDialog: React.FC<RecurringExpenseDialogProps> = ({ 
                 <SelectValue placeholder="Select who will pay" />
               </SelectTrigger>
               <SelectContent>
-                {group.members.filter(member => member.id && member.id.trim() !== '').map(member => (
+                {validMembers.map(member => (
                   <SelectItem key={member.id} value={member.id}>
                     {member.name} ({member.email})
                   </SelectItem>
@@ -248,7 +254,7 @@ export const RecurringExpenseDialog: React.FC<RecurringExpenseDialogProps> = ({ 
             </div>
             
             <div className="grid grid-cols-1 md:grid-cols-2 gap-2 max-h-32 overflow-y-auto">
-              {group.members.map(member => (
+              {validMembers.map(member => (
                 <div key={member.id} className="flex items-center space-x-2">
                   <input
                     type="checkbox"

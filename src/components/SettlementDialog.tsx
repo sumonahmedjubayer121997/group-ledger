@@ -24,7 +24,7 @@ const paymentMethods = [
   { value: 'paypal', label: 'PayPal' },
   { value: 'venmo', label: 'Venmo' },
   { value: 'other', label: 'Other' }
-];
+].filter(method => method.value && typeof method.value === 'string' && method.value.trim() !== '');
 
 export const SettlementDialog: React.FC<SettlementDialogProps> = ({
   isOpen,
@@ -75,7 +75,7 @@ export const SettlementDialog: React.FC<SettlementDialogProps> = ({
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                {paymentMethods.filter(method => method.value && method.value.trim() !== '').map(method => (
+                {paymentMethods.map(method => (
                   <SelectItem key={method.value} value={method.value}>
                     {method.label}
                   </SelectItem>
