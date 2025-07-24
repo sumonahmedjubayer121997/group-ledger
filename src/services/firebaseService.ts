@@ -441,11 +441,11 @@ export const getUserGroups = async (userId: string) => {
       // Transform users object to members array
       const membersArray = Object.entries(data.users || {}).map(([uid, userData]: [string, any]) => ({
         id: uid,
-        name: userData.name || 'Unknown',
-        email: userData.email || '',
-        role: userData.role as 'admin' | 'member',
-        joinedAt: userData.joinedAt?.toDate() || new Date(),
-      }));
+        name: userData?.name || 'Unknown',
+        email: userData?.email || '',
+        role: (userData?.role as 'admin' | 'member') || 'member',
+        joinedAt: userData?.joinedAt?.toDate() || new Date(),
+      })).filter(member => member.id); // Filter out invalid members
 
       const group: Group = {
         id: doc.id,
@@ -578,11 +578,11 @@ export const subscribeToUserGroups = (userId: string, callback: (groups: Group[]
       // Transform users object to members array
       const membersArray = Object.entries(data.users || {}).map(([uid, userData]: [string, any]) => ({
         id: uid,
-        name: userData.name || 'Unknown',
-        email: userData.email || '',
-        role: userData.role as 'admin' | 'member',
-        joinedAt: userData.joinedAt?.toDate() || new Date(),
-      }));
+        name: userData?.name || 'Unknown',
+        email: userData?.email || '',
+        role: (userData?.role as 'admin' | 'member') || 'member',
+        joinedAt: userData?.joinedAt?.toDate() || new Date(),
+      })).filter(member => member.id); // Filter out invalid members
 
       const group: Group = {
         id: doc.id,
