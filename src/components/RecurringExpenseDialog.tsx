@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
@@ -15,7 +16,22 @@ interface RecurringExpenseDialogProps {
   children: React.ReactNode;
 }
 
-const categories = ['food', 'travel', 'entertainment', 'utilities', 'shopping', 'rent', 'healthcare', 'other'];
+const categories = [
+  { value: 'food', label: 'Food' },
+  { value: 'travel', label: 'Travel' },
+  { value: 'entertainment', label: 'Entertainment' },
+  { value: 'utilities', label: 'Utilities' },
+  { value: 'shopping', label: 'Shopping' },
+  { value: 'rent', label: 'Rent' },
+  { value: 'healthcare', label: 'Healthcare' },
+  { value: 'other', label: 'Other' }
+];
+
+const frequencies = [
+  { value: 'weekly', label: 'Weekly' },
+  { value: 'monthly', label: 'Monthly' },
+  { value: 'yearly', label: 'Yearly' }
+];
 
 export const RecurringExpenseDialog: React.FC<RecurringExpenseDialogProps> = ({ group, children }) => {
   const [open, setOpen] = useState(false);
@@ -148,8 +164,8 @@ export const RecurringExpenseDialog: React.FC<RecurringExpenseDialogProps> = ({ 
                 </SelectTrigger>
                 <SelectContent>
                   {categories.map(cat => (
-                    <SelectItem key={cat} value={cat}>
-                      {cat.charAt(0).toUpperCase() + cat.slice(1)}
+                    <SelectItem key={cat.value} value={cat.value}>
+                      {cat.label}
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -166,9 +182,11 @@ export const RecurringExpenseDialog: React.FC<RecurringExpenseDialogProps> = ({ 
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="weekly">Weekly</SelectItem>
-                  <SelectItem value="monthly">Monthly</SelectItem>
-                  <SelectItem value="yearly">Yearly</SelectItem>
+                  {frequencies.map(freq => (
+                    <SelectItem key={freq.value} value={freq.value}>
+                      {freq.label}
+                    </SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
             </div>
