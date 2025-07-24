@@ -1,4 +1,3 @@
-
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -65,7 +64,6 @@ export const GroupForm = ({ isOpen, onClose }: GroupFormProps) => {
         description: "",
         members,
         createdAt: new Date(),
-        createdBy: user.uid,
         photo: "",
         coverImage: "",
         groupType: "private" as const,
