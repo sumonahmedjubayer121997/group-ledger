@@ -16,6 +16,8 @@ import { ExpenseChart } from "@/components/ExpenseChart";
 import { UserProfile } from "@/components/UserProfile";
 import { LandingPage } from "@/components/LandingPage";
 import { AuthPage } from "./AuthPage";
+import { MobileNavbar } from "@/components/MobileNavbar";
+import { useIsMobile } from "@/hooks/use-mobile";
 
 const Index = () => {
   const { user, userProfile, logout } = useAuth();
@@ -25,6 +27,7 @@ const Index = () => {
   const [showUserProfile, setShowUserProfile] = useState(false);
   const [showLanding, setShowLanding] = useState(false);
   const [showAuth, setShowAuth] = useState(false);
+  const isMobile = useIsMobile();
 
   // Initialize Firebase sync when user is authenticated
   useEffect(() => {
@@ -77,11 +80,7 @@ const Index = () => {
   }
 
   if (showUserProfile) {
-    return (
-      <div className="min-h-screen bg-gradient-to-br from-blue-50 to-green-50">
-        <UserProfile onClose={() => setShowUserProfile(false)} />
-      </div>
-    );
+    return <UserProfile onClose={() => setShowUserProfile(false)} />;
   }
 
   if (selectedGroup) {
@@ -99,44 +98,55 @@ const Index = () => {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-green-50">
-      <div className="container mx-auto px-2 py-4 sm:px-4 sm:py-6">
-        {/* Header */}
-        <div className="flex flex-col gap-3 sm:flex-row sm:justify-between sm:items-center mb-4 sm:mb-6">
-          <div className="text-center sm:text-left">
-            <h1 className="text-xl sm:text-2xl md:text-3xl font-bold text-gray-900">SplitWize</h1>
-            <p className="text-gray-600 text-xs sm:text-sm md:text-base">
-              Split expenses with friends and family
-            </p>
+      {/* Mobile Navbar */}
+      {isMobile && (
+        <MobileNavbar
+          onProfileClick={() => setShowUserProfile(true)}
+          onNewGroupClick={() => setShowGroupForm(true)}
+          onLogout={handleLogout}
+        />
+      )}
+
+      <div className="container mx-auto px-3 py-4 sm:px-4 sm:py-6">
+        {/* Desktop Header */}
+        {!isMobile && (
+          <div className="flex flex-col gap-3 sm:flex-row sm:justify-between sm:items-center mb-4 sm:mb-6">
+            <div className="text-center sm:text-left">
+              <h1 className="text-xl sm:text-2xl md:text-3xl font-bold text-gray-900">SplitWize</h1>
+              <p className="text-gray-600 text-xs sm:text-sm md:text-base">
+                Split expenses with friends and family
+              </p>
+            </div>
+            <div className="flex flex-wrap gap-2 justify-center sm:justify-end">
+              <Button
+                onClick={() => setShowUserProfile(true)}
+                variant="outline"
+                size="sm"
+                className="text-xs sm:text-sm"
+              >
+                <User className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-2" />
+                Profile
+              </Button>
+              <Button
+                onClick={() => setShowGroupForm(true)}
+                className="bg-blue-600 hover:bg-blue-700 text-xs sm:text-sm"
+                size="sm"
+              >
+                <Plus className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-2" />
+                New Group
+              </Button>
+              <Button
+                onClick={handleLogout}
+                variant="outline"
+                size="sm"
+                className="text-xs sm:text-sm"
+              >
+                <Settings className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-2" />
+                Logout
+              </Button>
+            </div>
           </div>
-          <div className="flex flex-wrap gap-2 justify-center sm:justify-end">
-            <Button
-              onClick={() => setShowUserProfile(true)}
-              variant="outline"
-              size="sm"
-              className="text-xs sm:text-sm"
-            >
-              <User className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-2" />
-              Profile
-            </Button>
-            <Button
-              onClick={() => setShowGroupForm(true)}
-              className="bg-blue-600 hover:bg-blue-700 text-xs sm:text-sm"
-              size="sm"
-            >
-              <Plus className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-2" />
-              New Group
-            </Button>
-            <Button
-              onClick={handleLogout}
-              variant="outline"
-              size="sm"
-              className="text-xs sm:text-sm"
-            >
-              <Settings className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-2" />
-              Logout
-            </Button>
-          </div>
-        </div>
+        )}
 
         {/* Welcome Message */}
         <div className="mb-4 sm:mb-6">
@@ -153,17 +163,27 @@ const Index = () => {
         </div>
 
         {/* Debug info - Hidden on mobile */}
-        <div className="hidden sm:block mb-4 text-sm text-gray-600">
-          Groups: {groups.length} | Expenses: {expenses.length} | User: {user?.uid}
-        </div>
+        {!isMobile && (
+          <div className="mb-4 text-sm text-gray-600">
+            Groups: {groups.length} | Expenses: {expenses.length} | User: {user?.uid}
+          </div>
+        )}
 
         {/* Tabs */}
         <Tabs defaultValue="overview" className="space-y-4 sm:space-y-6">
           <TabsList className="grid w-full grid-cols-2 sm:grid-cols-4 gap-1 sm:gap-2 p-1">
-            <TabsTrigger value="overview" className="text-xs sm:text-sm">Overview</TabsTrigger>
-            <TabsTrigger value="groups" className="text-xs sm:text-sm">Groups</TabsTrigger>
-            <TabsTrigger value="expenses" className="text-xs sm:text-sm">Expenses</TabsTrigger>
-            <TabsTrigger value="analytics" className="text-xs sm:text-sm">Analytics</TabsTrigger>
+            <TabsTrigger value="overview" className="text-xs sm:text-sm px-2 py-2">
+              Overview
+            </TabsTrigger>
+            <TabsTrigger value="groups" className="text-xs sm:text-sm px-2 py-2">
+              Groups
+            </TabsTrigger>
+            <TabsTrigger value="expenses" className="text-xs sm:text-sm px-2 py-2">
+              Expenses
+            </TabsTrigger>
+            <TabsTrigger value="analytics" className="text-xs sm:text-sm px-2 py-2">
+              Analytics
+            </TabsTrigger>
           </TabsList>
 
           {/* Overview */}
@@ -196,6 +216,17 @@ const Index = () => {
 
           {/* Groups */}
           <TabsContent value="groups" className="space-y-4 sm:space-y-6">
+            <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3 sm:gap-4 mb-4">
+              <h2 className="text-lg sm:text-xl font-bold">Your Groups</h2>
+              <Button
+                onClick={() => setShowGroupForm(true)}
+                className="bg-blue-600 hover:bg-blue-700 text-xs sm:text-sm"
+                size="sm"
+              >
+                <Plus className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-2" />
+                New Group
+              </Button>
+            </div>
             <GroupList groups={groups} onGroupClick={setSelectedGroup} />
           </TabsContent>
 
