@@ -27,7 +27,7 @@ export const GroupChat: React.FC<GroupChatProps> = ({ groupId }) => {
   const [sending, setSending] = useState(false);
   const [showMore, setShowMore] = useState(false);
   const [totalMessageCount, setTotalMessageCount] = useState(0);
-  const [messageLimit, setMessageLimit] = useState(10);
+  const [messageLimit, setMessageLimit] = useState(6);
   const [hoveredMessage, setHoveredMessage] = useState<string | null>(null);
   const { user, userProfile } = useAuth();
   const isMobile = useIsMobile();
@@ -63,7 +63,7 @@ export const GroupChat: React.FC<GroupChatProps> = ({ groupId }) => {
 
     setSending(true);
     try {
-      await sendChatMessage(groupId, user.uid, userProfile.name, newMessage);
+      await sendChatMessage(groupId, user.uid, userProfile.name, newMessage, userProfile.photoURL);
       setNewMessage('');
     } catch (error) {
       console.error('Error sending message:', error);
@@ -84,7 +84,12 @@ export const GroupChat: React.FC<GroupChatProps> = ({ groupId }) => {
     setShowMore(true);
   };
 
-  const canShowMore = totalMessageCount > 10 && !showMore;
+  const handleHideMessages = () => {
+    setMessageLimit(6);
+    setShowMore(false);
+  };
+
+  const canShowMore = totalMessageCount > 6 && !showMore;
 
   return (
     <Card className="h-full flex flex-col">
@@ -112,7 +117,20 @@ export const GroupChat: React.FC<GroupChatProps> = ({ groupId }) => {
                   className="text-xs"
                 >
                   <ChevronUp className="w-4 h-4 mr-2" />
-                  Show More Messages
+                  Show Messages
+                </Button>
+              </div>
+            )}
+            
+            {showMore && (
+              <div className="text-center">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={handleHideMessages}
+                  className="text-xs"
+                >
+                  Hide Messages
                 </Button>
               </div>
             )}
@@ -139,9 +157,13 @@ export const GroupChat: React.FC<GroupChatProps> = ({ groupId }) => {
                   >
                     {message.senderId !== user?.uid && (
                       <Avatar className="w-8 h-8 flex-shrink-0">
-                        <AvatarFallback className="text-xs bg-primary/10 text-primary">
-                          {message.senderName.charAt(0).toUpperCase()}
-                        </AvatarFallback>
+                        {message.senderPhotoURL ? (
+                          <img src={message.senderPhotoURL} alt={message.senderName} className="w-full h-full object-cover rounded-full" />
+                        ) : (
+                          <AvatarFallback className="text-xs bg-primary/10 text-primary">
+                            {message.senderName.charAt(0).toUpperCase()}
+                          </AvatarFallback>
+                        )}
                       </Avatar>
                     )}
                     
@@ -184,9 +206,13 @@ export const GroupChat: React.FC<GroupChatProps> = ({ groupId }) => {
                     
                     {message.senderId === user?.uid && (
                       <Avatar className="w-8 h-8 flex-shrink-0">
-                        <AvatarFallback className="text-xs bg-primary/10 text-primary">
-                          {message.senderName.charAt(0).toUpperCase()}
-                        </AvatarFallback>
+                        {message.senderPhotoURL ? (
+                          <img src={message.senderPhotoURL} alt={message.senderName} className="w-full h-full object-cover rounded-full" />
+                        ) : (
+                          <AvatarFallback className="text-xs bg-primary/10 text-primary">
+                            {message.senderName.charAt(0).toUpperCase()}
+                          </AvatarFallback>
+                        )}
                       </Avatar>
                     )}
                   </motion.div>

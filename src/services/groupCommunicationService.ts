@@ -25,11 +25,12 @@ export interface ChatMessage {
   id: string;
   senderId: string;
   senderName: string;
+  senderPhotoURL?: string;
   text: string;
   createdAt: Date;
 }
 
-export const sendChatMessage = async (groupId: string, senderId: string, senderName: string, text: string) => {
+export const sendChatMessage = async (groupId: string, senderId: string, senderName: string, text: string, senderPhotoURL?: string) => {
   try {
     const messagesRef = collection(db, 'groups', groupId, 'messages');
     
@@ -48,6 +49,7 @@ export const sendChatMessage = async (groupId: string, senderId: string, senderN
     const docRef = await addDoc(messagesRef, {
       senderId,
       senderName,
+      senderPhotoURL: senderPhotoURL || null,
       text: text.trim(),
       createdAt: serverTimestamp(),
     });
@@ -75,6 +77,7 @@ export const subscribeToGroupChat = (
         id: doc.id,
         senderId: data.senderId,
         senderName: data.senderName,
+        senderPhotoURL: data.senderPhotoURL,
         text: data.text,
         createdAt: data.createdAt?.toDate() || new Date(),
       });
