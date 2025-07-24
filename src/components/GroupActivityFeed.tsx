@@ -120,42 +120,44 @@ export const GroupActivityFeed: React.FC<GroupActivityFeedProps> = ({ group }) =
       <CardContent>
         <div className="space-y-4 max-h-96 overflow-y-auto">
           {enrichedActivities.map((activity) => (
-            <div
-              key={activity.id}
-              className={`p-4 rounded-lg border-l-4 ${getActivityColor(activity.type)}`}
-            >
-              <div className="flex items-start space-x-3">
-                <div className="flex-shrink-0">
-                  <div className="w-8 h-8 rounded-full bg-white border flex items-center justify-center">
-                    {getActivityIcon(activity.type)}
-                  </div>
-                </div>
-                
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center space-x-2">
-                   <Avatar className="h-16 w-16 sm:h-20 sm:w-20">
-                <AvatarImage src={activity.photoURL || undefined} />
-                <AvatarFallback className="text-sm sm:text-lg font-semibold">
-                  {getInitials(activity.displayName || 'User')}
-                </AvatarFallback>
-              </Avatar>
-                    <span className="font-medium text-sm">{activity.userName}</span>
-                    <Badge variant="outline" className="text-xs capitalize">
-                      {activity.type.replace('_', ' ')}
-                    </Badge>
-                  </div>
-                  
-                  <p className="text-sm text-gray-700 mt-1">
-                    {activity.description}
-                  </p>
-                  
-                  <p className="text-xs text-gray-500 mt-1">
-                    {format(new Date(activity.timestamp), 'MMM dd, yyyy at h:mm a')}
-                  </p>
-                </div>
-              </div>
-            </div>
-          ))}
+  <div
+    key={activity.id}
+    className={`p-4 rounded-lg border-l-4 ${getActivityColor(activity.type)}`}
+  >
+    <div className="flex items-start space-x-3">
+      <div className="flex-shrink-0">
+        <div className="w-8 h-8 rounded-full bg-white border flex items-center justify-center">
+          {getActivityIcon(activity.type)}
+        </div>
+      </div>
+
+      <div className="flex-1 min-w-0">
+        <div className="flex items-center space-x-2">
+          <Avatar className="h-8 w-8 sm:h-10 sm:w-10 ring-1 ring-gray-200 shadow-sm">
+            <AvatarImage
+              src={activity.photoURL || undefined}
+              alt={activity.userName}
+              className="object-cover"
+            />
+            <AvatarFallback className="text-xs font-semibold">
+              {getInitials(activity.userName || 'U')}
+            </AvatarFallback>
+          </Avatar>
+          <span className="font-medium text-sm truncate">{activity.userName}</span>
+          <Badge variant="outline" className="text-xs capitalize">
+            {activity.type.replace('_', ' ')}
+          </Badge>
+        </div>
+
+        <p className="text-sm text-gray-700 mt-1">{activity.description}</p>
+        <p className="text-xs text-gray-500 mt-1">
+          {format(new Date(activity.timestamp), 'MMM dd, yyyy at h:mm a')}
+        </p>
+      </div>
+    </div>
+  </div>
+))}
+
         </div>
       </CardContent>
     </Card>
