@@ -82,12 +82,15 @@ export const GroupDetailView: React.FC<GroupDetailViewProps> = ({ group, onBack 
     <div className="min-h-screen bg-background">
       {/* Mobile Header */}
       {isMobile && (
-        <div className="sticky top-0 z-20 bg-background/95 backdrop-blur-sm border-b border-border px-4 py-3">
-          <div className="flex items-center justify-between">
+        <div className="sticky top-0 z-30 bg-background/95 backdrop-blur-sm border-b border-border">
+          <div className="flex items-center justify-between px-4 py-3">
             <Button variant="ghost" size="sm" onClick={onBack} className="h-8 px-2">
               <ArrowLeft className="w-4 h-4 mr-1" />
               <span className="text-sm">Back</span>
             </Button>
+            <div className="flex-1 mx-4">
+              <h1 className="text-sm font-semibold text-center truncate">{group.name}</h1>
+            </div>
             <Button
               size="sm"
               onClick={() => setShowExpenseForm(true)}
@@ -251,7 +254,7 @@ export const GroupDetailView: React.FC<GroupDetailViewProps> = ({ group, onBack 
 
       {/* Mobile Navigation */}
       {isMobile && (
-        <div className="sticky top-0 z-10 bg-background/95 backdrop-blur-sm border-b border-border">
+        <div className="sticky top-[60px] z-20 bg-background/95 backdrop-blur-sm border-b border-border">
           <GroupDetailMobileNav
             tabs={tabs}
             activeTab={activeTab}
@@ -285,7 +288,7 @@ export const GroupDetailView: React.FC<GroupDetailViewProps> = ({ group, onBack 
       )}
 
       {/* Tab Content */}
-      <div className={`${isMobile ? 'px-4 py-3 pb-20' : 'p-6'} ${isMobile ? 'space-y-4' : 'space-y-6'}`}>
+      <div className={`${isMobile ? 'px-4 py-3 pb-24' : 'p-6'} ${isMobile ? 'space-y-4' : 'space-y-6'} ${isMobile ? 'min-h-screen' : ''}`}>
         <AnimatePresence mode="wait">
           <motion.div
             key={activeTab}
@@ -389,8 +392,8 @@ export const GroupDetailView: React.FC<GroupDetailViewProps> = ({ group, onBack 
 
       {/* Mobile Bottom Navigation for Quick Actions */}
       {isMobile && (
-        <div className="fixed bottom-0 left-0 right-0 z-20 bg-background/95 backdrop-blur-sm border-t border-border p-3">
-          <div className="flex items-center justify-center space-x-3 max-w-sm mx-auto">
+        <div className="fixed bottom-0 left-0 right-0 z-30 bg-background border-t border-border p-3 safe-area-pb">
+          <div className="flex items-center justify-center space-x-3 max-w-lg mx-auto">
             <Button
               onClick={() => setShowExpenseForm(true)}
               className="flex-1 bg-primary hover:bg-primary/90 text-primary-foreground h-10"
