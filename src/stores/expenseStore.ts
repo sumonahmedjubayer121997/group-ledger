@@ -173,6 +173,7 @@ export const useExpenseStore = create<ExpenseStore>()(
           // Always initialize if user changed or not initialized
           if (!isInitialized || currentUserId !== userId) {
             console.log('Initializing Firebase sync for user:', userId);
+            console.log('Initializing Firebase sync for user:', userId);
             
             // Clean up existing subscriptions first
             if (groupsUnsubscriber) {

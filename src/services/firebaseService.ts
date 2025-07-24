@@ -349,9 +349,12 @@ console.log("users:", users);
     };
 
     console.log('Creating group with new structure:', firestoreGroup);
+    console.log('Users object structure:', firestoreGroup.users);
 
     const docRef = await addDoc(collection(db, 'groups'), firestoreGroup);
     const groupId = docRef.id;
+    
+    console.log('Group created with ID:', groupId);
 
     const batch = [];
     for (const [uid, userData] of Object.entries(users)) {
@@ -564,6 +567,7 @@ export const subscribeToUserGroups = (userId: string, callback: (groups: Group[]
   
   return onSnapshot(q, (snapshot) => {
     console.log('Groups snapshot received, size:', snapshot.size);
+    console.log('Query used:', `users.${userId}.role in [admin, member]`);
     const groups: Group[] = [];
     
     snapshot.forEach((doc) => {
