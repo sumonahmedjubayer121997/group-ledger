@@ -566,13 +566,14 @@ export const subscribeToUserGroups = (userId: string, callback: (groups: Group[]
   );
   
   return onSnapshot(q, (snapshot) => {
-    console.log('Groups snapshot received, size:', snapshot.size);
-    console.log('Query used:', `users.${userId}.role in [admin, member]`);
+    console.log('📡 Groups snapshot received, size:', snapshot.size);
+    console.log('🔍 Query used for user:', userId, `-> users.${userId}.role in [admin, member]`);
     const groups: Group[] = [];
     
     snapshot.forEach((doc) => {
       const data = doc.data();
-      console.log('Processing group from subscription:', doc.id, data);
+      console.log('📋 Processing group from subscription:', doc.id, data.name);
+      console.log('👥 Group users structure:', data.users);
       
       // Transform users object to members array
       const membersArray = Object.entries(data.users || {}).map(([uid, userData]: [string, any]) => ({

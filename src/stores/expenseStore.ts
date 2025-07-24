@@ -167,12 +167,19 @@ export const useExpenseStore = create<ExpenseStore>()(
         initializeFirebaseSync: async (userId: string) => {
           const { currentUserId, isInitialized } = get();
           
-          console.log('initializeFirebaseSync called with userId:', userId);
-          console.log('Current state - isInitialized:', isInitialized, 'currentUserId:', currentUserId);
+          console.log('🔄 initializeFirebaseSync called with userId:', userId);
+          console.log('📊 Current state - isInitialized:', isInitialized, 'currentUserId:', currentUserId);
+          console.log('🔍 User details for debugging:', userId);
+          
+          // Force cleanup if switching users
+          if (currentUserId && currentUserId !== userId) {
+            console.log('🧹 Different user detected, cleaning up first...');
+            get().cleanup();
+          }
           
           // Always initialize if user changed or not initialized
           if (!isInitialized || currentUserId !== userId) {
-            console.log('Initializing Firebase sync for user:', userId);
+            console.log('🚀 Initializing Firebase sync for user:', userId);
             console.log('Initializing Firebase sync for user:', userId);
             
             // Clean up existing subscriptions first
@@ -193,17 +200,19 @@ export const useExpenseStore = create<ExpenseStore>()(
             
             try {
               // First, try to get initial groups data
-              console.log('Fetching initial groups data...');
+              console.log('📚 Fetching initial groups data for user:', userId);
               const initialGroups = await getUserGroups(userId);
-              console.log('Initial groups fetched:', initialGroups.length);
+              console.log('📚 Initial groups fetched:', initialGroups.length, 'groups');
+              console.log('📋 Groups details:', initialGroups.map(g => ({ id: g.id, name: g.name, members: g.members.length })));
               
               // Set initial groups
               set({ groups: initialGroups });
               
               // Then set up real-time subscription
-              console.log('Setting up real-time subscription...');
+              console.log('🔔 Setting up real-time subscription for user:', userId);
               groupsUnsubscriber = subscribeToUserGroups(userId, (groups) => {
-                console.log('Groups updated from Firebase subscription:', groups.length, 'groups');
+                console.log('📡 Groups updated from Firebase subscription:', groups.length, 'groups');
+                console.log('🎯 Updated groups data:', groups.map(g => ({ id: g.id, name: g.name, members: g.members.length })));
                 set({ groups, loading: false });
                 
                 // Clean up old expense subscriptions for groups that no longer exist
@@ -324,7 +333,11 @@ export const useExpenseStore = create<ExpenseStore>()(
     const newGroup = await createGroupFirebase(groupDoc, userId);
     console.log('✅ Group created:', newGroup);
 
-    set({ loading: false });
+    // Force refresh groups to ensure the newly created group appears
+    console.log('🔄 Force refreshing groups after creation...');
+    const updatedGroups = await getUserGroups(userId);
+    console.log('🔄 Updated groups after creation:', updatedGroups.length, 'groups');
+    set({ groups: updatedGroups, loading: false });
 
     // ✅ Record group creation activity
     get().addActivity({
