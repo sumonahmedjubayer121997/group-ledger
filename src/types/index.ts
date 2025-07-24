@@ -52,6 +52,7 @@ export interface Member {
   id: string;
   name: string;
   email: string;
+  photoURL?: string;
   role?: 'admin' | 'member' | 'viewer';
   joinedAt?: Date;
 }

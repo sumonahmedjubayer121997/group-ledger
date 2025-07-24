@@ -2,6 +2,7 @@
 import React from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Group } from '@/stores/expenseStore';
 import { Users, Calendar, User } from 'lucide-react';
 
@@ -60,14 +61,17 @@ export const GroupList: React.FC<GroupListProps> = ({ groups, onGroupClick }) =>
                 <h4 className="font-semibold text-gray-900 text-sm sm:text-base truncate pr-2">{group.name}</h4>
                 <div className="flex -space-x-1 sm:-space-x-2">
                   {group.members.slice(0, 3).map((member, index) => (
-                    <div
+                    <Avatar
                       key={member.id}
-                      className="w-6 h-6 sm:w-8 sm:h-8 bg-blue-100 rounded-full flex items-center justify-center border-2 border-white"
+                      className="w-6 h-6 sm:w-8 sm:h-8 border-2 border-white"
                     >
-                      <span className="text-blue-600 font-medium text-xs">
-                        {member.name.charAt(0)}
-                      </span>
-                    </div>
+                      {member.photoURL ? (
+                        <AvatarImage src={member.photoURL} alt={member.name} />
+                      ) : null}
+                      <AvatarFallback className="text-xs bg-primary/10 text-primary">
+                        {member.name.charAt(0).toUpperCase()}
+                      </AvatarFallback>
+                    </Avatar>
                   ))}
                   {group.members.length > 3 && (
                     <div className="w-6 h-6 sm:w-8 sm:h-8 bg-gray-100 rounded-full flex items-center justify-center border-2 border-white">
