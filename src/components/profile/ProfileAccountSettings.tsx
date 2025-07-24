@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -10,13 +9,13 @@ import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/contexts/AuthContext';
 import { User } from 'firebase/auth';
 import { UserProfile } from '@/contexts/AuthContext';
+import { ProfilePictureUpload } from '@/components/ProfilePictureUpload';
 import { 
   Key, 
   Mail, 
   User as UserIcon, 
   Shield, 
   Link,
-  Camera,
   CheckCircle
 } from 'lucide-react';
 
@@ -33,6 +32,7 @@ export const ProfileAccountSettings: React.FC<ProfileAccountSettingsProps> = ({ 
   const [currentPassword, setCurrentPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
+  const [profilePhotoURL, setProfilePhotoURL] = useState(userProfile.photoURL || '');
 
   const handleUpdateDisplayName = async () => {
     if (!displayName.trim()) {
@@ -60,6 +60,10 @@ export const ProfileAccountSettings: React.FC<ProfileAccountSettingsProps> = ({ 
     } finally {
       setIsLoading(false);
     }
+  };
+
+  const handlePhotoChange = (url: string) => {
+    setProfilePhotoURL(url);
   };
 
   const handleUpdatePassword = async () => {
@@ -166,12 +170,12 @@ export const ProfileAccountSettings: React.FC<ProfileAccountSettingsProps> = ({ 
             <Label>Profile Photo</Label>
             <div className="flex items-center gap-4">
               <div className="text-sm text-muted-foreground">
-                Update your profile photo from your account settings
+                Upload a custom photo or choose from our collection
               </div>
-              <Button variant="outline" size="sm">
-                <Camera className="h-4 w-4 mr-2" />
-                Upload Photo
-              </Button>
+              <ProfilePictureUpload 
+                currentPhotoURL={profilePhotoURL}
+                onPhotoChange={handlePhotoChange}
+              />
             </div>
           </div>
         </CardContent>

@@ -15,7 +15,6 @@ import {
   Shield, 
   Activity,
   Download,
-  Camera,
   Edit,
   ArrowLeft
 } from 'lucide-react';
@@ -25,6 +24,7 @@ import { ProfileAccountSettings } from './profile/ProfileAccountSettings';
 import { ProfilePreferences } from './profile/ProfilePreferences';
 import { ProfilePrivacySecurity } from './profile/ProfilePrivacySecurity';
 import { ProfileActivityFeed } from './profile/ProfileActivityFeed';
+import { ProfilePictureUpload } from './ProfilePictureUpload';
 import { useIsMobile } from '@/hooks/use-mobile';
 
 interface UserProfileProps {
@@ -34,6 +34,7 @@ interface UserProfileProps {
 export const UserProfile: React.FC<UserProfileProps> = ({ onClose }) => {
   const { user, userProfile, loading } = useAuth();
   const [activeTab, setActiveTab] = useState('overview');
+  const [profilePhotoURL, setProfilePhotoURL] = useState(userProfile?.photoURL || '');
   const isMobile = useIsMobile();
 
   console.log('UserProfile render - user:', user?.uid, 'userProfile:', userProfile?.displayName, 'loading:', loading);
@@ -63,7 +64,7 @@ export const UserProfile: React.FC<UserProfileProps> = ({ onClose }) => {
     uid: user.uid,
     email: user.email || '',
     displayName: user.displayName || 'User',
-    photoURL: user.photoURL,
+    photoURL: profilePhotoURL || user.photoURL,
     phoneNumber: user.phoneNumber,
     emailVerified: user.emailVerified,
     role: 'user' as const,
@@ -82,6 +83,10 @@ export const UserProfile: React.FC<UserProfileProps> = ({ onClose }) => {
       .map(n => n[0])
       .join('')
       .toUpperCase();
+  };
+
+  const handlePhotoChange = (url: string) => {
+    setProfilePhotoURL(url);
   };
 
   const tabItems = [
@@ -115,18 +120,17 @@ export const UserProfile: React.FC<UserProfileProps> = ({ onClose }) => {
           <div className="flex items-center space-x-4">
             <div className="relative">
               <Avatar className="h-16 w-16 sm:h-20 sm:w-20">
-                <AvatarImage src={profileData.photoURL || undefined} />
+                <AvatarImage src={profilePhotoURL || profileData.photoURL || undefined} />
                 <AvatarFallback className="text-sm sm:text-lg font-semibold">
                   {getInitials(profileData.displayName || 'User')}
                 </AvatarFallback>
               </Avatar>
-              <Button 
-                size="sm" 
-                variant="outline" 
-                className="absolute -bottom-1 -right-1 sm:-bottom-2 sm:-right-2 h-6 w-6 sm:h-8 sm:w-8 rounded-full p-0"
-              >
-                <Camera className="h-3 w-3 sm:h-4 sm:w-4" />
-              </Button>
+              <div className="absolute -bottom-1 -right-1 sm:-bottom-2 sm:-right-2">
+                <ProfilePictureUpload 
+                  currentPhotoURL={profilePhotoURL || profileData.photoURL || undefined}
+                  onPhotoChange={handlePhotoChange}
+                />
+              </div>
             </div>
             <div className="flex-1 min-w-0">
               <h1 className="text-lg sm:text-2xl font-bold truncate">
