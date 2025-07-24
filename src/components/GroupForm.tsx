@@ -8,7 +8,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { useExpenseStore } from "@/stores/expenseStore";
 import { toast } from "sonner";
 import { Plus, X } from "lucide-react";
-import type { GroupMember } from "@/types/index";
+import type { Member } from "@/types/index";
 
 interface GroupFormProps {
   isOpen: boolean;
@@ -43,31 +43,42 @@ export const GroupForm = ({ isOpen, onClose }: GroupFormProps) => {
     setIsSubmitting(true);
 
     try {
-      const members: GroupMember[] = [
+      const members: Member[] = [
         {
-          uid: user.uid,
+          id: user.uid,
           email: user.email || "",
-          displayName: user.displayName || "You",
+          name: user.displayName || "You",
           role: "admin" as const,
         },
         ...memberEmails
           .filter(email => email.trim() !== "")
           .map(email => ({
-            uid: `temp-${Date.now()}-${Math.random()}`,
+            id: `temp-${Date.now()}-${Math.random()}`,
             email: email.trim(),
-            displayName: email.trim(),
+            name: email.trim(),
             role: "member" as const,
           })),
       ];
 
       await addGroup({
         name: groupName,
-        members,
-        currency: "USD",
         description: "",
-        createdBy: user.uid,
+        members,
         createdAt: new Date(),
-        updatedAt: new Date(),
+        createdBy: user.uid,
+        photo: "",
+        coverImage: "",
+        groupType: "private" as const,
+        inviteCode: crypto.randomUUID(),
+        settings: {
+          currency: "USD",
+          simplifyDebts: true,
+          notifications: true,
+          recurringBills: false,
+        },
+        tags: [],
+        location: "",
+        isArchived: false,
       }, user.uid);
 
       toast.success("Group created successfully!");
