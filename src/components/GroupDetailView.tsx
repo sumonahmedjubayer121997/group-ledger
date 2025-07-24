@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -6,8 +7,10 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { useExpenseStore, Group } from '@/stores/expenseStore';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { motion, AnimatePresence } from 'framer-motion';
+import {GroupCommunicationHub} from './GroupCommunicationHub';
 import { 
   Users, 
+  MessageCircle,
   Settings, 
   BarChart3, 
   Activity, 
@@ -17,8 +20,7 @@ import {
   User,
   MoreVertical,
   Archive,
-  ArrowLeft,
-  MessageCircle
+  ArrowLeft
 } from 'lucide-react';
 import { GroupSettings } from './GroupSettings';
 import { GroupActivityFeed } from './GroupActivityFeed';
@@ -28,7 +30,6 @@ import { GroupInviteDialog } from './GroupInviteDialog';
 import { ExpenseForm } from './ExpenseForm';
 import { RecurringExpenseDialog } from './RecurringExpenseDialog';
 import { GroupDetailMobileNav } from './GroupDetailMobileNav';
-import { GroupCommunicationHub } from './GroupCommunicationHub';
 
 interface GroupDetailViewProps {
   group: Group;
@@ -36,7 +37,7 @@ interface GroupDetailViewProps {
 }
 
 export const GroupDetailView: React.FC<GroupDetailViewProps> = ({ group, onBack }) => {
-  const [activeTab, setActiveTab] = useState<'overview' | 'analytics' | 'activity' | 'members' | 'settings' | 'communication'>('overview');
+  const [activeTab, setActiveTab] = useState<'overview' | 'analytics' | 'activity' | 'members' |'communication'  | 'settings'>('overview');
   const [showExpenseForm, setShowExpenseForm] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
   const [showInvite, setShowInvite] = useState(false);
@@ -74,30 +75,27 @@ export const GroupDetailView: React.FC<GroupDetailViewProps> = ({ group, onBack 
     { id: 'analytics', label: 'Analytics', icon: BarChart3 },
     { id: 'activity', label: 'Activity', icon: Activity },
     { id: 'members', label: 'Members', icon: Users },
-    { id: 'communication', label: 'Communication', icon: MessageCircle },
     { id: 'settings', label: 'Settings', icon: Settings },
+    { id: 'communication', label: 'Com', icon: Users },
   ];
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-screen bg-gray-50/50">
       {/* Mobile Header */}
       {isMobile && (
-        <div className="sticky top-0 z-30 bg-background/95 backdrop-blur-sm border-b border-border">
-          <div className="flex items-center justify-between px-4 py-3">
-            <Button variant="ghost" size="sm" onClick={onBack} className="h-8 px-2">
-              <ArrowLeft className="w-4 h-4 mr-1" />
-              <span className="text-sm">Back</span>
+        <div className="sticky top-0 z-20 bg-white/90 backdrop-blur-sm border-b px-4 py-3">
+          <div className="flex items-center justify-between">
+            <Button variant="ghost" size="sm" onClick={onBack}>
+              <ArrowLeft className="w-4 h-4 mr-2" />
+              Back
             </Button>
-            <div className="flex-1 mx-4">
-              <h1 className="text-sm font-semibold text-center truncate">{group.name}</h1>
-            </div>
             <Button
               size="sm"
               onClick={() => setShowExpenseForm(true)}
-              className="h-8 px-3 bg-primary hover:bg-primary/90 text-primary-foreground"
+              className="bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 text-white"
             >
               <Plus className="w-4 h-4 mr-1" />
-              <span className="text-sm">Add</span>
+              Add
             </Button>
           </div>
         </div>
@@ -178,32 +176,30 @@ export const GroupDetailView: React.FC<GroupDetailViewProps> = ({ group, onBack 
 
       {/* Mobile Group Info */}
       {isMobile && (
-        <div className="px-4 py-4 bg-background border-b border-border">
+        <div className="px-4 py-4 bg-white border-b">
           <div className="flex items-center space-x-3 mb-3">
             {group.photo ? (
-              <Avatar className="w-10 h-10 flex-shrink-0">
+              <Avatar className="w-10 h-10">
                 <AvatarImage src={group.photo} />
-                <AvatarFallback className="text-sm font-medium">{group.name.charAt(0)}</AvatarFallback>
+                <AvatarFallback>{group.name.charAt(0)}</AvatarFallback>
               </Avatar>
             ) : (
-              <div className="w-10 h-10 bg-primary rounded-full flex items-center justify-center flex-shrink-0">
-                <span className="text-primary-foreground font-bold text-sm">{group.name.charAt(0)}</span>
+              <div className="w-10 h-10 bg-gradient-to-r from-blue-500 to-purple-600 rounded-full flex items-center justify-center">
+                <span className="text-white font-bold">{group.name.charAt(0)}</span>
               </div>
             )}
-            <div className="flex-1 min-w-0">
-              <h1 className="text-base font-bold truncate text-foreground">{group.name}</h1>
-              {group.description && (
-                <p className="text-sm text-muted-foreground truncate">{group.description}</p>
-              )}
+            <div className="flex-1">
+              <h1 className="text-lg font-bold">{group.name}</h1>
+              <p className="text-sm text-gray-600 line-clamp-1">{group.description}</p>
             </div>
           </div>
           
-          <div className="flex items-center gap-2 flex-wrap">
-            <Badge variant={group.groupType === 'private' ? 'secondary' : 'outline'} className="text-xs px-2 py-0.5 h-5">
+          <div className="flex items-center space-x-2">
+            <Badge variant={group.groupType === 'private' ? 'secondary' : 'outline'} className="text-xs">
               {group.groupType}
             </Badge>
             {group.tags?.slice(0, 2).map(tag => (
-              <Badge key={tag} variant="outline" className="text-xs px-2 py-0.5 h-5">
+              <Badge key={tag} variant="outline" className="text-xs">
                 {tag}
               </Badge>
             ))}
@@ -212,56 +208,52 @@ export const GroupDetailView: React.FC<GroupDetailViewProps> = ({ group, onBack 
       )}
 
       {/* Stats Cards */}
-      <div className={`${isMobile ? 'px-4 py-3' : 'py-6'}`}>
-        <div className={`grid ${isMobile ? 'grid-cols-2 gap-3' : 'grid-cols-1 md:grid-cols-4 gap-4'}`}>
-          <Card className={`${isMobile ? 'shadow-sm border-border' : ''}`}>
-            <CardContent className={`${isMobile ? 'p-3' : 'p-4'} text-center`}>
-              <div className={`${isMobile ? 'text-sm font-semibold' : 'text-2xl font-bold'} text-green-600 truncate`}>
+      <div className={`${isMobile ? 'px-4 py-4' : 'py-6'}`}>
+        <div className={`grid ${isMobile ? 'grid-cols-2' : 'grid-cols-1 md:grid-cols-4'} gap-4`}>
+          <Card>
+            <CardContent className={`${isMobile ? 'p-3' : 'p-4'}`}>
+              <div className={`${isMobile ? 'text-lg' : 'text-2xl'} font-bold text-green-600`}>
                 ${totalExpenses.toFixed(2)}
               </div>
-              <p className={`${isMobile ? 'text-xs mt-0.5' : 'text-sm mt-1'} text-muted-foreground`}>Total Spent</p>
+              <p className="text-xs text-gray-600">Total Spent</p>
             </CardContent>
           </Card>
           
-          <Card className={`${isMobile ? 'shadow-sm border-border' : ''}`}>
-            <CardContent className={`${isMobile ? 'p-3' : 'p-4'} text-center`}>
-              <div className={`${isMobile ? 'text-sm font-semibold' : 'text-2xl font-bold'} text-blue-600`}>
+          <Card>
+            <CardContent className={`${isMobile ? 'p-3' : 'p-4'}`}>
+              <div className={`${isMobile ? 'text-lg' : 'text-2xl'} font-bold text-blue-600`}>
                 {groupExpenses.length}
               </div>
-              <p className={`${isMobile ? 'text-xs mt-0.5' : 'text-sm mt-1'} text-muted-foreground`}>Expenses</p>
+              <p className="text-xs text-gray-600">Expenses</p>
             </CardContent>
           </Card>
           
-          <Card className={`${isMobile ? 'shadow-sm border-border' : ''}`}>
-            <CardContent className={`${isMobile ? 'p-3' : 'p-4'} text-center`}>
-              <div className={`${isMobile ? 'text-sm font-semibold' : 'text-2xl font-bold'} text-purple-600`}>
+          <Card>
+            <CardContent className={`${isMobile ? 'p-3' : 'p-4'}`}>
+              <div className={`${isMobile ? 'text-lg' : 'text-2xl'} font-bold text-purple-600`}>
                 {group.members.length}
               </div>
-              <p className={`${isMobile ? 'text-xs mt-0.5' : 'text-sm mt-1'} text-muted-foreground`}>Members</p>
+              <p className="text-xs text-gray-600">Members</p>
             </CardContent>
           </Card>
           
-          <Card className={`${isMobile ? 'shadow-sm border-border' : ''}`}>
-            <CardContent className={`${isMobile ? 'p-3' : 'p-4'} text-center`}>
-              <div className={`${isMobile ? 'text-sm font-semibold' : 'text-2xl font-bold'} text-orange-600`}>
+          <Card>
+            <CardContent className={`${isMobile ? 'p-3' : 'p-4'}`}>
+              <div className={`${isMobile ? 'text-lg' : 'text-2xl'} font-bold text-orange-600`}>
                 {balances.length}
               </div>
-              <p className={`${isMobile ? 'text-xs mt-0.5' : 'text-sm mt-1'} text-muted-foreground`}>Balances</p>
+              <p className="text-xs text-gray-600">Balances</p>
             </CardContent>
           </Card>
         </div>
       </div>
 
       {/* Mobile Navigation */}
-      {isMobile && (
-        <div className="sticky top-[60px] z-20 bg-background/95 backdrop-blur-sm border-b border-border">
-          <GroupDetailMobileNav
-            tabs={tabs}
-            activeTab={activeTab}
-            onTabChange={(tabId) => setActiveTab(tabId as any)}
-          />
-        </div>
-      )}
+      <GroupDetailMobileNav
+        tabs={tabs}
+        activeTab={activeTab}
+        onTabChange={(tabId) => setActiveTab(tabId as any)}
+      />
 
       {/* Desktop Navigation Tabs */}
       {!isMobile && (
@@ -288,7 +280,7 @@ export const GroupDetailView: React.FC<GroupDetailViewProps> = ({ group, onBack 
       )}
 
       {/* Tab Content */}
-      <div className={`${isMobile ? 'px-4 py-3 pb-24' : 'p-6'} ${isMobile ? 'space-y-4' : 'space-y-6'} ${isMobile ? 'min-h-screen' : ''}`}>
+      <div className={`${isMobile ? 'px-4 py-4' : 'p-6'} space-y-6`}>
         <AnimatePresence mode="wait">
           <motion.div
             key={activeTab}
@@ -298,40 +290,34 @@ export const GroupDetailView: React.FC<GroupDetailViewProps> = ({ group, onBack 
             transition={{ duration: 0.2 }}
           >
             {activeTab === 'overview' && (
-              <div className={`grid ${isMobile ? 'grid-cols-1 gap-4' : 'grid-cols-1 lg:grid-cols-2 gap-6'}`}>
-                <Card className={`${isMobile ? 'shadow-sm border-border' : ''}`}>
-                  <CardHeader className={`${isMobile ? 'pb-2 px-4 pt-4' : ''}`}>
+              <div className={`grid ${isMobile ? 'grid-cols-1' : 'grid-cols-1 lg:grid-cols-2'} gap-6`}>
+                <Card>
+                  <CardHeader>
                     <CardTitle className="flex items-center justify-between">
-                      <span className={`${isMobile ? 'text-sm' : 'text-xl'} font-semibold`}>Recent Members</span>
+                      <span className={isMobile ? 'text-lg' : 'text-xl'}>Recent Members</span>
                       <Button 
-                        size="sm"
+                        size="sm" 
                         variant="outline"
                         onClick={() => setActiveTab('members')}
-                        className={`${isMobile ? 'text-xs px-2 py-1 h-6' : ''}`}
                       >
                         View All
                       </Button>
                     </CardTitle>
                   </CardHeader>
-                  <CardContent className={`${isMobile ? 'pt-0 px-4 pb-4' : ''}`}>
-                    <div className={`${isMobile ? 'space-y-3' : 'space-y-3'}`}>
+                  <CardContent>
+                    <div className="space-y-3">
                       {group.members.slice(0, isMobile ? 3 : 5).map(member => (
                         <div key={member.id} className="flex items-center justify-between">
-                          <div className="flex items-center space-x-3 flex-1 min-w-0">
-                            <Avatar className={`${isMobile ? 'w-8 h-8' : 'w-10 h-10'} flex-shrink-0`}>
-                              {member.photoURL ? (
-                                <AvatarImage src={member.photoURL} alt={member.name} />
-                              ) : null}
-                              <AvatarFallback className="text-xs bg-primary/10 text-primary font-medium">
-                                {member.name.charAt(0).toUpperCase()}
-                              </AvatarFallback>
+                          <div className="flex items-center space-x-3">
+                            <Avatar className="w-8 h-8">
+                              <AvatarFallback>{member.name.charAt(0)}</AvatarFallback>
                             </Avatar>
-                            <div className="min-w-0 flex-1">
-                              <div className={`${isMobile ? 'text-sm' : 'text-sm'} font-medium truncate text-foreground`}>{member.name}</div>
-                              <div className={`${isMobile ? 'text-xs' : 'text-xs'} text-muted-foreground truncate`}>{member.email}</div>
+                            <div>
+                              <div className="font-medium text-sm">{member.name}</div>
+                              <div className="text-xs text-gray-500">{member.email}</div>
                             </div>
                           </div>
-                          <div className="flex items-center space-x-1 flex-shrink-0">
+                          <div className="flex items-center space-x-2">
                             {getRoleIcon(member.role)}
                             {!isMobile && getRoleBadge(member.role)}
                           </div>
@@ -341,36 +327,39 @@ export const GroupDetailView: React.FC<GroupDetailViewProps> = ({ group, onBack 
                   </CardContent>
                 </Card>
 
-                <Card className={`${isMobile ? 'shadow-sm border-border' : ''}`}>
-                  <CardHeader className={`${isMobile ? 'pb-2 px-4 pt-4' : ''}`}>
-                    <CardTitle className={`${isMobile ? 'text-sm' : 'text-xl'} font-semibold`}>Quick Actions</CardTitle>
+                <Card>
+                  <CardHeader>
+                    <CardTitle className={isMobile ? 'text-lg' : 'text-xl'}>Quick Actions</CardTitle>
                   </CardHeader>
-                  <CardContent className={`${isMobile ? 'pt-0 px-4 pb-4' : ''}`}>
-                    <div className={`${isMobile ? 'space-y-2' : 'space-y-3'}`}>
+                  <CardContent>
+                    <div className="space-y-3">
                       <Button 
                         variant="outline" 
-                        className={`w-full justify-start text-left ${isMobile ? 'h-9 text-sm' : ''}`}
+                        className="w-full justify-start"
                         onClick={() => setShowRecurring(true)}
+                        size={isMobile ? "sm" : "default"}
                       >
-                        <Plus className="w-4 h-4 mr-2 flex-shrink-0" />
-                        <span className="truncate">Add Recurring Expense</span>
+                        <Plus className="w-4 h-4 mr-2" />
+                        Add Recurring Expense
                       </Button>
                       <Button 
                         variant="outline" 
-                        className={`w-full justify-start text-left ${isMobile ? 'h-9 text-sm' : ''}`}
+                        className="w-full justify-start"
                         onClick={() => setShowInvite(true)}
+                        size={isMobile ? "sm" : "default"}
                       >
-                        <Users className="w-4 h-4 mr-2 flex-shrink-0" />
-                        <span className="truncate">Invite Members</span>
+                        <Users className="w-4 h-4 mr-2" />
+                        Invite Members
                       </Button>
                       {isUserAdmin && (
                         <Button 
                           variant="outline" 
-                          className={`w-full justify-start text-left text-destructive hover:text-destructive-foreground hover:bg-destructive/10 ${isMobile ? 'h-9 text-sm' : ''}`}
+                          className="w-full justify-start text-red-600 hover:text-red-700"
                           onClick={() => archiveGroup(group.id)}
+                          size={isMobile ? "sm" : "default"}
                         >
-                          <Archive className="w-4 h-4 mr-2 flex-shrink-0" />
-                          <span className="truncate">Archive Group</span>
+                          <Archive className="w-4 h-4 mr-2" />
+                          Archive Group
                         </Button>
                       )}
                     </div>
@@ -383,35 +372,12 @@ export const GroupDetailView: React.FC<GroupDetailViewProps> = ({ group, onBack 
             {activeTab === 'activity' && <GroupActivityFeed group={group} />}
             {activeTab === 'members' && <GroupMemberManagement group={group} />}
             {activeTab === 'communication' && (
-              <GroupCommunicationHub group={group} isAdmin={isUserAdmin} />
+              <GroupCommunicationHub group={group} isAdmin />
             )}
             {activeTab === 'settings' && isUserAdmin && <GroupSettings group={group} />}
           </motion.div>
         </AnimatePresence>
       </div>
-
-      {/* Mobile Bottom Navigation for Quick Actions */}
-      {isMobile && (
-        <div className="fixed bottom-0 left-0 right-0 z-30 bg-background border-t border-border p-3 safe-area-pb">
-          <div className="flex items-center justify-center space-x-3 max-w-lg mx-auto">
-            <Button
-              onClick={() => setShowExpenseForm(true)}
-              className="flex-1 bg-primary hover:bg-primary/90 text-primary-foreground h-10"
-            >
-              <Plus className="w-4 h-4 mr-2" />
-              Add Expense
-            </Button>
-            <Button
-              variant="outline"
-              onClick={() => setShowInvite(true)}
-              className="flex-1 h-10"
-            >
-              <Users className="w-4 h-4 mr-2" />
-              Invite
-            </Button>
-          </div>
-        </div>
-      )}
 
       {/* Modals */}
       <ExpenseForm
