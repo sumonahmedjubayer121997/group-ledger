@@ -1,5 +1,5 @@
 
-import React, { useState } from 'react';
+import React, { useState,useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -30,11 +30,22 @@ import { GroupInviteDialog } from './GroupInviteDialog';
 import { ExpenseForm } from './ExpenseForm';
 import { RecurringExpenseDialog } from './RecurringExpenseDialog';
 import { GroupDetailMobileNav } from './GroupDetailMobileNav';
+import { fetchGroupMembersWithPhotos } from '@/components/firebaseComponents/FetchGroupMembersWithPhotos';
 
 interface GroupDetailViewProps {
   group: Group;
   onBack: () => void;
 }
+
+type MemberWithPhoto = {
+  userId: string;
+  name: string;
+  photoURL: string | null;
+  role?: string;
+  email?: string;
+  [key: string]: any; // Allow additional properties
+};
+
 
 export const GroupDetailView: React.FC<GroupDetailViewProps> = ({ group, onBack }) => {
   const [activeTab, setActiveTab] = useState<'overview' | 'analytics' | 'activity' | 'members' |'communication'  | 'settings'>('overview');
@@ -42,7 +53,20 @@ export const GroupDetailView: React.FC<GroupDetailViewProps> = ({ group, onBack 
   const [showSettings, setShowSettings] = useState(false);
   const [showInvite, setShowInvite] = useState(false);
   const [showRecurring, setShowRecurring] = useState(false);
+  const [groupMembers, setGroupMembers] = useState<MemberWithPhoto[]>([]);
+  const [groupId, setGroupId] = useState(group.id || '');
+
   
+ useEffect(() => {
+    const loadMembers = async () => {
+      if (!groupId) return;
+      const members = await fetchGroupMembersWithPhotos(groupId);
+      setGroupMembers(members);
+    };
+
+    loadMembers();
+  }, [groupId]); // 👈 Watch for groupId changes
+
   const { getGroupExpenses, getBalances, archiveGroup } = useExpenseStore();
   const isMobile = useIsMobile();
   
@@ -309,9 +333,17 @@ export const GroupDetailView: React.FC<GroupDetailViewProps> = ({ group, onBack 
                       {group.members.slice(0, isMobile ? 3 : 5).map(member => (
                         <div key={member.id} className="flex items-center justify-between">
                           <div className="flex items-center space-x-3">
-                            <Avatar className="w-8 h-8">
-                              <AvatarFallback>{member.name.charAt(0)}</AvatarFallback>
-                            </Avatar>
+                           <Avatar
+                                                 key={member.id}
+                                                 className="w-6 h-6 sm:w-8 sm:h-8 border-2 border-white"
+                                               >
+                                                 {member.photoURL ? (
+                                                   <AvatarImage src={member.photoURL} alt={member.name} />
+                                                 ) : null}
+                                                 <AvatarFallback className="text-xs bg-primary/10 text-primary">
+                                                   {member.name.charAt(0).toUpperCase()}
+                                                 </AvatarFallback>
+                                               </Avatar>
                             <div>
                               <div className="font-medium text-sm">{member.name}</div>
                               <div className="text-xs text-gray-500">{member.email}</div>
@@ -356,6 +388,7 @@ export const GroupDetailView: React.FC<GroupDetailViewProps> = ({ group, onBack 
                           variant="outline" 
                           className="w-full justify-start text-red-600 hover:text-red-700"
                           onClick={() => archiveGroup(group.id)}
+
                           size={isMobile ? "sm" : "default"}
                         >
                           <Archive className="w-4 h-4 mr-2" />

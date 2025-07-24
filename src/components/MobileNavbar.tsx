@@ -1,10 +1,12 @@
 
 import { useState } from "react";
-import { Menu, X, User, Plus, Settings, LogOut } from "lucide-react";
+import { Menu, X, Users, UserPlus, Settings, LogOut , HandCoins } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import { useAuth } from "@/contexts/AuthContext";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { ExpenseForm } from "@/components/ExpenseForm";
+import { NotificationBell } from "@/components/NotificationBell";
 
 interface MobileNavbarProps {
   onProfileClick: () => void;
@@ -13,6 +15,7 @@ interface MobileNavbarProps {
 }
 
 export const MobileNavbar = ({ onProfileClick, onNewGroupClick, onLogout }: MobileNavbarProps) => {
+   const [showExpenseForm, setShowExpenseForm] = useState(false);
   const { user, userProfile } = useAuth();
   const [isOpen, setIsOpen] = useState(false);
 
@@ -36,6 +39,7 @@ export const MobileNavbar = ({ onProfileClick, onNewGroupClick, onLogout }: Mobi
       </div>
       
       <div className="flex items-center gap-3">
+        <NotificationBell />
         <Avatar className="h-8 w-8">
           <AvatarImage src={userProfile?.photoURL || undefined} />
           <AvatarFallback className="text-sm">
@@ -52,6 +56,7 @@ export const MobileNavbar = ({ onProfileClick, onNewGroupClick, onLogout }: Mobi
           <SheetContent side="right" className="w-[280px]">
             <div className="flex flex-col space-y-4 pt-4">
               <div className="flex items-center space-x-3 pb-4 border-b">
+                
                 <Avatar className="h-10 w-10">
                   <AvatarImage src={userProfile?.photoURL || undefined} />
                   <AvatarFallback>
@@ -69,16 +74,24 @@ export const MobileNavbar = ({ onProfileClick, onNewGroupClick, onLogout }: Mobi
                 className="justify-start"
                 onClick={() => handleMenuItemClick(onProfileClick)}
               >
-                <User className="h-4 w-4 mr-3" />
+                <UserPlus className="h-4 w-4 mr-3" />
                 Profile
               </Button>
-              
+              <Button
+                    onClick={() => setShowExpenseForm(true)}
+                    className="justify-start"
+                    size="sm"
+                    variant="ghost"
+                  >
+                    <HandCoins className="h-3 w-3 mr-3" />
+                    Add Expense
+                  </Button>
               <Button
                 variant="ghost"
                 className="justify-start"
                 onClick={() => handleMenuItemClick(onNewGroupClick)}
               >
-                <Plus className="h-4 w-4 mr-3" />
+                <Users className="h-4 w-4 mr-3" />
                 New Group
               </Button>
               
@@ -90,6 +103,10 @@ export const MobileNavbar = ({ onProfileClick, onNewGroupClick, onLogout }: Mobi
                 <LogOut className="h-4 w-4 mr-3" />
                 Logout
               </Button>
+                 <ExpenseForm
+                            isOpen={showExpenseForm}
+                            onClose={() => setShowExpenseForm(false)}
+                          />
             </div>
           </SheetContent>
         </Sheet>

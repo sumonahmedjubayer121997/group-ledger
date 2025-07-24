@@ -2,7 +2,7 @@
 import React, { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Avatar, AvatarFallback } from '@/components/ui/avatar';
+import { Avatar, AvatarFallback , AvatarImage} from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -156,9 +156,17 @@ export const GroupMemberManagement: React.FC<GroupMemberManagementProps> = ({ gr
             {group.members.map((member) => (
               <div key={member.id} className="flex flex-col sm:flex-row sm:items-center sm:justify-between p-3 sm:p-4 border rounded-lg space-y-3 sm:space-y-0">
                 <div className="flex items-center space-x-3 sm:space-x-4 min-w-0 flex-1">
-                  <Avatar className="w-8 h-8 sm:w-10 sm:h-10 flex-shrink-0">
-                    <AvatarFallback>{member.name.charAt(0)}</AvatarFallback>
-                  </Avatar>
+                  <Avatar
+                      key={member.id}
+                      className="w-6 h-6 sm:w-8 sm:h-8 border-2 border-white"
+                    >
+                      {member.photoURL ? (
+                        <AvatarImage src={member.photoURL} alt={member.name} />
+                      ) : null}
+                      <AvatarFallback className="text-xs bg-primary/10 text-primary">
+                        {member.name.charAt(0).toUpperCase()}
+                      </AvatarFallback>
+                    </Avatar>
                   <div className="min-w-0 flex-1">
                     <div className="flex items-center space-x-2">
                       <span className="font-medium text-sm sm:text-base truncate">{member.name}</span>

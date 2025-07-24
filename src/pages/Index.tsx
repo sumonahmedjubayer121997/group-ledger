@@ -19,7 +19,7 @@ import { MobileNavbar } from "@/components/MobileNavbar";
 import { NotificationBell } from "@/components/NotificationBell";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { motion, AnimatePresence } from "framer-motion";
-
+import { fetchGroupMembersWithPhotos } from "@/components/firebaseComponents/FetchGroupMembersWithPhotos";
 const Index = () => {
   const { user, userProfile, logout } = useAuth();
   const { groups, expenses, selectedGroup, setSelectedGroup, getBalances, initializeFirebaseSync } = useExpenseStore();
@@ -30,6 +30,8 @@ const Index = () => {
   const [showAuth, setShowAuth] = useState(false);
   const [activeTab, setActiveTab] = useState("overview");
   const isMobile = useIsMobile();
+  const [enrichedGroups, setEnrichedGroups] = useState([]);
+
 
   // Initialize Firebase sync when user is authenticated
   useEffect(() => {
@@ -39,6 +41,28 @@ const Index = () => {
       initializeFirebaseSync(user.uid);
     }
   }, [user?.uid, initializeFirebaseSync]);
+
+  useEffect(() => {
+  const loadGroupsWithMembers = async () => {
+    if (!user?.uid) return;
+
+    // Already syncing groups from Firestore
+    await initializeFirebaseSync(user.uid); 
+
+    // After syncing, enrich each group with member details
+    const enriched = await Promise.all(
+      groups.map(async (group) => {
+        const members = await fetchGroupMembersWithPhotos(group.id); // your utility
+        return { ...group, members };
+      })
+    );
+
+    setEnrichedGroups(enriched);
+  };
+
+  loadGroupsWithMembers();
+}, [user?.uid, initializeFirebaseSync,groups]);
+
 
   // Show landing page if no user or user wants to see it
   useEffect(() => {
@@ -292,7 +316,7 @@ const Index = () => {
                     New Group
                   </Button>
                 </div>
-                <GroupList groups={groups} onGroupClick={setSelectedGroup} />
+                <GroupList groups={enrichedGroups} onGroupClick={setSelectedGroup} />
               </motion.div>
             </TabsContent>
 
