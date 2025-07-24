@@ -82,19 +82,19 @@ export const GroupDetailView: React.FC<GroupDetailViewProps> = ({ group, onBack 
     <div className="min-h-screen bg-gray-50/50">
       {/* Mobile Header */}
       {isMobile && (
-        <div className="sticky top-0 z-20 bg-white/90 backdrop-blur-sm border-b px-4 py-3">
+        <div className="sticky top-0 z-20 bg-background/95 backdrop-blur-sm border-b border-border px-4 py-3">
           <div className="flex items-center justify-between">
-            <Button variant="ghost" size="sm" onClick={onBack}>
-              <ArrowLeft className="w-4 h-4 mr-2" />
-              Back
+            <Button variant="ghost" size="sm" onClick={onBack} className="h-8 px-2">
+              <ArrowLeft className="w-4 h-4 mr-1" />
+              <span className="text-sm">Back</span>
             </Button>
             <Button
               size="sm"
               onClick={() => setShowExpenseForm(true)}
-              className="bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 text-white"
+              className="h-8 px-3 bg-primary hover:bg-primary/90 text-primary-foreground"
             >
               <Plus className="w-4 h-4 mr-1" />
-              Add
+              <span className="text-sm">Add</span>
             </Button>
           </div>
         </div>
@@ -175,32 +175,32 @@ export const GroupDetailView: React.FC<GroupDetailViewProps> = ({ group, onBack 
 
       {/* Mobile Group Info */}
       {isMobile && (
-        <div className="px-3 py-3 bg-white border-b">
+        <div className="px-4 py-4 bg-background border-b border-border">
           <div className="flex items-center space-x-3 mb-3">
             {group.photo ? (
-              <Avatar className="w-12 h-12 flex-shrink-0">
+              <Avatar className="w-10 h-10 flex-shrink-0">
                 <AvatarImage src={group.photo} />
-                <AvatarFallback>{group.name.charAt(0)}</AvatarFallback>
+                <AvatarFallback className="text-sm font-medium">{group.name.charAt(0)}</AvatarFallback>
               </Avatar>
             ) : (
-              <div className="w-12 h-12 bg-gradient-to-r from-blue-500 to-purple-600 rounded-full flex items-center justify-center flex-shrink-0">
-                <span className="text-white font-bold text-sm">{group.name.charAt(0)}</span>
+              <div className="w-10 h-10 bg-primary rounded-full flex items-center justify-center flex-shrink-0">
+                <span className="text-primary-foreground font-bold text-sm">{group.name.charAt(0)}</span>
               </div>
             )}
             <div className="flex-1 min-w-0">
-              <h1 className="text-lg font-bold truncate">{group.name}</h1>
+              <h1 className="text-base font-bold truncate text-foreground">{group.name}</h1>
               {group.description && (
-                <p className="text-sm text-gray-600 truncate">{group.description}</p>
+                <p className="text-sm text-muted-foreground truncate">{group.description}</p>
               )}
             </div>
           </div>
           
           <div className="flex items-center gap-2 flex-wrap">
-            <Badge variant={group.groupType === 'private' ? 'secondary' : 'outline'} className="text-xs px-2 py-1">
+            <Badge variant={group.groupType === 'private' ? 'secondary' : 'outline'} className="text-xs px-2 py-0.5 h-5">
               {group.groupType}
             </Badge>
-            {group.tags?.slice(0, 3).map(tag => (
-              <Badge key={tag} variant="outline" className="text-xs px-2 py-1">
+            {group.tags?.slice(0, 2).map(tag => (
+              <Badge key={tag} variant="outline" className="text-xs px-2 py-0.5 h-5">
                 {tag}
               </Badge>
             ))}
@@ -209,41 +209,41 @@ export const GroupDetailView: React.FC<GroupDetailViewProps> = ({ group, onBack 
       )}
 
       {/* Stats Cards */}
-      <div className={`${isMobile ? 'px-3 py-3' : 'py-6'}`}>
+      <div className={`${isMobile ? 'px-4 py-3' : 'py-6'}`}>
         <div className={`grid ${isMobile ? 'grid-cols-2 gap-3' : 'grid-cols-1 md:grid-cols-4 gap-4'}`}>
-          <Card className={isMobile ? 'shadow-sm' : ''}>
+          <Card className={`${isMobile ? 'shadow-sm border-border' : ''}`}>
             <CardContent className={`${isMobile ? 'p-3' : 'p-4'} text-center`}>
-              <div className={`${isMobile ? 'text-base' : 'text-2xl'} font-bold text-green-600 truncate`}>
+              <div className={`${isMobile ? 'text-sm font-semibold' : 'text-2xl font-bold'} text-green-600 truncate`}>
                 ${totalExpenses.toFixed(2)}
               </div>
-              <p className={`${isMobile ? 'text-xs' : 'text-sm'} text-gray-600 mt-1`}>Total Spent</p>
+              <p className={`${isMobile ? 'text-xs mt-0.5' : 'text-sm mt-1'} text-muted-foreground`}>Total Spent</p>
             </CardContent>
           </Card>
           
-          <Card className={isMobile ? 'shadow-sm' : ''}>
+          <Card className={`${isMobile ? 'shadow-sm border-border' : ''}`}>
             <CardContent className={`${isMobile ? 'p-3' : 'p-4'} text-center`}>
-              <div className={`${isMobile ? 'text-base' : 'text-2xl'} font-bold text-blue-600`}>
+              <div className={`${isMobile ? 'text-sm font-semibold' : 'text-2xl font-bold'} text-blue-600`}>
                 {groupExpenses.length}
               </div>
-              <p className={`${isMobile ? 'text-xs' : 'text-sm'} text-gray-600 mt-1`}>Expenses</p>
+              <p className={`${isMobile ? 'text-xs mt-0.5' : 'text-sm mt-1'} text-muted-foreground`}>Expenses</p>
             </CardContent>
           </Card>
           
-          <Card className={isMobile ? 'shadow-sm' : ''}>
+          <Card className={`${isMobile ? 'shadow-sm border-border' : ''}`}>
             <CardContent className={`${isMobile ? 'p-3' : 'p-4'} text-center`}>
-              <div className={`${isMobile ? 'text-base' : 'text-2xl'} font-bold text-purple-600`}>
+              <div className={`${isMobile ? 'text-sm font-semibold' : 'text-2xl font-bold'} text-purple-600`}>
                 {group.members.length}
               </div>
-              <p className={`${isMobile ? 'text-xs' : 'text-sm'} text-gray-600 mt-1`}>Members</p>
+              <p className={`${isMobile ? 'text-xs mt-0.5' : 'text-sm mt-1'} text-muted-foreground`}>Members</p>
             </CardContent>
           </Card>
           
-          <Card className={isMobile ? 'shadow-sm' : ''}>
+          <Card className={`${isMobile ? 'shadow-sm border-border' : ''}`}>
             <CardContent className={`${isMobile ? 'p-3' : 'p-4'} text-center`}>
-              <div className={`${isMobile ? 'text-base' : 'text-2xl'} font-bold text-orange-600`}>
+              <div className={`${isMobile ? 'text-sm font-semibold' : 'text-2xl font-bold'} text-orange-600`}>
                 {balances.length}
               </div>
-              <p className={`${isMobile ? 'text-xs' : 'text-sm'} text-gray-600 mt-1`}>Balances</p>
+              <p className={`${isMobile ? 'text-xs mt-0.5' : 'text-sm mt-1'} text-muted-foreground`}>Balances</p>
             </CardContent>
           </Card>
         </div>
@@ -281,7 +281,7 @@ export const GroupDetailView: React.FC<GroupDetailViewProps> = ({ group, onBack 
       )}
 
       {/* Tab Content */}
-      <div className={`${isMobile ? 'px-3 py-3' : 'p-6'} ${isMobile ? 'space-y-4' : 'space-y-6'}`}>
+      <div className={`${isMobile ? 'px-4 py-3 pb-20' : 'p-6'} ${isMobile ? 'space-y-4' : 'space-y-6'}`}>
         <AnimatePresence mode="wait">
           <motion.div
             key={activeTab}
@@ -292,22 +292,22 @@ export const GroupDetailView: React.FC<GroupDetailViewProps> = ({ group, onBack 
           >
             {activeTab === 'overview' && (
               <div className={`grid ${isMobile ? 'grid-cols-1 gap-4' : 'grid-cols-1 lg:grid-cols-2 gap-6'}`}>
-                <Card className={isMobile ? 'shadow-sm' : ''}>
-                  <CardHeader className={isMobile ? 'pb-3' : ''}>
+                <Card className={`${isMobile ? 'shadow-sm border-border' : ''}`}>
+                  <CardHeader className={`${isMobile ? 'pb-2 px-4 pt-4' : ''}`}>
                     <CardTitle className="flex items-center justify-between">
-                      <span className={`${isMobile ? 'text-base' : 'text-xl'} font-semibold`}>Recent Members</span>
+                      <span className={`${isMobile ? 'text-sm' : 'text-xl'} font-semibold`}>Recent Members</span>
                       <Button 
                         size="sm"
                         variant="outline"
                         onClick={() => setActiveTab('members')}
-                        className={isMobile ? 'text-xs px-2 py-1 h-7' : ''}
+                        className={`${isMobile ? 'text-xs px-2 py-1 h-6' : ''}`}
                       >
                         View All
                       </Button>
                     </CardTitle>
                   </CardHeader>
-                  <CardContent className={isMobile ? 'pt-0' : ''}>
-                    <div className={`${isMobile ? 'space-y-2' : 'space-y-3'}`}>
+                  <CardContent className={`${isMobile ? 'pt-0 px-4 pb-4' : ''}`}>
+                    <div className={`${isMobile ? 'space-y-3' : 'space-y-3'}`}>
                       {group.members.slice(0, isMobile ? 3 : 5).map(member => (
                         <div key={member.id} className="flex items-center justify-between">
                           <div className="flex items-center space-x-3 flex-1 min-w-0">
@@ -315,16 +315,16 @@ export const GroupDetailView: React.FC<GroupDetailViewProps> = ({ group, onBack 
                               {member.photoURL ? (
                                 <AvatarImage src={member.photoURL} alt={member.name} />
                               ) : null}
-                              <AvatarFallback className="text-xs bg-primary/10 text-primary">
+                              <AvatarFallback className="text-xs bg-primary/10 text-primary font-medium">
                                 {member.name.charAt(0).toUpperCase()}
                               </AvatarFallback>
                             </Avatar>
                             <div className="min-w-0 flex-1">
-                              <div className={`${isMobile ? 'text-sm' : 'text-sm'} font-medium truncate`}>{member.name}</div>
-                              <div className={`${isMobile ? 'text-xs' : 'text-xs'} text-gray-500 truncate`}>{member.email}</div>
+                              <div className={`${isMobile ? 'text-sm' : 'text-sm'} font-medium truncate text-foreground`}>{member.name}</div>
+                              <div className={`${isMobile ? 'text-xs' : 'text-xs'} text-muted-foreground truncate`}>{member.email}</div>
                             </div>
                           </div>
-                          <div className="flex items-center space-x-2 flex-shrink-0">
+                          <div className="flex items-center space-x-1 flex-shrink-0">
                             {getRoleIcon(member.role)}
                             {!isMobile && getRoleBadge(member.role)}
                           </div>
@@ -334,26 +334,24 @@ export const GroupDetailView: React.FC<GroupDetailViewProps> = ({ group, onBack 
                   </CardContent>
                 </Card>
 
-                <Card className={isMobile ? 'shadow-sm' : ''}>
-                  <CardHeader className={isMobile ? 'pb-3' : ''}>
-                    <CardTitle className={`${isMobile ? 'text-base' : 'text-xl'} font-semibold`}>Quick Actions</CardTitle>
+                <Card className={`${isMobile ? 'shadow-sm border-border' : ''}`}>
+                  <CardHeader className={`${isMobile ? 'pb-2 px-4 pt-4' : ''}`}>
+                    <CardTitle className={`${isMobile ? 'text-sm' : 'text-xl'} font-semibold`}>Quick Actions</CardTitle>
                   </CardHeader>
-                  <CardContent className={isMobile ? 'pt-0' : ''}>
+                  <CardContent className={`${isMobile ? 'pt-0 px-4 pb-4' : ''}`}>
                     <div className={`${isMobile ? 'space-y-2' : 'space-y-3'}`}>
                       <Button 
                         variant="outline" 
-                        className="w-full justify-start text-left"
+                        className={`w-full justify-start text-left ${isMobile ? 'h-9 text-sm' : ''}`}
                         onClick={() => setShowRecurring(true)}
-                        size={isMobile ? "sm" : "default"}
                       >
                         <Plus className="w-4 h-4 mr-2 flex-shrink-0" />
                         <span className="truncate">Add Recurring Expense</span>
                       </Button>
                       <Button 
                         variant="outline" 
-                        className="w-full justify-start text-left"
+                        className={`w-full justify-start text-left ${isMobile ? 'h-9 text-sm' : ''}`}
                         onClick={() => setShowInvite(true)}
-                        size={isMobile ? "sm" : "default"}
                       >
                         <Users className="w-4 h-4 mr-2 flex-shrink-0" />
                         <span className="truncate">Invite Members</span>
@@ -361,9 +359,8 @@ export const GroupDetailView: React.FC<GroupDetailViewProps> = ({ group, onBack 
                       {isUserAdmin && (
                         <Button 
                           variant="outline" 
-                          className="w-full justify-start text-left text-red-600 hover:text-red-700"
+                          className={`w-full justify-start text-left text-destructive hover:text-destructive-foreground hover:bg-destructive/10 ${isMobile ? 'h-9 text-sm' : ''}`}
                           onClick={() => archiveGroup(group.id)}
-                          size={isMobile ? "sm" : "default"}
                         >
                           <Archive className="w-4 h-4 mr-2 flex-shrink-0" />
                           <span className="truncate">Archive Group</span>
