@@ -13,6 +13,7 @@ import {
   addMemberToGroup as addMemberToGroupFirebase,
   removeMemberFromGroup as removeMemberFromGroupFirebase,
 } from '@/services/firebaseService';
+import { notificationService } from '@/services/notificationService';
 
 export interface Member {
   id: string;
@@ -271,6 +272,23 @@ export const useExpenseStore = create<ExpenseStore>()(
             console.log('Adding expense:', expense);
             await createExpenseFirebase(expense, userId);
             console.log('Expense added successfully to Firebase');
+            
+            // Add notification for new expense
+            const groups = get().groups;
+            const group = groups.find(g => g.id === expense.groupId);
+            const currentUser = groups.flatMap(g => g.members).find(m => m.id === userId);
+            
+            if (group && currentUser) {
+              notificationService.notifyExpenseAdded(
+                expense.description,
+                expense.amount,
+                group.settings?.currency || '$',
+                currentUser.name,
+                group.name,
+                group.id
+              );
+            }
+            
             set({ loading: false });
             // Real-time listener will update the state
           } catch (error) {
@@ -417,6 +435,20 @@ export const useExpenseStore = create<ExpenseStore>()(
             const expense = get().expenses.find(e => e.id === id);
             if (expense) {
               await updateExpenseFirebase(expense.groupId, id, updatedExpense);
+              
+              // Add notification for expense edit
+              const groups = get().groups;
+              const group = groups.find(g => g.id === expense.groupId);
+              
+              if (group) {
+                notificationService.notifyExpenseEdited(
+                  expense.description,
+                  expense.paidBy.name,
+                  group.name,
+                  group.id
+                );
+              }
+              
               set({ loading: false });
               // Firebase listener will update the state
               
@@ -439,10 +471,21 @@ export const useExpenseStore = create<ExpenseStore>()(
             const expense = get().expenses.find(e => e.id === id);
             
             await deleteExpenseFirebase(groupId, id);
-            set({ loading: false });
-            // Firebase listener will update the state
             
+            // Add notification for expense deletion
             if (expense) {
+              const groups = get().groups;
+              const group = groups.find(g => g.id === expense.groupId);
+              
+              if (group) {
+                notificationService.notifyExpenseDeleted(
+                  expense.description,
+                  expense.paidBy.name,
+                  group.name,
+                  group.id
+                );
+              }
+              
               get().addActivity({
                 type: 'expense_deleted',
                 userId: expense.paidBy.id,

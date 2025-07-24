@@ -16,6 +16,7 @@ import { UserProfile } from "@/components/UserProfile";
 import { LandingPage } from "@/components/LandingPage";
 import { AuthPage } from "./AuthPage";
 import { MobileNavbar } from "@/components/MobileNavbar";
+import { NotificationBell } from "@/components/NotificationBell";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { motion, AnimatePresence } from "framer-motion";
 
@@ -132,6 +133,7 @@ const Index = () => {
               </p>
             </div>
             <div className="flex flex-wrap gap-2 justify-center sm:justify-end">
+              <NotificationBell />
               <Button
                 onClick={() => setShowUserProfile(true)}
                 variant="outline"
