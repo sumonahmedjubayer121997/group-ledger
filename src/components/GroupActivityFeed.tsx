@@ -1,10 +1,13 @@
 import React from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Avatar, AvatarFallback } from '@/components/ui/avatar';
+import { Avatar, AvatarFallback,AvatarImage } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
 import { useExpenseStore, Group } from '@/stores/expenseStore';
 import { Activity, DollarSign, Users, Trash, Edit, UserPlus, UserMinus } from 'lucide-react';
 import { format } from 'date-fns';
+import { useEffect, useState } from 'react';
+import { fetchGroupMembersWithPhotos } from '@/components/firebaseComponents/FetchGroupMembersWithPhotos'; // adjust path
+
 
 interface GroupActivityFeedProps {
   group: Group;
@@ -13,6 +16,36 @@ interface GroupActivityFeedProps {
 export const GroupActivityFeed: React.FC<GroupActivityFeedProps> = ({ group }) => {
   const { getGroupActivities } = useExpenseStore();
   const activities = getGroupActivities(group.id);
+  const [enrichedActivities, setEnrichedActivities] = useState<any[]>([]);
+
+  useEffect(() => {
+  const enrichActivities = async () => {
+    const members = await fetchGroupMembersWithPhotos(group.id);
+
+    const enriched = activities.map((activity) => {
+      const matchedMember = members.find((m) => m.userId === activity.userId);
+      return {
+        ...activity,
+        photoURL: matchedMember?.photoURL || null,
+        userName: matchedMember?.name || activity.userName || 'Unknown',
+      };
+    });
+
+    setEnrichedActivities(enriched);
+  };
+
+  enrichActivities();
+}, [group.id, activities]);
+
+
+ const getInitials = (name: string) => {
+    return name
+      .split(' ')
+      .map(n => n[0])
+      .join('')
+      .toUpperCase();
+  };
+
 
   const getActivityIcon = (type: string) => {
     switch (type) {
@@ -86,7 +119,7 @@ export const GroupActivityFeed: React.FC<GroupActivityFeedProps> = ({ group }) =
       </CardHeader>
       <CardContent>
         <div className="space-y-4 max-h-96 overflow-y-auto">
-          {activities.map((activity) => (
+          {enrichedActivities.map((activity) => (
             <div
               key={activity.id}
               className={`p-4 rounded-lg border-l-4 ${getActivityColor(activity.type)}`}
@@ -100,11 +133,12 @@ export const GroupActivityFeed: React.FC<GroupActivityFeedProps> = ({ group }) =
                 
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center space-x-2">
-                    <Avatar className="w-6 h-6">
-                      <AvatarFallback className="text-xs">
-                        {activity.userName.charAt(0)}
-                      </AvatarFallback>
-                    </Avatar>
+                   <Avatar className="h-16 w-16 sm:h-20 sm:w-20">
+                <AvatarImage src={activity.photoURL || undefined} />
+                <AvatarFallback className="text-sm sm:text-lg font-semibold">
+                  {getInitials(activity.displayName || 'User')}
+                </AvatarFallback>
+              </Avatar>
                     <span className="font-medium text-sm">{activity.userName}</span>
                     <Badge variant="outline" className="text-xs capitalize">
                       {activity.type.replace('_', ' ')}
