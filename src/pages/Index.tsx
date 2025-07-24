@@ -218,25 +218,30 @@ const Index = () => {
         {/* Debug info - Hidden on mobile */}
         {!isMobile && (
           <div className="mb-4 text-sm text-gray-600">
-            Groups: {groups.length} | Expenses: {expenses.length} | User: {user?.uid}
+            Groups: {groups.length} | Expenses: {expenses.length} | User: {user?.displayName}
           </div>
         )}
 
         {/* Tabs */}
-        <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4 sm:space-y-6">
+        
+     
+          <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4 sm:space-y-6">
+            {!isMobile && (
           <TabsList className="grid w-full grid-cols-4 gap-1 sm:gap-2 p-1">
             {tabItems.map((item) => {
               const Icon = item.icon;
               const isActive = activeTab === item.value;
               
               return (
+               
                 <TabsTrigger 
                   key={item.value}
                   value={item.value} 
                   className="relative flex items-center justify-center space-x-2 px-2 py-2 text-xs sm:text-sm min-h-[48px] sm:min-h-auto whitespace-nowrap min-w-fit"
                 >
+                  
                   <Icon className="h-4 w-4" />
-                  {isActive && isMobile && (
+                  {/* {isActive && isMobile && (
                     <motion.span
                       initial={{ opacity: 0, width: 0 }}
                       animate={{ opacity: 1, width: "auto" }}
@@ -245,7 +250,7 @@ const Index = () => {
                     >
                       {item.label}
                     </motion.span>
-                  )}
+                  )} */}
                   {!isMobile && (
                     <span className="truncate">{item.label}</span>
                   )}
@@ -256,6 +261,7 @@ const Index = () => {
               );
             })}
           </TabsList>
+            )}
 
           <AnimatePresence mode="wait">
             {/* Overview */}
@@ -373,6 +379,7 @@ const Index = () => {
             </TabsContent>
           </AnimatePresence>
         </Tabs>
+      
       </div>
 
       {/* Modals */}
@@ -403,6 +410,51 @@ const Index = () => {
             />
           </motion.div>
         )}
+        {/* Mobile Bottom Tab Bar */}
+
+        
+
+        
+{isMobile && (
+  <div className="fixed bottom-5 left-0 right-0 z-50 bg-gray border-t shadow-md p-2 sm:p-2 rounded-t-lg mx-3 sm:mx-4">
+    <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+    <TabsList className="grid grid-cols-4 text-center text-gray-700 p-0">
+       {tabItems.map((item) => {
+              const Icon = item.icon;
+              const isActive = activeTab === item.value;
+              
+              return (
+                <TabsTrigger 
+                  key={item.value}
+                  value={item.value} 
+            className={`flex flex-col items-center justify-center px-2 py-1 text-xs ${
+              isActive ? "text-blue-600 font-medium" : "text-gray-500"
+            }`}
+          >
+             <Icon className="h-4 w-4" />
+                  {isActive && isMobile && (
+                    <motion.span
+                      initial={{ opacity: 0, width: 0 }}
+                      animate={{ opacity: 1, width: "auto" }}
+                      exit={{ opacity: 0, width: 0 }}
+                      className="text-xs font-medium"
+                    >
+                      {item.label}
+                    </motion.span>
+                  )}
+                  {!isActive && isMobile && (
+                    <span className="sr-only">{item.label}</span>
+                  )}
+            
+          </TabsTrigger>
+        
+        );
+      })}
+    </TabsList>
+    </Tabs>
+  </div>
+)}
+
       </AnimatePresence>
     </div>
   );
