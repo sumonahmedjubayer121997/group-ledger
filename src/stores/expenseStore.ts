@@ -171,6 +171,7 @@ export const useExpenseStore = create<ExpenseStore>()(
           console.log('🔄 initializeFirebaseSync called with userId:', userId);
           console.log('📊 Current state - isInitialized:', isInitialized, 'currentUserId:', currentUserId);
           console.log('🔍 User details for debugging:', userId);
+         
           
           // Force cleanup if switching users
           if (currentUserId && currentUserId !== userId) {
