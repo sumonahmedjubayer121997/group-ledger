@@ -30,6 +30,7 @@ import { GroupInviteDialog } from './GroupInviteDialog';
 import { ExpenseForm } from './ExpenseForm';
 import { RecurringExpenseDialog } from './RecurringExpenseDialog';
 import { GroupDetailMobileNav } from './GroupDetailMobileNav';
+import { GroupExpensesList } from './GroupExpensesList';
 import { fetchGroupMembersWithPhotos } from '@/components/firebaseComponents/FetchGroupMembersWithPhotos';
 
 interface GroupDetailViewProps {
@@ -76,7 +77,7 @@ export const GroupDetailView: React.FC<GroupDetailViewProps> = ({ group, onBack 
     }
   }, []);
 
-  const { getGroupExpenses, getBalances, archiveGroup } = useExpenseStore();
+  const { getGroupExpenses, getBalances, archiveGroup, expenses } = useExpenseStore();
   const isMobile = useIsMobile();
   
   const groupExpenses = getGroupExpenses(group.id);
@@ -319,90 +320,99 @@ export const GroupDetailView: React.FC<GroupDetailViewProps> = ({ group, onBack 
             transition={{ duration: 0.2 }}
           >
             {activeTab === 'overview' && (
-              <div className={`grid ${isMobile ? 'grid-cols-1' : 'grid-cols-1 lg:grid-cols-2'} gap-6`}>
-                <Card>
-                  <CardHeader>
-                    <CardTitle className="flex items-center justify-between">
-                      <span className={isMobile ? 'text-lg' : 'text-xl'}>Recent Members</span>
-                      <Button 
-                        size="sm" 
-                        variant="outline"
-                        onClick={() => setActiveTab('members')}
-                      >
-                        View All
-                      </Button>
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="space-y-3">
-                      {group.members.slice(0, isMobile ? 3 : 5).map(member => (
-                        <div key={member.id} className="flex items-center justify-between">
-                          <div className="flex items-center space-x-3">
-                           <Avatar
-                                                 key={member.id}
-                                                 className="w-6 h-6 sm:w-8 sm:h-8 border-2 border-white"
-                                               >
-                                                 {member.photoURL ? (
-                                                   <AvatarImage src={member.photoURL} alt={member.name} />
-                                                 ) : null}
-                                                 <AvatarFallback className="text-xs bg-primary/10 text-primary">
-                                                   {member.name.charAt(0).toUpperCase()}
-                                                 </AvatarFallback>
-                                               </Avatar>
-                            <div>
-                              <div className="font-medium text-sm">{member.name}</div>
-                              <div className="text-xs text-gray-500">{member.email}</div>
+              <div className="space-y-6">
+                {/* Recent Expenses */}
+                <GroupExpensesList
+                  group={group}
+                  expenses={expenses}
+                  maxExpenses={5}
+                />
+                
+                {/* Members and Quick Actions */}
+                <div className={`grid ${isMobile ? 'grid-cols-1' : 'grid-cols-1 lg:grid-cols-2'} gap-6`}>
+                  <Card>
+                    <CardHeader>
+                      <CardTitle className="flex items-center justify-between">
+                        <span className={isMobile ? 'text-lg' : 'text-xl'}>Recent Members</span>
+                        <Button 
+                          size="sm" 
+                          variant="outline"
+                          onClick={() => setActiveTab('members')}
+                        >
+                          View All
+                        </Button>
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="space-y-3">
+                        {group.members.slice(0, isMobile ? 3 : 5).map(member => (
+                          <div key={member.id} className="flex items-center justify-between">
+                            <div className="flex items-center space-x-3">
+                             <Avatar
+                                                   key={member.id}
+                                                   className="w-6 h-6 sm:w-8 sm:h-8 border-2 border-white"
+                                                 >
+                                                   {member.photoURL ? (
+                                                     <AvatarImage src={member.photoURL} alt={member.name} />
+                                                   ) : null}
+                                                   <AvatarFallback className="text-xs bg-primary/10 text-primary">
+                                                     {member.name.charAt(0).toUpperCase()}
+                                                   </AvatarFallback>
+                                                 </Avatar>
+                              <div>
+                                <div className="font-medium text-sm">{member.name}</div>
+                                <div className="text-xs text-gray-500">{member.email}</div>
+                              </div>
+                            </div>
+                            <div className="flex items-center space-x-2">
+                              {getRoleIcon(member.role)}
+                              {!isMobile && getRoleBadge(member.role)}
                             </div>
                           </div>
-                          <div className="flex items-center space-x-2">
-                            {getRoleIcon(member.role)}
-                            {!isMobile && getRoleBadge(member.role)}
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  </CardContent>
-                </Card>
+                        ))}
+                      </div>
+                    </CardContent>
+                  </Card>
 
-                <Card>
-                  <CardHeader>
-                    <CardTitle className={isMobile ? 'text-lg' : 'text-xl'}>Quick Actions</CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="space-y-3">
-                      <Button 
-                        variant="outline" 
-                        className="w-full justify-start"
-                        onClick={() => setShowRecurring(true)}
-                        size={isMobile ? "sm" : "default"}
-                      >
-                        <Plus className="w-4 h-4 mr-2" />
-                        Add Recurring Expense
-                      </Button>
-                      <Button 
-                        variant="outline" 
-                        className="w-full justify-start"
-                        onClick={() => setShowInvite(true)}
-                        size={isMobile ? "sm" : "default"}
-                      >
-                        <Users className="w-4 h-4 mr-2" />
-                        Invite Members
-                      </Button>
-                      {isUserAdmin && (
+                  <Card>
+                    <CardHeader>
+                      <CardTitle className={isMobile ? 'text-lg' : 'text-xl'}>Quick Actions</CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="space-y-3">
                         <Button 
                           variant="outline" 
-                          className="w-full justify-start text-red-600 hover:text-red-700"
-                          onClick={() => archiveGroup(group.id)}
-
+                          className="w-full justify-start"
+                          onClick={() => setShowRecurring(true)}
                           size={isMobile ? "sm" : "default"}
                         >
-                          <Archive className="w-4 h-4 mr-2" />
-                          Archive Group
+                          <Plus className="w-4 h-4 mr-2" />
+                          Add Recurring Expense
                         </Button>
-                      )}
-                    </div>
-                  </CardContent>
-                </Card>
+                        <Button 
+                          variant="outline" 
+                          className="w-full justify-start"
+                          onClick={() => setShowInvite(true)}
+                          size={isMobile ? "sm" : "default"}
+                        >
+                          <Users className="w-4 h-4 mr-2" />
+                          Invite Members
+                        </Button>
+                        {isUserAdmin && (
+                          <Button 
+                            variant="outline" 
+                            className="w-full justify-start text-red-600 hover:text-red-700"
+                            onClick={() => archiveGroup(group.id)}
+                            size={isMobile ? "sm" : "default"}
+                          >
+                            <Archive className="w-4 h-4 mr-2" />
+                            Archive Group
+                          </Button>
+                        )}
+                      </div>
+                    </CardContent>
+                  </Card>
+                </div>
               </div>
             )}
 
