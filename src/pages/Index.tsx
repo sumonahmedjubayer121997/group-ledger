@@ -12,6 +12,7 @@ import { ExpenseForm } from "@/components/ExpenseForm";
 import { RecentExpenses } from "@/components/RecentExpenses";
 import { BalanceCard } from "@/components/BalanceCard";
 import { ExpenseChart } from "@/components/ExpenseChart";
+import { SpendingTrends } from "@/components/SpendingTrends";
 import { UserProfile } from "@/components/UserProfile";
 import { LandingPage } from "@/components/LandingPage";
 import { AuthPage } from "./AuthPage";
@@ -376,17 +377,7 @@ const Index = () => {
               >
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6">
                   <ExpenseChart expenses={expenses} />
-                  <Card>
-                    <CardHeader>
-                      <CardTitle className="flex items-center gap-2 text-base sm:text-lg">
-                        <TrendingUp className="h-4 w-4 sm:h-5 sm:w-5" />
-                        Spending Trends
-                      </CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                      <p className="text-muted-foreground text-sm">Analytics coming soon...</p>
-                    </CardContent>
-                  </Card>
+                  <SpendingTrends expenses={expenses} />
                 </div>
               </motion.div>
             </TabsContent>

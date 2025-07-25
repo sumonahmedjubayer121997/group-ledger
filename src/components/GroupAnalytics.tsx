@@ -1,9 +1,12 @@
 import React from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';
 import { useExpenseStore, Group } from '@/stores/expenseStore';
-import { BarChart3, PieChart, TrendingUp, DollarSign } from 'lucide-react';
+import { BarChart3, PieChart, TrendingUp, DollarSign, Download } from 'lucide-react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart as RechartsPieChart, Cell, Pie } from 'recharts';
+import jsPDF from 'jspdf';
+import 'jspdf-autotable';
 
 interface GroupAnalyticsProps {
   group: Group;
@@ -60,6 +63,117 @@ export const GroupAnalytics: React.FC<GroupAnalyticsProps> = ({ group }) => {
     return months;
   }, [expenses]);
 
+  const exportGroupAnalyticsToPDF = () => {
+    const doc = new jsPDF();
+    
+    // Header
+    doc.setFontSize(20);
+    doc.text(`${group.name} - Analytics Report`, 20, 20);
+    
+    // Group Info
+    doc.setFontSize(12);
+    doc.text(`Generated on: ${new Date().toLocaleDateString()}`, 20, 35);
+    doc.text(`Group Type: ${group.groupType}`, 20, 45);
+    doc.text(`Total Members: ${group.members.length}`, 20, 55);
+    doc.text(`Group Description: ${group.description}`, 20, 65);
+    
+    // Summary metrics
+    doc.setFontSize(14);
+    doc.text('Summary Metrics', 20, 85);
+    
+    const summaryData = [
+      ['Total Spent', `$${analytics.totalSpent.toFixed(2)}`],
+      ['Average per Person', `$${(analytics.totalSpent / group.members.length).toFixed(2)}`],
+      ['Total Expenses', analytics.expenseCount.toString()],
+      ['Categories Used', Object.keys(analytics.categorySpending).length.toString()]
+    ];
+    
+    (doc as any).autoTable({
+      body: summaryData,
+      startY: 95,
+      styles: { fontSize: 10 },
+      theme: 'grid'
+    });
+    
+    // Member spending breakdown
+    let finalY = (doc as any).lastAutoTable.finalY + 20;
+    doc.setFontSize(14);
+    doc.text('Member Spending Breakdown', 20, finalY);
+    
+    const memberTableData = memberSpendingData.map(member => [
+      member.name,
+      `$${member.amount.toFixed(2)}`,
+      `${member.percentage.toFixed(1)}%`
+    ]);
+    
+    (doc as any).autoTable({
+      head: [['Member Name', 'Amount Spent', 'Percentage']],
+      body: memberTableData,
+      startY: finalY + 10,
+      styles: { fontSize: 10 },
+      headStyles: { fillColor: [59, 130, 246] },
+    });
+    
+    // Category spending breakdown
+    finalY = (doc as any).lastAutoTable.finalY + 20;
+    doc.setFontSize(14);
+    doc.text('Category Spending Breakdown', 20, finalY);
+    
+    const categoryTableData = categorySpendingData.map(category => [
+      category.name,
+      `$${category.amount.toFixed(2)}`,
+      `${category.percentage.toFixed(1)}%`
+    ]);
+    
+    (doc as any).autoTable({
+      head: [['Category', 'Amount', 'Percentage']],
+      body: categoryTableData,
+      startY: finalY + 10,
+      styles: { fontSize: 10 },
+      headStyles: { fillColor: [16, 185, 129] },
+    });
+    
+    // Monthly trend
+    finalY = (doc as any).lastAutoTable.finalY + 20;
+    doc.setFontSize(14);
+    doc.text('Monthly Spending Trend', 20, finalY);
+    
+    const monthlyTableData = monthlyData.map(month => [
+      month.month,
+      `$${month.amount.toFixed(2)}`,
+      month.count.toString()
+    ]);
+    
+    (doc as any).autoTable({
+      head: [['Month', 'Amount', 'Expense Count']],
+      body: monthlyTableData,
+      startY: finalY + 10,
+      styles: { fontSize: 10 },
+      headStyles: { fillColor: [139, 92, 246] },
+    });
+    
+    // Group members list
+    finalY = (doc as any).lastAutoTable.finalY + 20;
+    doc.setFontSize(14);
+    doc.text('Group Members', 20, finalY);
+    
+    const membersTableData = group.members.map(member => [
+      member.name,
+      member.email || 'N/A',
+      member.role || 'Member'
+    ]);
+    
+    (doc as any).autoTable({
+      head: [['Name', 'Email', 'Role']],
+      body: membersTableData,
+      startY: finalY + 10,
+      styles: { fontSize: 10 },
+      headStyles: { fillColor: [245, 158, 11] },
+    });
+    
+    doc.save(`${group.name}-analytics-report.pdf`);
+  };
+
   if (analytics.totalSpent === 0) {
     return (
       <Card>
@@ -82,6 +196,17 @@ export const GroupAnalytics: React.FC<GroupAnalyticsProps> = ({ group }) => {
 
   return (
     <div className="space-y-6">
+      {/* Export Button */}
+      <div className="flex justify-end">
+        <Button
+          onClick={exportGroupAnalyticsToPDF}
+          variant="outline"
+          className="flex items-center gap-2"
+        >
+          <Download className="w-4 h-4" />
+          Export Analytics PDF
+        </Button>
+      </div>
       {/* Summary Cards */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
         <Card>

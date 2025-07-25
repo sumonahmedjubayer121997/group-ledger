@@ -1,9 +1,12 @@
 
 import React from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
 import { PieChart, Pie, Cell, ResponsiveContainer, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend } from 'recharts';
 import { Expense } from '@/stores/expenseStore';
-import { TrendingUp, PieChart as PieChartIcon } from 'lucide-react';
+import { TrendingUp, PieChart as PieChartIcon, Download } from 'lucide-react';
+import jsPDF from 'jspdf';
+import 'jspdf-autotable';
 
 interface ExpenseChartProps {
   expenses: Expense[];
@@ -36,6 +39,82 @@ export const ExpenseChart: React.FC<ExpenseChartProps> = ({ expenses }) => {
     amount,
   }));
 
+  const exportToPDF = () => {
+    const doc = new jsPDF();
+    
+    // Header
+    doc.setFontSize(20);
+    doc.text('Expense Analytics Report', 20, 20);
+    
+    // Date
+    doc.setFontSize(12);
+    doc.text(`Generated on: ${new Date().toLocaleDateString()}`, 20, 30);
+    doc.text(`Total Expenses: ${expenses.length}`, 20, 40);
+    doc.text(`Total Amount: $${expenses.reduce((sum, exp) => sum + exp.amount, 0).toFixed(2)}`, 20, 50);
+    
+    // Category breakdown table
+    doc.setFontSize(14);
+    doc.text('Expense Breakdown by Category', 20, 70);
+    
+    const categoryTableData = Object.entries(categoryData).map(([category, amount]) => [
+      category,
+      `$${amount.toFixed(2)}`,
+      `${((amount / expenses.reduce((sum, exp) => sum + exp.amount, 0)) * 100).toFixed(1)}%`
+    ]);
+    
+    (doc as any).autoTable({
+      head: [['Category', 'Amount', 'Percentage']],
+      body: categoryTableData,
+      startY: 80,
+      styles: { fontSize: 10 },
+      headStyles: { fillColor: [59, 130, 246] },
+    });
+    
+    // Monthly breakdown table
+    let finalY = (doc as any).lastAutoTable.finalY + 20;
+    doc.setFontSize(14);
+    doc.text('Monthly Spending Trend', 20, finalY);
+    
+    const monthlyTableData = Object.entries(monthlyData).map(([month, amount]) => [
+      month,
+      `$${amount.toFixed(2)}`
+    ]);
+    
+    (doc as any).autoTable({
+      head: [['Month', 'Amount']],
+      body: monthlyTableData,
+      startY: finalY + 10,
+      styles: { fontSize: 10 },
+      headStyles: { fillColor: [16, 185, 129] },
+    });
+    
+    // Recent expenses
+    finalY = (doc as any).lastAutoTable.finalY + 20;
+    doc.setFontSize(14);
+    doc.text('Recent Expenses', 20, finalY);
+    
+    const recentExpenses = expenses
+      .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
+      .slice(0, 10)
+      .map(expense => [
+        expense.description,
+        expense.category,
+        `$${expense.amount.toFixed(2)}`,
+        new Date(expense.date).toLocaleDateString(),
+        expense.paidBy.name
+      ]);
+    
+    (doc as any).autoTable({
+      head: [['Description', 'Category', 'Amount', 'Date', 'Paid By']],
+      body: recentExpenses,
+      startY: finalY + 10,
+      styles: { fontSize: 8 },
+      headStyles: { fillColor: [139, 92, 246] },
+    });
+    
+    doc.save('expense-analytics.pdf');
+  };
+
   if (expenses.length === 0) {
     return (
       <Card className="bg-white shadow-lg border-0">
@@ -59,10 +138,21 @@ export const ExpenseChart: React.FC<ExpenseChartProps> = ({ expenses }) => {
   return (
     <Card className="bg-white shadow-lg border-0">
       <CardHeader>
-        <CardTitle className="flex items-center space-x-2">
-          <TrendingUp className="w-5 h-5 text-purple-500" />
-          <span>Expense Analytics</span>
-        </CardTitle>
+        <div className="flex items-center justify-between">
+          <CardTitle className="flex items-center space-x-2">
+            <TrendingUp className="w-5 h-5 text-purple-500" />
+            <span>Expense Analytics</span>
+          </CardTitle>
+          <Button
+            onClick={exportToPDF}
+            variant="outline"
+            size="sm"
+            className="flex items-center gap-2"
+          >
+            <Download className="w-4 h-4" />
+            Export PDF
+          </Button>
+        </div>
       </CardHeader>
       <CardContent>
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
