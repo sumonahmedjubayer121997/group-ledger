@@ -67,20 +67,54 @@ export const GroupAnalytics: React.FC<GroupAnalyticsProps> = ({ group }) => {
     try {
       const doc = new jsPDF();
       
-      // Header
-      doc.setFontSize(20);
-      doc.text(`${group.name} - Analytics Report`, 20, 20);
+      // Cover Page
+      doc.setFontSize(24);
+      doc.setFont("helvetica", "bold");
+      doc.text(`${group.name}`, 105, 40, { align: 'center' });
       
-      // Group Info
+      doc.setFontSize(18);
+      doc.setFont("helvetica", "normal");
+      doc.text('Analytics Report', 105, 55, { align: 'center' });
+      
+      // Add a decorative line
+      doc.setLineWidth(1);
+      doc.line(20, 70, 190, 70);
+      
+      // Report details
       doc.setFontSize(12);
-      doc.text(`Generated on: ${new Date().toLocaleDateString()}`, 20, 35);
-      doc.text(`Group Type: ${group.groupType || 'Standard'}`, 20, 45);
-      doc.text(`Total Members: ${group.members.length}`, 20, 55);
-      doc.text(`Group Description: ${group.description || 'No description'}`, 20, 65);
+      doc.setFont("helvetica", "normal");
+      doc.text(`Generated on: ${new Date().toLocaleDateString('en-US', { 
+        weekday: 'long', 
+        year: 'numeric', 
+        month: 'long', 
+        day: 'numeric' 
+      })}`, 105, 85, { align: 'center' });
       
-      // Summary metrics
+      // Group information box
+      doc.setFillColor(240, 248, 255);
+      doc.rect(20, 100, 170, 50, 'F');
+      doc.setDrawColor(59, 130, 246);
+      doc.rect(20, 100, 170, 50, 'S');
+      
       doc.setFontSize(14);
-      doc.text('Summary Metrics', 20, 85);
+      doc.setFont("helvetica", "bold");
+      doc.text('Group Information', 25, 115);
+      
+      doc.setFontSize(10);
+      doc.setFont("helvetica", "normal");
+      doc.text(`Group Type: ${group.groupType || 'Standard'}`, 25, 125);
+      doc.text(`Total Members: ${group.members.length}`, 25, 135);
+      doc.text(`Description: ${group.description || 'No description'}`, 25, 145);
+      
+      // Summary metrics in a styled box
+      doc.setFillColor(248, 250, 252);
+      doc.rect(20, 160, 170, 60, 'F');
+      doc.setDrawColor(100, 116, 139);
+      doc.rect(20, 160, 170, 60, 'S');
+      
+      doc.setFontSize(14);
+      doc.setFont("helvetica", "bold");
+      doc.text('Summary Metrics', 25, 175);
       
       const summaryData = [
         ['Total Spent', `$${analytics.totalSpent.toFixed(2)}`],
@@ -89,19 +123,29 @@ export const GroupAnalytics: React.FC<GroupAnalyticsProps> = ({ group }) => {
         ['Categories Used', Object.keys(analytics.categorySpending).length.toString()]
       ];
       
-      // Use jsPDF autoTable if available, otherwise create simple table
+      doc.setFontSize(10);
+      doc.setFont("helvetica", "normal");
+      let yPos = 185;
+      summaryData.forEach((row, index) => {
+        doc.text(`${row[0]}: ${row[1]}`, 25, yPos + (index * 8));
+      });
+      
+      // New page for detailed analytics
+      doc.addPage();
+      
+      // Page header
+      doc.setFontSize(16);
+      doc.setFont("helvetica", "bold");
+      doc.text('Detailed Analytics', 20, 20);
+      doc.line(20, 25, 190, 25);
+      
+      let currentY = 40;
+      
       if ((doc as any).autoTable) {
-        (doc as any).autoTable({
-          body: summaryData,
-          startY: 95,
-          styles: { fontSize: 10 },
-          theme: 'grid'
-        });
-        
         // Member spending breakdown
-        let finalY = (doc as any).lastAutoTable.finalY + 20;
         doc.setFontSize(14);
-        doc.text('Member Spending Breakdown', 20, finalY);
+        doc.setFont("helvetica", "bold");
+        doc.text('Member Spending Breakdown', 20, currentY);
         
         const memberTableData = memberSpendingData.map(member => [
           member.name,
@@ -110,17 +154,28 @@ export const GroupAnalytics: React.FC<GroupAnalyticsProps> = ({ group }) => {
         ]);
         
         (doc as any).autoTable({
-          head: [['Member Name', 'Amount Spent', 'Percentage']],
+          head: [['Member Name', 'Amount Spent', 'Percentage of Total']],
           body: memberTableData,
-          startY: finalY + 10,
-          styles: { fontSize: 10 },
-          headStyles: { fillColor: [59, 130, 246] },
+          startY: currentY + 5,
+          styles: { 
+            fontSize: 9,
+            cellPadding: 3,
+            halign: 'center'
+          },
+          headStyles: { 
+            fillColor: [59, 130, 246],
+            textColor: 255,
+            fontStyle: 'bold'
+          },
+          alternateRowStyles: { fillColor: [249, 250, 251] },
         });
         
+        currentY = (doc as any).lastAutoTable.finalY + 20;
+        
         // Category spending breakdown
-        finalY = (doc as any).lastAutoTable.finalY + 20;
         doc.setFontSize(14);
-        doc.text('Category Spending Breakdown', 20, finalY);
+        doc.setFont("helvetica", "bold");
+        doc.text('Category Spending Analysis', 20, currentY);
         
         const categoryTableData = categorySpendingData.map(category => [
           category.name,
@@ -129,73 +184,187 @@ export const GroupAnalytics: React.FC<GroupAnalyticsProps> = ({ group }) => {
         ]);
         
         (doc as any).autoTable({
-          head: [['Category', 'Amount', 'Percentage']],
+          head: [['Category', 'Amount', 'Percentage of Total']],
           body: categoryTableData,
-          startY: finalY + 10,
-          styles: { fontSize: 10 },
-          headStyles: { fillColor: [16, 185, 129] },
+          startY: currentY + 5,
+          styles: { 
+            fontSize: 9,
+            cellPadding: 3,
+            halign: 'center'
+          },
+          headStyles: { 
+            fillColor: [16, 185, 129],
+            textColor: 255,
+            fontStyle: 'bold'
+          },
+          alternateRowStyles: { fillColor: [240, 253, 244] },
         });
         
+        currentY = (doc as any).lastAutoTable.finalY + 20;
+        
         // Monthly trend
-        finalY = (doc as any).lastAutoTable.finalY + 20;
         doc.setFontSize(14);
-        doc.text('Monthly Spending Trend', 20, finalY);
+        doc.setFont("helvetica", "bold");
+        doc.text('Monthly Spending Trend', 20, currentY);
         
         const monthlyTableData = monthlyData.map(month => [
           month.month,
           `$${month.amount.toFixed(2)}`,
-          month.count.toString()
+          month.count.toString(),
+          month.count > 0 ? `$${(month.amount / month.count).toFixed(2)}` : '$0.00'
         ]);
         
         (doc as any).autoTable({
-          head: [['Month', 'Amount', 'Expense Count']],
+          head: [['Month', 'Total Amount', 'Expense Count', 'Average per Expense']],
           body: monthlyTableData,
-          startY: finalY + 10,
-          styles: { fontSize: 10 },
-          headStyles: { fillColor: [139, 92, 246] },
+          startY: currentY + 5,
+          styles: { 
+            fontSize: 9,
+            cellPadding: 3,
+            halign: 'center'
+          },
+          headStyles: { 
+            fillColor: [139, 92, 246],
+            textColor: 255,
+            fontStyle: 'bold'
+          },
+          alternateRowStyles: { fillColor: [248, 250, 252] },
         });
         
-        // Group members list
-        finalY = (doc as any).lastAutoTable.finalY + 20;
-        doc.setFontSize(14);
-        doc.text('Group Members', 20, finalY);
+        // New page for all expenses
+        doc.addPage();
+        
+        // All expenses table
+        doc.setFontSize(16);
+        doc.setFont("helvetica", "bold");
+        doc.text('Complete Expense List', 20, 20);
+        doc.line(20, 25, 190, 25);
+        
+        const allExpensesData = expenses
+          .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
+          .map(expense => [
+            expense.description,
+            expense.category,
+            `$${expense.amount.toFixed(2)}`,
+            new Date(expense.date).toLocaleDateString(),
+            expense.paidBy.name,
+            expense.splitType || 'Equal'
+          ]);
+        
+        (doc as any).autoTable({
+          head: [['Description', 'Category', 'Amount', 'Date', 'Paid By', 'Split Type']],
+          body: allExpensesData,
+          startY: 35,
+          styles: { 
+            fontSize: 8,
+            cellPadding: 2,
+            overflow: 'linebreak',
+            columnWidth: 'wrap'
+          },
+          headStyles: { 
+            fillColor: [220, 38, 127],
+            textColor: 255,
+            fontStyle: 'bold',
+            fontSize: 9
+          },
+          alternateRowStyles: { fillColor: [253, 242, 248] },
+          columnStyles: {
+            0: { columnWidth: 40 }, // Description
+            1: { columnWidth: 25 }, // Category
+            2: { columnWidth: 20 }, // Amount
+            3: { columnWidth: 25 }, // Date
+            4: { columnWidth: 25 }, // Paid By
+            5: { columnWidth: 20 }  // Split Type
+          }
+        });
+        
+        // New page for group members
+        doc.addPage();
+        
+        doc.setFontSize(16);
+        doc.setFont("helvetica", "bold");
+        doc.text('Group Members', 20, 20);
+        doc.line(20, 25, 190, 25);
         
         const membersTableData = group.members.map(member => [
           member.name,
           member.email || 'N/A',
-          member.role || 'Member'
+          member.role || 'Member',
+          memberSpendingData.find(m => m.name === member.name)?.amount.toFixed(2) || '0.00'
         ]);
         
         (doc as any).autoTable({
-          head: [['Name', 'Email', 'Role']],
+          head: [['Name', 'Email', 'Role', 'Total Spent']],
           body: membersTableData,
-          startY: finalY + 10,
-          styles: { fontSize: 10 },
-          headStyles: { fillColor: [245, 158, 11] },
-        });
-      } else {
-        // Fallback without autoTable
-        let yPos = 100;
-        doc.setFontSize(10);
-        summaryData.forEach((row, index) => {
-          doc.text(`${row[0]}: ${row[1]}`, 20, yPos + (index * 10));
+          startY: 35,
+          styles: { 
+            fontSize: 10,
+            cellPadding: 4,
+            halign: 'center'
+          },
+          headStyles: { 
+            fillColor: [245, 158, 11],
+            textColor: 255,
+            fontStyle: 'bold'
+          },
+          alternateRowStyles: { fillColor: [255, 251, 235] },
         });
         
-        yPos += 60;
-        doc.setFontSize(14);
-        doc.text('Member Spending:', 20, yPos);
-        yPos += 15;
+        // Chart data summary page
+        doc.addPage();
+        
+        doc.setFontSize(16);
+        doc.setFont("helvetica", "bold");
+        doc.text('Chart Data Summary', 20, 20);
+        doc.line(20, 25, 190, 25);
+        
+        // Add spending insights
+        doc.setFontSize(12);
+        doc.setFont("helvetica", "bold");
+        doc.text('Key Insights:', 20, 40);
+        
         doc.setFontSize(10);
-        memberSpendingData.forEach((member, index) => {
-          doc.text(`${member.name}: $${member.amount.toFixed(2)} (${member.percentage.toFixed(1)}%)`, 20, yPos + (index * 10));
+        doc.setFont("helvetica", "normal");
+        
+        const topSpender = memberSpendingData[0];
+        const topCategory = categorySpendingData[0];
+        const highestMonth = monthlyData.reduce((max, month) => month.amount > max.amount ? month : max, monthlyData[0]);
+        
+        const insights = [
+          `• Highest spender: ${topSpender?.name} with $${topSpender?.amount.toFixed(2)}`,
+          `• Most expensive category: ${topCategory?.name} ($${topCategory?.amount.toFixed(2)})`,
+          `• Peak spending month: ${highestMonth?.month} ($${highestMonth?.amount.toFixed(2)})`,
+          `• Average expense amount: $${(analytics.totalSpent / analytics.expenseCount).toFixed(2)}`,
+          `• Most active month: ${monthlyData.reduce((max, month) => month.count > max.count ? month : max, monthlyData[0])?.month} (${monthlyData.reduce((max, month) => month.count > max.count ? month : max, monthlyData[0])?.count} expenses)`
+        ];
+        
+        let insightY = 50;
+        insights.forEach((insight, index) => {
+          doc.text(insight, 20, insightY + (index * 8));
         });
+        
+      } else {
+        // Fallback without autoTable
+        doc.setFontSize(10);
+        summaryData.forEach((row, index) => {
+          doc.text(`${row[0]}: ${row[1]}`, 20, currentY + (index * 10));
+        });
+      }
+      
+      // Footer on last page
+      const pageCount = doc.getNumberOfPages();
+      for (let i = 1; i <= pageCount; i++) {
+        doc.setPage(i);
+        doc.setFontSize(8);
+        doc.setFont("helvetica", "normal");
+        doc.text(`Generated by Expense Tracker - Page ${i} of ${pageCount}`, 105, 285, { align: 'center' });
       }
       
       // Generate safe filename
       const safeFileName = group.name.replace(/[^a-z0-9]/gi, '_').toLowerCase();
-      doc.save(`${safeFileName}-analytics-report.pdf`);
+      doc.save(`${safeFileName}-complete-analytics-report.pdf`);
       
-      console.log('PDF export completed successfully');
+      console.log('Complete PDF export with all expenses completed successfully');
     } catch (error) {
       console.error('Error exporting PDF:', error);
       alert('Error generating PDF. Please try again.');
