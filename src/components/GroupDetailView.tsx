@@ -67,6 +67,15 @@ export const GroupDetailView: React.FC<GroupDetailViewProps> = ({ group, onBack 
     loadMembers();
   }, [groupId]); // 👈 Watch for groupId changes
 
+  // Check for notification navigation to specific tab
+  useEffect(() => {
+    const openTab = sessionStorage.getItem('openTab');
+    if (openTab === 'chat') {
+      setActiveTab('communication');
+      sessionStorage.removeItem('openTab'); // Clean up
+    }
+  }, []);
+
   const { getGroupExpenses, getBalances, archiveGroup } = useExpenseStore();
   const isMobile = useIsMobile();
   

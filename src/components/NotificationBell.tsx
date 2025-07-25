@@ -9,6 +9,7 @@ import { Separator } from '@/components/ui/separator';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Switch } from '@/components/ui/switch';
 import { useNotificationStore } from '@/stores/notificationStore';
+import { useExpenseStore } from '@/stores/expenseStore';
 import { formatDistanceToNow } from 'date-fns';
 import { toast } from '@/hooks/use-toast';
 import { useAuth } from '@/contexts/AuthContext';
@@ -18,6 +19,7 @@ export const NotificationBell = () => {
   const [isOpen, setIsOpen] = useState(false);
   const navigate = useNavigate();
   const { user } = useAuth();
+  const { groups, setSelectedGroup } = useExpenseStore();
   
   const {
     notifications,
@@ -52,7 +54,31 @@ export const NotificationBell = () => {
     }
     
     if (notification.actionUrl) {
-      navigate(notification.actionUrl);
+      // Parse the URL to handle group navigation
+      const url = new URL(notification.actionUrl, window.location.origin);
+      const pathParts = url.pathname.split('/');
+      
+      if (pathParts[1] === 'groups' && pathParts[2]) {
+        const groupId = pathParts[2];
+        const tabParam = url.searchParams.get('tab');
+        
+        // Find the group and set it as selected
+        const group = groups.find(g => g.id === groupId);
+        if (group) {
+          setSelectedGroup(group);
+          
+          // If there's a tab parameter, we could trigger a custom event or use a callback
+          // For now, the GroupDetailView will need to handle tab switching
+          if (tabParam === 'chat') {
+            // Store the tab to switch to in sessionStorage so GroupDetailView can pick it up
+            sessionStorage.setItem('openTab', 'chat');
+          }
+        }
+      } else {
+        // For other routes, use normal navigation
+        navigate(notification.actionUrl);
+      }
+      
       setIsOpen(false); // Close the popover after navigation
     }
   };
