@@ -512,9 +512,14 @@ export const createExpense = async (expenseData: Omit<Expense, 'id'>, userId: st
 
 export const updateExpense = async (groupId: string, expenseId: string, updates: Partial<Expense>) => {
   try {
+    // Clean the updates object to remove undefined values
+    const cleanUpdates = Object.fromEntries(
+      Object.entries(updates).filter(([_, value]) => value !== undefined)
+    );
+    
     const expenseRef = doc(db, 'groups', groupId, 'expenses', expenseId);
     await updateDoc(expenseRef, {
-      ...updates,
+      ...cleanUpdates,
       updatedAt: serverTimestamp(),
     });
   } catch (error) {
