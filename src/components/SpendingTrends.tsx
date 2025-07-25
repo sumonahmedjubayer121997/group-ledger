@@ -225,3 +225,5 @@ export const SpendingTrends: React.FC<SpendingTrendsProps> = ({ expenses }) => {
     </Card>
   );
 };
+
+export default SpendingTrends;

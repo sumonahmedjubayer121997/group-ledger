@@ -12,7 +12,7 @@ import { ExpenseForm } from "@/components/ExpenseForm";
 import { RecentExpenses } from "@/components/RecentExpenses";
 import { BalanceCard } from "@/components/BalanceCard";
 import { ExpenseChart } from "@/components/ExpenseChart";
-import { SpendingTrends } from "@/components/SpendingTrends";
+import SpendingTrends from "@/components/SpendingTrends";
 import { UserProfile } from "@/components/UserProfile";
 import { LandingPage } from "@/components/LandingPage";
 import { AuthPage } from "./AuthPage";
