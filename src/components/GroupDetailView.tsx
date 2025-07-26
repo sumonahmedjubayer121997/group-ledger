@@ -5,6 +5,7 @@ import { Badge } from '@/components/ui/badge';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { useExpenseStore, Group } from '@/stores/expenseStore';
 import { useIsMobile } from '@/hooks/use-mobile';
+import { useAuth } from '@/contexts/AuthContext';
 import { motion, AnimatePresence } from 'framer-motion';
 import { GroupCommunicationHub } from './GroupCommunicationHub';
 import { fetchGroupById } from '@/services/firebaseService';
@@ -85,6 +86,7 @@ export const GroupDetailView: React.FC<GroupDetailViewProps> = ({ group: initial
 
   const { getGroupExpenses, getBalances, archiveGroup, expenses } = useExpenseStore();
   const isMobile = useIsMobile();
+  const { user } = useAuth();
 
   const groupExpenses = getGroupExpenses(group.id);
   const balances = getBalances().filter(balance =>
@@ -92,7 +94,7 @@ export const GroupDetailView: React.FC<GroupDetailViewProps> = ({ group: initial
   );
 
   const totalExpenses = groupExpenses.reduce((sum, expense) => sum + expense.amount, 0);
-  const isUserAdmin = group.members.some(m => m.role === 'admin');
+  const isUserAdmin = user && group.members.some(m => m.email === user.email && m.role === 'admin');
 
   const getRoleIcon = (role?: string) => {
     switch (role) {
