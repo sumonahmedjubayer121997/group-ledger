@@ -36,7 +36,7 @@ const COLORS = [
 ];
 
 // Helper: Format currency
-const formatCurrency = (amount: number) => `$${amount.toFixed(2)}`;
+const formatCurrency = (amount: number) => `${amount.toFixed(2)}`;
 
 // Helper: Add PDF footer to all pages
 function addPDFFooter(doc: jsPDF, groupName: string) {
@@ -174,7 +174,7 @@ export const GroupAnalytics: React.FC<GroupAnalyticsProps> = ({ group }) => {
               <DollarSign className="w-5 h-5 text-green-500" />
               <div>
                 <div className="text-2xl font-bold text-green-600">
-                  {formatCurrency(analytics.totalSpent)}
+                 {group.settings.currency}{formatCurrency(analytics.totalSpent)}
                 </div>
                 <p className="text-sm text-gray-600">Total Spent</p>
               </div>
@@ -188,7 +188,7 @@ export const GroupAnalytics: React.FC<GroupAnalyticsProps> = ({ group }) => {
               <BarChart3 className="w-5 h-5 text-blue-500" />
               <div>
                 <div className="text-2xl font-bold text-blue-600">
-                  {formatCurrency(
+                  {group.settings.currency}{formatCurrency(
                     analytics.totalSpent / group.members.length
                   )}
                 </div>
@@ -240,7 +240,7 @@ export const GroupAnalytics: React.FC<GroupAnalyticsProps> = ({ group }) => {
                   <div className="flex justify-between text-sm">
                     <span className="font-medium">{member.name}</span>
                     <span className="text-gray-600">
-                      {formatCurrency(member.amount)} ({member.percentage.toFixed(1)}%)
+                      {group.settings.currency}{formatCurrency(member.amount)} ({member.percentage.toFixed(1)}%)
                     </span>
                   </div>
                   <Progress value={member.percentage} className="h-2" />
@@ -262,7 +262,7 @@ export const GroupAnalytics: React.FC<GroupAnalyticsProps> = ({ group }) => {
                   <div className="flex justify-between text-sm">
                     <span className="font-medium">{category.name}</span>
                     <span className="text-gray-600">
-                      {formatCurrency(category.amount)} ({category.percentage.toFixed(1)}%)
+                      {group.settings.currency}{formatCurrency(category.amount)} ({category.percentage.toFixed(1)}%)
                     </span>
                   </div>
                   <Progress value={category.percentage} className="h-2" />
@@ -286,7 +286,7 @@ export const GroupAnalytics: React.FC<GroupAnalyticsProps> = ({ group }) => {
                 <XAxis dataKey="month" />
                 <YAxis />
                 <Tooltip
-                  formatter={(value: number) => [formatCurrency(value), 'Amount']}
+                  formatter={(value: number) => [formatCurrency(value), `Amount(${group.settings.currency})`]}
                   labelFormatter={(label) => `${label}`}
                 />
                 <Bar dataKey="amount" fill="#3b82f6" />

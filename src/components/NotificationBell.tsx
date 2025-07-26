@@ -5,7 +5,6 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { Separator } from '@/components/ui/separator';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Switch } from '@/components/ui/switch';
 import { useNotificationStore } from '@/stores/notificationStore';
@@ -20,7 +19,7 @@ export const NotificationBell = () => {
   const navigate = useNavigate();
   const { user } = useAuth();
   const { groups, setSelectedGroup } = useExpenseStore();
-  
+
   const {
     notifications,
     unreadCount,
@@ -37,12 +36,10 @@ export const NotificationBell = () => {
 
   const recentNotifications = getRecentNotifications(10);
 
-  // Start listening for notifications when user is authenticated
   useEffect(() => {
     if (user?.uid) {
       startListening(user.uid);
     }
-
     return () => {
       stopListening();
     };
@@ -52,34 +49,23 @@ export const NotificationBell = () => {
     if (!notification.read) {
       markAsRead(notification.id);
     }
-    
     if (notification.actionUrl) {
-      // Parse the URL to handle group navigation
       const url = new URL(notification.actionUrl, window.location.origin);
       const pathParts = url.pathname.split('/');
-      
       if (pathParts[1] === 'groups' && pathParts[2]) {
         const groupId = pathParts[2];
         const tabParam = url.searchParams.get('tab');
-        
-        // Find the group and set it as selected
         const group = groups.find(g => g.id === groupId);
         if (group) {
           setSelectedGroup(group);
-          
-          // If there's a tab parameter, we could trigger a custom event or use a callback
-          // For now, the GroupDetailView will need to handle tab switching
           if (tabParam === 'chat') {
-            // Store the tab to switch to in sessionStorage so GroupDetailView can pick it up
             sessionStorage.setItem('openTab', 'chat');
           }
         }
       } else {
-        // For other routes, use normal navigation
         navigate(notification.actionUrl);
       }
-      
-      setIsOpen(false); // Close the popover after navigation
+      setIsOpen(false);
     }
   };
 
@@ -118,13 +104,13 @@ export const NotificationBell = () => {
         <Button
           variant="ghost"
           size="sm"
-          className="relative hover:bg-secondary/80"
+          className="relative hover:bg-gray-100"
           onClick={() => setIsOpen(!isOpen)}
         >
           <Bell className="h-5 w-5" />
           {unreadCount > 0 && (
-            <Badge 
-              variant="destructive" 
+            <Badge
+              variant="destructive"
               className="absolute -top-1 -right-1 h-5 w-5 flex items-center justify-center text-xs p-0 min-w-[20px]"
             >
               {unreadCount > 99 ? '99+' : unreadCount}
@@ -132,15 +118,16 @@ export const NotificationBell = () => {
           )}
         </Button>
       </PopoverTrigger>
-      
-      <PopoverContent className="w-80 p-0" align="end">
-        <div className="flex items-center justify-between p-4 border-b">
-          <h3 className="font-semibold">Notifications</h3>
+
+      <PopoverContent className="w-80 p-0 bg-white" align="end">
+        <div className="flex items-center justify-between p-4 border-b border-gray-100">
+          <h3 className="font-semibold text-gray-900">Notifications</h3>
           <div className="flex items-center space-x-2">
             <Button
               variant="ghost"
               size="sm"
               onClick={() => setShowSettings(!showSettings)}
+              className="hover:bg-gray-100"
             >
               <Settings className="h-4 w-4" />
             </Button>
@@ -152,6 +139,7 @@ export const NotificationBell = () => {
                   clearAllNotifications();
                   toast({ title: "All notifications cleared" });
                 }}
+                className="hover:bg-gray-100"
               >
                 <Trash2 className="h-4 w-4" />
               </Button>
@@ -160,13 +148,13 @@ export const NotificationBell = () => {
         </div>
 
         {showSettings ? (
-          <Card className="m-4 border-0 shadow-none">
+          <Card className="m-4 border-0 shadow-none bg-white">
             <CardHeader className="pb-3">
-              <CardTitle className="text-sm">Notification Preferences</CardTitle>
+              <CardTitle className="text-sm text-gray-900">Notification Preferences</CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="flex items-center justify-between">
-                <span className="text-sm">Expense Updates</span>
+                <span className="text-sm text-gray-800">Expense Updates</span>
                 <Switch
                   checked={preferences.expenseNotifications}
                   onCheckedChange={(checked) =>
@@ -175,7 +163,7 @@ export const NotificationBell = () => {
                 />
               </div>
               <div className="flex items-center justify-between">
-                <span className="text-sm">Payment Reminders</span>
+                <span className="text-sm text-gray-800">Payment Reminders</span>
                 <Switch
                   checked={preferences.paymentReminders}
                   onCheckedChange={(checked) =>
@@ -184,7 +172,7 @@ export const NotificationBell = () => {
                 />
               </div>
               <div className="flex items-center justify-between">
-                <span className="text-sm">Group Activity</span>
+                <span className="text-sm text-gray-800">Group Activity</span>
                 <Switch
                   checked={preferences.groupActivity}
                   onCheckedChange={(checked) =>
@@ -193,7 +181,7 @@ export const NotificationBell = () => {
                 />
               </div>
               <div className="flex items-center justify-between">
-                <span className="text-sm">System Alerts</span>
+                <span className="text-sm text-gray-800">System Alerts</span>
                 <Switch
                   checked={preferences.systemAlerts}
                   onCheckedChange={(checked) =>
@@ -214,11 +202,11 @@ export const NotificationBell = () => {
         ) : (
           <>
             {unreadCount > 0 && (
-              <div className="p-3 border-b">
+              <div className="p-3 border-b border-gray-100">
                 <Button
                   variant="ghost"
                   size="sm"
-                  className="w-full justify-start text-sm"
+                  className="w-full justify-start text-sm text-gray-700 hover:bg-gray-100"
                   onClick={() => {
                     markAllAsRead(user?.uid);
                     toast({ title: "All notifications marked as read" });
@@ -229,53 +217,43 @@ export const NotificationBell = () => {
               </div>
             )}
 
-            <ScrollArea className="h-80">
+            <ScrollArea className="h-80 bg-white text-black">
               {recentNotifications.length === 0 ? (
-                <div className="p-6 text-center text-muted-foreground">
-                  <Bell className="h-8 w-8 mx-auto mb-2 opacity-50" />
+                <div className="p-8 text-center text-gray-400">
+                  <Bell className="h-8 w-8 mx-auto mb-2 opacity-20" />
                   <p className="text-sm">No notifications yet</p>
                 </div>
               ) : (
-                <div className="space-y-1 p-2">
+                <div className="divide-y divide-gray-100">
                   {recentNotifications.map((notification) => (
                     <div
                       key={notification.id}
-                      className={`relative p-3 rounded-lg cursor-pointer transition-colors hover:bg-secondary/50 ${
-                        !notification.read ? 'bg-primary/5 border-l-2 border-l-primary' : ''
-                      }`}
+                      className={`group relative flex items-start gap-3 px-4 py-3 cursor-pointer transition-colors
+                        ${!notification.read ? 'bg-gray-50' : 'bg-white'}
+                        hover:bg-gray-100`}
                       onClick={() => handleNotificationClick(notification)}
                     >
-                      <div className="flex items-start justify-between">
-                        <div className="flex items-start space-x-2 flex-1">
-                          <span className="text-lg leading-none">
-                            {getNotificationIcon(notification.type)}
-                          </span>
-                          <div className="flex-1 min-w-0">
-                            <p className="text-sm font-medium leading-tight">
-                              {notification.title}
-                            </p>
-                            <p className="text-xs text-muted-foreground mt-1 leading-tight">
-                              {notification.message}
-                            </p>
-                            <p className="text-xs text-muted-foreground mt-1">
-                              {formatTime(notification.timestamp)}
-                            </p>
-                          </div>
-                        </div>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          className="h-6 w-6 p-0 opacity-0 group-hover:opacity-100 hover:bg-destructive hover:text-destructive-foreground"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            removeNotification(notification.id);
-                          }}
-                        >
-                          <X className="h-3 w-3" />
-                        </Button>
+                      <span className="text-xl mt-1 opacity-70">{getNotificationIcon(notification.type)}</span>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-medium text-gray-900 truncate">{notification.title}</p>
+                        <p className="text-xs text-gray-500 mt-0.5 truncate">{notification.message}</p>
+                        <p className="text-xs text-gray-400 mt-0.5">{formatTime(notification.timestamp)}</p>
                       </div>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-6 w-6 p-0 opacity-0 group-hover:opacity-100 transition-opacity hover:bg-gray-200 hover:text-red-400"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          removeNotification(notification.id);
+                        }}
+                        tabIndex={-1}
+                        aria-label="Remove notification"
+                      >
+                        <X className="h-3 w-3" />
+                      </Button>
                       {!notification.read && (
-                        <div className="absolute top-3 right-3 h-2 w-2 bg-primary rounded-full" />
+                        <span className="absolute top-3 right-3 h-2 w-2 bg-black rounded-full" />
                       )}
                     </div>
                   ))}

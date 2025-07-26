@@ -1,5 +1,4 @@
-
-import React, { useState,useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -7,18 +6,18 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { useExpenseStore, Group } from '@/stores/expenseStore';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { motion, AnimatePresence } from 'framer-motion';
-import {GroupCommunicationHub} from './GroupCommunicationHub';
-import { 
-  Users, 
+import { GroupCommunicationHub } from './GroupCommunicationHub';
+import { fetchGroupById } from '@/services/firebaseService';
+import {
+  Users,
   MessageCircle,
-  Settings, 
-  BarChart3, 
-  Activity, 
-  Plus, 
+  Settings,
+  BarChart3,
+  Activity,
+  Plus,
   Crown,
   Eye,
   User,
-  MoreVertical,
   Archive,
   ArrowLeft
 } from 'lucide-react';
@@ -44,44 +43,51 @@ type MemberWithPhoto = {
   photoURL: string | null;
   role?: string;
   email?: string;
-  [key: string]: any; // Allow additional properties
+  [key: string]: any;
 };
 
-
-export const GroupDetailView: React.FC<GroupDetailViewProps> = ({ group, onBack }) => {
-  const [activeTab, setActiveTab] = useState<'overview' | 'analytics' | 'activity' | 'members' |'communication'  | 'settings'>('overview');
+export const GroupDetailView: React.FC<GroupDetailViewProps> = ({ group: initialGroup, onBack }) => {
+  const [activeTab, setActiveTab] = useState<'overview' | 'analytics' | 'activity' | 'members' | 'communication' | 'settings'>('overview');
   const [showExpenseForm, setShowExpenseForm] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
   const [showInvite, setShowInvite] = useState(false);
   const [showRecurring, setShowRecurring] = useState(false);
   const [groupMembers, setGroupMembers] = useState<MemberWithPhoto[]>([]);
-  const [groupId, setGroupId] = useState(group.id || '');
+  const [group, setGroup] = useState<Group>(initialGroup);
 
-  
- useEffect(() => {
+  // Always fetch the latest group data from Firestore
+  useEffect(() => {
+    const fetchLatestGroup = async () => {
+      const freshGroup = await fetchGroupById(initialGroup.id);
+      if (freshGroup) setGroup(freshGroup);
+      else console.error('Group not found:', initialGroup.id);
+    };
+    fetchLatestGroup();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [initialGroup.id]);
+
+  useEffect(() => {
     const loadMembers = async () => {
-      if (!groupId) return;
-      const members = await fetchGroupMembersWithPhotos(groupId);
+      if (!group.id) return;
+      const members = await fetchGroupMembersWithPhotos(group.id);
       setGroupMembers(members);
     };
-
     loadMembers();
-  }, [groupId]); // 👈 Watch for groupId changes
+  }, [group.id]);
 
-  // Check for notification navigation to specific tab
   useEffect(() => {
     const openTab = sessionStorage.getItem('openTab');
     if (openTab === 'chat') {
       setActiveTab('communication');
-      sessionStorage.removeItem('openTab'); // Clean up
+      sessionStorage.removeItem('openTab');
     }
   }, []);
 
   const { getGroupExpenses, getBalances, archiveGroup, expenses } = useExpenseStore();
   const isMobile = useIsMobile();
-  
+
   const groupExpenses = getGroupExpenses(group.id);
-  const balances = getBalances().filter(balance => 
+  const balances = getBalances().filter(balance =>
     group.members.some(m => m.id === balance.from.id || m.id === balance.to.id)
   );
 
@@ -143,7 +149,7 @@ export const GroupDetailView: React.FC<GroupDetailViewProps> = ({ group, onBack 
               <img src={group.coverImage} alt="Group cover" className="w-full h-full object-cover rounded-lg" />
             </div>
           )}
-          
+
           <Card className="bg-white shadow-lg border-0">
             <CardHeader>
               <div className="flex items-center justify-between">
@@ -176,7 +182,7 @@ export const GroupDetailView: React.FC<GroupDetailViewProps> = ({ group, onBack 
                     </div>
                   </div>
                 </div>
-                
+
                 <div className="flex items-center space-x-2">
                   <Button
                     onClick={() => setShowExpenseForm(true)}
@@ -185,14 +191,14 @@ export const GroupDetailView: React.FC<GroupDetailViewProps> = ({ group, onBack 
                     <Plus className="w-4 h-4 mr-2" />
                     Add Expense
                   </Button>
-                  
+
                   <GroupInviteDialog group={group}>
                     <Button variant="outline">
                       <Users className="w-4 h-4 mr-2" />
                       Invite
                     </Button>
                   </GroupInviteDialog>
-                  
+
                   {isUserAdmin && (
                     <Button
                       variant="outline"
@@ -212,7 +218,7 @@ export const GroupDetailView: React.FC<GroupDetailViewProps> = ({ group, onBack 
       {isMobile && (
         <div className="px-4 py-4 bg-white border-b">
           <div className="flex items-center space-x-3 mb-3">
-            {group.photo ? (
+            {group.coverImage ? (
               <Avatar className="w-10 h-10">
                 <AvatarImage src={group.photo} />
                 <AvatarFallback>{group.name.charAt(0)}</AvatarFallback>
@@ -227,7 +233,7 @@ export const GroupDetailView: React.FC<GroupDetailViewProps> = ({ group, onBack 
               <p className="text-sm text-gray-600 line-clamp-1">{group.description}</p>
             </div>
           </div>
-          
+
           <div className="flex items-center space-x-2">
             <Badge variant={group.groupType === 'private' ? 'secondary' : 'outline'} className="text-xs">
               {group.groupType}
@@ -247,12 +253,12 @@ export const GroupDetailView: React.FC<GroupDetailViewProps> = ({ group, onBack 
           <Card>
             <CardContent className={`${isMobile ? 'p-3' : 'p-4'}`}>
               <div className={`${isMobile ? 'text-lg' : 'text-2xl'} font-bold text-green-600`}>
-                ${totalExpenses.toFixed(2)}
+                {group.settings.currency} {totalExpenses.toFixed(2)}
               </div>
               <p className="text-xs text-gray-600">Total Spent</p>
             </CardContent>
           </Card>
-          
+
           <Card>
             <CardContent className={`${isMobile ? 'p-3' : 'p-4'}`}>
               <div className={`${isMobile ? 'text-lg' : 'text-2xl'} font-bold text-blue-600`}>
@@ -261,7 +267,7 @@ export const GroupDetailView: React.FC<GroupDetailViewProps> = ({ group, onBack 
               <p className="text-xs text-gray-600">Expenses</p>
             </CardContent>
           </Card>
-          
+
           <Card>
             <CardContent className={`${isMobile ? 'p-3' : 'p-4'}`}>
               <div className={`${isMobile ? 'text-lg' : 'text-2xl'} font-bold text-purple-600`}>
@@ -270,7 +276,7 @@ export const GroupDetailView: React.FC<GroupDetailViewProps> = ({ group, onBack 
               <p className="text-xs text-gray-600">Members</p>
             </CardContent>
           </Card>
-          
+
           <Card>
             <CardContent className={`${isMobile ? 'p-3' : 'p-4'}`}>
               <div className={`${isMobile ? 'text-lg' : 'text-2xl'} font-bold text-orange-600`}>
@@ -281,9 +287,6 @@ export const GroupDetailView: React.FC<GroupDetailViewProps> = ({ group, onBack 
           </Card>
         </div>
       </div>
-
-      {/* Mobile Navigation */}
-     
 
       {/* Desktop Navigation Tabs */}
       {!isMobile && (
@@ -327,15 +330,15 @@ export const GroupDetailView: React.FC<GroupDetailViewProps> = ({ group, onBack 
                   expenses={expenses}
                   maxExpenses={5}
                 />
-                
+
                 {/* Members and Quick Actions */}
                 <div className={`grid ${isMobile ? 'grid-cols-1' : 'grid-cols-1 lg:grid-cols-2'} gap-6`}>
                   <Card>
                     <CardHeader>
                       <CardTitle className="flex items-center justify-between">
                         <span className={isMobile ? 'text-lg' : 'text-xl'}>Recent Members</span>
-                        <Button 
-                          size="sm" 
+                        <Button
+                          size="sm"
                           variant="outline"
                           onClick={() => setActiveTab('members')}
                         >
@@ -348,17 +351,17 @@ export const GroupDetailView: React.FC<GroupDetailViewProps> = ({ group, onBack 
                         {group.members.slice(0, isMobile ? 3 : 5).map(member => (
                           <div key={member.id} className="flex items-center justify-between">
                             <div className="flex items-center space-x-3">
-                             <Avatar
-                                                   key={member.id}
-                                                   className="w-6 h-6 sm:w-8 sm:h-8 border-2 border-white"
-                                                 >
-                                                   {member.photoURL ? (
-                                                     <AvatarImage src={member.photoURL} alt={member.name} />
-                                                   ) : null}
-                                                   <AvatarFallback className="text-xs bg-primary/10 text-primary">
-                                                     {member.name.charAt(0).toUpperCase()}
-                                                   </AvatarFallback>
-                                                 </Avatar>
+                              <Avatar
+                                key={member.id}
+                                className="w-6 h-6 sm:w-8 sm:h-8 border-2 border-white"
+                              >
+                                {member.photoURL ? (
+                                  <AvatarImage src={member.photoURL} alt={member.name} />
+                                ) : null}
+                                <AvatarFallback className="text-xs bg-primary/10 text-primary">
+                                  {member.name.charAt(0).toUpperCase()}
+                                </AvatarFallback>
+                              </Avatar>
                               <div>
                                 <div className="font-medium text-sm">{member.name}</div>
                                 <div className="text-xs text-gray-500">{member.email}</div>
@@ -380,8 +383,8 @@ export const GroupDetailView: React.FC<GroupDetailViewProps> = ({ group, onBack 
                     </CardHeader>
                     <CardContent>
                       <div className="space-y-3">
-                        <Button 
-                          variant="outline" 
+                        <Button
+                          variant="outline"
                           className="w-full justify-start"
                           onClick={() => setShowRecurring(true)}
                           size={isMobile ? "sm" : "default"}
@@ -389,8 +392,8 @@ export const GroupDetailView: React.FC<GroupDetailViewProps> = ({ group, onBack 
                           <Plus className="w-4 h-4 mr-2" />
                           Add Recurring Expense
                         </Button>
-                        <Button 
-                          variant="outline" 
+                        <Button
+                          variant="outline"
                           className="w-full justify-start"
                           onClick={() => setShowInvite(true)}
                           size={isMobile ? "sm" : "default"}
@@ -399,8 +402,8 @@ export const GroupDetailView: React.FC<GroupDetailViewProps> = ({ group, onBack 
                           Invite Members
                         </Button>
                         {isUserAdmin && (
-                          <Button 
-                            variant="outline" 
+                          <Button
+                            variant="outline"
                             className="w-full justify-start text-red-600 hover:text-red-700"
                             onClick={() => archiveGroup(group.id)}
                             size={isMobile ? "sm" : "default"}
@@ -432,18 +435,17 @@ export const GroupDetailView: React.FC<GroupDetailViewProps> = ({ group, onBack 
         isOpen={showExpenseForm}
         onClose={() => setShowExpenseForm(false)}
       />
-      
+
       <RecurringExpenseDialog group={group}>
         <div />
       </RecurringExpenseDialog>
       <div className="fixed bottom-0 left-0 right-0  z-50 bg-white border-t shadow-sm p-2 sm:w-full sm:max-w-md mx-auto">
-         <GroupDetailMobileNav
-        tabs={tabs}
-        activeTab={activeTab}
-        onTabChange={(tabId) => setActiveTab(tabId as any)}
-      />
+        <GroupDetailMobileNav
+          tabs={tabs}
+          activeTab={activeTab}
+          onTabChange={(tabId) => setActiveTab(tabId as any)}
+        />
       </div>
-      
     </div>
   );
 };

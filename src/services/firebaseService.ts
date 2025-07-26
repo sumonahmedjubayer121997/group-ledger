@@ -416,6 +416,65 @@ export const updateGroup = async (groupId: string, updates: Partial<Group>) => {
     console.error('Error updating group:', error);
     throw error;
   }
+};/**
+ * Fetch a single group by its ID from Firestore.
+ * @param groupId The Firestore document ID of the group.
+ * @returns The Group object or null if not found.
+ */
+
+
+export const fetchGroupById = async (groupId: string): Promise<Group | null> => {
+  try {
+    const groupRef = doc(db, 'groups', groupId);
+    const groupSnap = await getDoc(groupRef);
+
+    if (!groupSnap.exists()) return null;
+
+    const data = groupSnap.data();
+
+    // Debug: log the raw Firestore data
+    console.log('Firestore group data:', data);
+
+    // Transform users/members object to members array
+    const membersArray = Object.entries(data.members || {}).map(([uid, userData]: [string, any]) => ({
+      id: uid,
+      name: userData.name || 'Unknown',
+      email: userData.email || '',
+      role: userData.role as 'admin' | 'member',
+      joinedAt: userData.joinedAt?.toDate ? userData.joinedAt.toDate() : new Date(),
+    }));
+ 
+    console.log('Transformed members array:', membersArray);
+    const group: Group = {
+      id: groupSnap.id,
+      name: data.name || 'Unnamed Group',
+      description: data.description || '',
+      photo: data.photo || '',
+      coverImage: data.coverImage || '',
+      members: membersArray,
+      createdBy: data.createdBy || '',
+      createdAt: data.createdAt?.toDate ? data.createdAt.toDate() : new Date(),
+      groupType: data.groupType || 'private',
+      inviteCode: data.inviteCode || '',
+      settings: data.settings || {
+        currency: 'USD',
+        simplifyDebts: true,
+        notifications: true,
+        recurringBills: false,
+      },
+      isArchived: data.isArchived || false,
+      tags: data.tags || [],
+      location: data.location || '',
+    };
+
+    // Debug: log the constructed group object
+    console.log('Constructed group object:', group);
+
+    return group;
+  } catch (error) {
+    console.error('Error fetching group by ID:', error);
+    return null;
+  }
 };
 
 export const getUserGroups = async (userId: string) => {
@@ -441,11 +500,11 @@ export const getUserGroups = async (userId: string) => {
       // Transform users object to members array
       const membersArray = Object.entries(data.users || {}).map(([uid, userData]: [string, any]) => ({
         id: uid,
-        name: userData?.name || 'Unknown',
-        email: userData?.email || '',
-        role: (userData?.role as 'admin' | 'member') || 'member',
-        joinedAt: userData?.joinedAt?.toDate() || new Date(),
-      })).filter(member => member.id); // Filter out invalid members
+        name: userData.name || 'Unknown',
+        email: userData.email || '',
+        role: userData.role as 'admin' | 'member',
+        joinedAt: userData.joinedAt?.toDate() || new Date(),
+      }));
 
       const group: Group = {
         id: doc.id,
@@ -512,14 +571,9 @@ export const createExpense = async (expenseData: Omit<Expense, 'id'>, userId: st
 
 export const updateExpense = async (groupId: string, expenseId: string, updates: Partial<Expense>) => {
   try {
-    // Clean the updates object to remove undefined values
-    const cleanUpdates = Object.fromEntries(
-      Object.entries(updates).filter(([_, value]) => value !== undefined)
-    );
-    
     const expenseRef = doc(db, 'groups', groupId, 'expenses', expenseId);
     await updateDoc(expenseRef, {
-      ...cleanUpdates,
+      ...updates,
       updatedAt: serverTimestamp(),
     });
   } catch (error) {
@@ -583,11 +637,11 @@ export const subscribeToUserGroups = (userId: string, callback: (groups: Group[]
       // Transform users object to members array
       const membersArray = Object.entries(data.users || {}).map(([uid, userData]: [string, any]) => ({
         id: uid,
-        name: userData?.name || 'Unknown',
-        email: userData?.email || '',
-        role: (userData?.role as 'admin' | 'member') || 'member',
-        joinedAt: userData?.joinedAt?.toDate() || new Date(),
-      })).filter(member => member.id); // Filter out invalid members
+        name: userData.name || 'Unknown',
+        email: userData.email || '',
+        role: userData.role as 'admin' | 'member',
+        joinedAt: userData.joinedAt?.toDate() || new Date(),
+      }));
 
       const group: Group = {
         id: doc.id,

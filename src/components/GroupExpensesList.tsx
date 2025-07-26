@@ -141,7 +141,7 @@ export const GroupExpensesList: React.FC<GroupExpensesListProps> = ({
                 </div>
                 <div className="flex items-center space-x-2">
                   <div className="text-right flex-shrink-0">
-                    <div className="font-semibold text-gray-900 text-sm">${expense.amount.toFixed(2)}</div>
+                    <div className="font-semibold text-gray-900 text-sm">{group.settings.currency}{expense.amount.toFixed(2)}</div>
                     <Badge variant="outline" className="text-xs">
                       {expense.category}
                     </Badge>

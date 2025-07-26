@@ -16,6 +16,7 @@ import {
 import { notificationFirebaseService } from '@/services/notificationFirebaseService';
 
 export interface Member {
+  userId: string;
   id: string;
   name: string;
   email: string;
@@ -708,7 +709,7 @@ export const useExpenseStore = create<ExpenseStore>()(
         getGroupAnalytics: (groupId) => {
           const expenses = get().getGroupExpenses(groupId);
           const totalSpent = expenses.reduce((sum, expense) => sum + expense.amount, 0);
-          
+         // const memberName= 
           const memberSpending = expenses.reduce((acc, expense) => {
             acc[expense.paidBy.id] = (acc[expense.paidBy.id] || 0) + expense.amount;
             return acc;

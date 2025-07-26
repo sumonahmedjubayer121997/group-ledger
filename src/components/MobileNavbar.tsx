@@ -1,12 +1,14 @@
 
 import { useState } from "react";
-import { Menu, X, Users, UserPlus, Settings, LogOut , HandCoins } from "lucide-react";
+import { Menu, X, Users, UserPlus, Settings, LogOut , HandCoins, Upload } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import { useAuth } from "@/contexts/AuthContext";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { ExpenseForm } from "@/components/ExpenseForm";
 import { NotificationBell } from "@/components/NotificationBell";
+import { ImportDialog } from "@/components/ImportDialog";
+
 
 interface MobileNavbarProps {
   onProfileClick: () => void;
@@ -86,6 +88,16 @@ export const MobileNavbar = ({ onProfileClick, onNewGroupClick, onLogout }: Mobi
                     <HandCoins className="h-3 w-3 mr-3" />
                     Add Expense
                   </Button>
+                  <ImportDialog>
+                                      <Button
+                                        variant="ghost"
+                                         className="justify-start"
+                                        size="sm"
+                                      >
+                                        <Upload className="h-4 w-4 mr-3" />
+                                        Import CSV
+                                      </Button>
+                                    </ImportDialog>
               <Button
                 variant="ghost"
                 className="justify-start"
