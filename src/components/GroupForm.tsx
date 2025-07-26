@@ -56,8 +56,10 @@ export const GroupForm = ({ isOpen, onClose }: GroupFormProps) => {
         .filter(member => member.email.trim() !== "")
         .map(async (member) => {
           const existingUser = await getUserByEmail(member.email.trim());
+          const id = existingUser ? existingUser.uid : `temp-${Date.now()}-${Math.random()}`;
           return {
-            id: existingUser ? existingUser.uid : `temp-${Date.now()}-${Math.random()}`,
+            userId: id,
+            id: id,
             email: member.email.trim(),
             name: member.name.trim() || existingUser?.name || member.email.trim(),
             role: "member" as const,
@@ -68,6 +70,7 @@ export const GroupForm = ({ isOpen, onClose }: GroupFormProps) => {
 
       const members: Member[] = [
         {
+          userId: user.uid,
           id: user.uid,
           email: user.email || "",
           name: user.displayName || "You",
@@ -84,6 +87,7 @@ export const GroupForm = ({ isOpen, onClose }: GroupFormProps) => {
         description: description,
         members,
         createdAt: new Date(),
+        createdBy: user.uid,
         photo: "",
         coverImage: "",
         groupType: "private" as const,

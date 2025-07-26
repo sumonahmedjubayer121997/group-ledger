@@ -49,6 +49,7 @@ export interface FirebaseGroup {
 
 // Store types (used in components and store)
 export interface Member {
+  userId: string;
   id: string;
   name: string;
   email: string;

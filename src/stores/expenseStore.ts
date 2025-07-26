@@ -61,6 +61,7 @@ export interface Group {
   description: string;
   members: Member[];
   createdAt: Date;
+  createdBy: string;
   photo?: string;
   coverImage?: string;
   groupType: 'private' | 'public';

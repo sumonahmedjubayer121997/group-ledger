@@ -437,6 +437,7 @@ export const fetchGroupById = async (groupId: string): Promise<Group | null> => 
 
     // Transform users/members object to members array
     const membersArray = Object.entries(data.members || {}).map(([uid, userData]: [string, any]) => ({
+      userId: uid,
       id: uid,
       name: userData.name || 'Unknown',
       email: userData.email || '',
@@ -499,6 +500,7 @@ export const getUserGroups = async (userId: string) => {
       
       // Transform users object to members array
       const membersArray = Object.entries(data.users || {}).map(([uid, userData]: [string, any]) => ({
+        userId: uid,
         id: uid,
         name: userData.name || 'Unknown',
         email: userData.email || '',
@@ -512,6 +514,7 @@ export const getUserGroups = async (userId: string) => {
         description: data.description || '',
         members: membersArray,
         createdAt: data.createdAt?.toDate() || new Date(),
+        createdBy: data.createdBy || '',
         groupType: data.groupType || 'private',
         inviteCode: data.inviteCode || '',
         settings: data.settings || {
@@ -636,6 +639,7 @@ export const subscribeToUserGroups = (userId: string, callback: (groups: Group[]
       
       // Transform users object to members array
       const membersArray = Object.entries(data.users || {}).map(([uid, userData]: [string, any]) => ({
+        userId: uid,
         id: uid,
         name: userData.name || 'Unknown',
         email: userData.email || '',
@@ -649,6 +653,7 @@ export const subscribeToUserGroups = (userId: string, callback: (groups: Group[]
         description: data.description || '',
         members: membersArray,
         createdAt: data.createdAt?.toDate() || new Date(),
+        createdBy: data.createdBy || '',
         groupType: data.groupType || 'private',
         inviteCode: data.inviteCode || '',
         settings: data.settings || {
@@ -779,6 +784,7 @@ export const getGroupMembers = async (groupId: string): Promise<Member[]> => {
     querySnapshot.forEach((doc) => {
       const data = doc.data();
       members.push({
+        userId: doc.id,
         id: doc.id,
         name: data.name || 'Unknown',
         email: data.email || '',

@@ -52,6 +52,7 @@ export const GroupMemberManagement: React.FC<GroupMemberManagementProps> = ({ gr
     }
 
     const newMember: Omit<Member, 'joinedAt' | 'role'> = {
+      userId: crypto.randomUUID(),
       id: crypto.randomUUID(),
       name: newMemberName.trim(),
       email: newMemberEmail.trim(),

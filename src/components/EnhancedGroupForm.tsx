@@ -152,8 +152,10 @@ export const EnhancedGroupForm = ({ isOpen, onClose, group, isEditing = false }:
           .filter(member => member.email.trim() !== "")
           .map(async (member) => {
             const existingUser = await getUserByEmail(member.email.trim());
+            const id = existingUser ? existingUser.uid : `temp-${Date.now()}-${Math.random()}`;
             return {
-              id: existingUser ? existingUser.uid : `temp-${Date.now()}-${Math.random()}`,
+              userId: id,
+              id: id,
               email: member.email.trim(),
               name: member.name.trim() || existingUser?.name || member.email.trim(),
               role: member.role,
@@ -165,6 +167,7 @@ export const EnhancedGroupForm = ({ isOpen, onClose, group, isEditing = false }:
 
         const members: Member[] = [
           {
+            userId: user.uid,
             id: user.uid,
             email: user.email || "",
             name: user.displayName || "You",
@@ -182,6 +185,7 @@ export const EnhancedGroupForm = ({ isOpen, onClose, group, isEditing = false }:
           groupType,
           members,
           createdAt: new Date(),
+          createdBy: user.uid,
           photo: groupPhoto,
           coverImage,
           inviteCode: currentInviteCode || crypto.randomUUID(),
