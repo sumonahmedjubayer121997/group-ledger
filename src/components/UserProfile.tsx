@@ -71,7 +71,7 @@ export const UserProfile: React.FC<UserProfileProps> = ({ onClose }) => {
     createdAt: new Date(),
     lastLoginAt: new Date(),
     preferences: {
-      currency: 'USD',
+      currency: '$',
       notifications: true,
       theme: 'light' as const,
     },

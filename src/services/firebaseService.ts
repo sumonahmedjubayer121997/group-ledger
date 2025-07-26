@@ -436,14 +436,15 @@ export const fetchGroupById = async (groupId: string): Promise<Group | null> => 
     console.log('Firestore group data:', data);
 
     // Transform users/members object to members array
-    const membersArray = Object.entries(data.members || {}).map(([uid, userData]: [string, any]) => ({
-      userId: uid,
-      id: uid,
-      name: userData.name || 'Unknown',
-      email: userData.email || '',
-      role: userData.role as 'admin' | 'member',
-      joinedAt: userData.joinedAt?.toDate ? userData.joinedAt.toDate() : new Date(),
-    }));
+    const membersArray = Object.entries(data.users || {}).map(([uid, userData]: [string, any]) => ({
+  userId: uid,
+  id: uid,
+  name: userData.name || 'Unknown',
+  email: userData.email || '',
+  role: userData.role as 'admin' | 'member',
+  joinedAt: userData.joinedAt?.toDate ? userData.joinedAt.toDate() : new Date(),
+}));
+
  
     console.log('Transformed members array:', membersArray);
     const group: Group = {

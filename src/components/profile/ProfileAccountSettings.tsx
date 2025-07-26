@@ -47,7 +47,7 @@ export const ProfileAccountSettings: React.FC<ProfileAccountSettingsProps> = ({ 
 
     setIsLoading(true);
     try {
-      await updateUserProfile({ displayName });
+      await updateUserProfile({ name: displayName });
       toast({
         title: "Success",
         description: "Display name updated successfully"

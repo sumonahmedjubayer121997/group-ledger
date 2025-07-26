@@ -1,9 +1,10 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';
 import { useExpenseStore, Group } from '@/stores/expenseStore';
-import { BarChart3, PieChart, TrendingUp, DollarSign, Download } from 'lucide-react';
+import { BarChart3, PieChart, TrendingUp, DollarSign, Download, Currency } from 'lucide-react';
+import { useSettingsStore } from '@/stores/settingsStore'; // <-- Import your settings store
 import {
   BarChart,
   Bar,
@@ -18,7 +19,9 @@ import {
 } from 'recharts';
 import jsPDF from 'jspdf';
 import 'jspdf-autotable';
-import  exportGroupAnalyticsToPDF from './ExportGroupAnalyticsToPDF';
+import exportGroupAnalyticsToPDF from './ExportGroupAnalyticsToPDF';
+import { fetchGroupById } from '@/services/firebaseService';
+import { set } from 'date-fns';
 
 interface GroupAnalyticsProps {
   group: Group;
@@ -36,8 +39,18 @@ const COLORS = [
 ];
 
 // Helper: Format currency
-const formatCurrency = (amount: number) => `${amount.toFixed(2)}`;
+// Helper: Format currency
+const formatCurrency = (amount: number, symbol: string): string => {
+  // Format number manually with commas and 2 decimal places
+  const formattedAmount = amount.toLocaleString(undefined, {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  });
 
+  return `${symbol}${formattedAmount}`;
+};
+
+// ...existing code...
 // Helper: Add PDF footer to all pages
 function addPDFFooter(doc: jsPDF, groupName: string) {
   const pageCount = doc.getNumberOfPages();
@@ -60,9 +73,33 @@ function getSafeFileName(name: string) {
 }
 
 export const GroupAnalytics: React.FC<GroupAnalyticsProps> = ({ group }) => {
-  const { getGroupAnalytics, getGroupExpenses } = useExpenseStore();
-  const analytics = getGroupAnalytics(group.id);
-  const expenses = getGroupExpenses(group.id);
+const { getGroupAnalytics, getGroupExpenses } = useExpenseStore();
+const analytics = getGroupAnalytics(group.id);
+const expenses = getGroupExpenses(group.id);
+const [groupInfo, setGroupInfo] = React.useState<Group | null>(null);
+const [currency, setCurrency] = React.useState<string>(''); 
+
+
+
+React.useEffect(() => {
+  const fetchData = async () => {
+    try {
+      const fetchedGroup = await fetchGroupById(group.id);
+      if (!fetchedGroup) {
+        console.error(`Group with ID ${group.id} not found`);
+        return;
+      }
+      setCurrency(fetchedGroup.settings.currency);
+      setGroupInfo(fetchedGroup);
+      console.log('Fetched group info:', fetchedGroup);
+    } catch (error) {
+      console.error('Error fetching group info:', error);
+    }
+  };
+
+  fetchData();
+}, [group.id]);
+
 
   // Prepare member spending data
   const memberSpendingData = React.useMemo(
@@ -119,8 +156,9 @@ export const GroupAnalytics: React.FC<GroupAnalyticsProps> = ({ group }) => {
     return months;
   }, [expenses]);
 
-  // PDF Export
-
+  // --- FIX: Calculate avg per person based on actual group members, avoid division by zero ---
+  const memberCount = group.members.length > 0 ? group.members.length : 1;
+  const avgPerPerson = analytics.totalSpent / memberCount;
 
   if (analytics.totalSpent === 0) {
     return (
@@ -148,20 +186,20 @@ export const GroupAnalytics: React.FC<GroupAnalyticsProps> = ({ group }) => {
     <div className="space-y-6">
       {/* Export Button */}
       <div className="flex justify-end">
-       <Button
-  onClick={() =>
-    exportGroupAnalyticsToPDF({
-      group,
-      analytics,
-      expenses,
-      memberSpendingData,
-      categorySpendingData,
-      monthlyData,
-    })
-  }
-  variant="outline"
-  className="flex items-center gap-2"
->
+        <Button
+          onClick={() =>
+            exportGroupAnalyticsToPDF({
+              group,
+              analytics,
+              expenses,
+              memberSpendingData,
+              categorySpendingData,
+              monthlyData,
+            })
+          }
+          variant="outline"
+          className="flex items-center gap-2"
+        >
           <Download className="w-4 h-4" />
           Export Analytics PDF
         </Button>
@@ -174,7 +212,7 @@ export const GroupAnalytics: React.FC<GroupAnalyticsProps> = ({ group }) => {
               <DollarSign className="w-5 h-5 text-green-500" />
               <div>
                 <div className="text-2xl font-bold text-green-600">
-                 {group.settings.currency}{formatCurrency(analytics.totalSpent)}
+                  {formatCurrency(analytics.totalSpent,currency)}
                 </div>
                 <p className="text-sm text-gray-600">Total Spent</p>
               </div>
@@ -188,9 +226,7 @@ export const GroupAnalytics: React.FC<GroupAnalyticsProps> = ({ group }) => {
               <BarChart3 className="w-5 h-5 text-blue-500" />
               <div>
                 <div className="text-2xl font-bold text-blue-600">
-                  {group.settings.currency}{formatCurrency(
-                    analytics.totalSpent / group.members.length
-                  )}
+                 {formatCurrency(avgPerPerson,currency)}
                 </div>
                 <p className="text-sm text-gray-600">Avg per Person</p>
               </div>
@@ -240,7 +276,7 @@ export const GroupAnalytics: React.FC<GroupAnalyticsProps> = ({ group }) => {
                   <div className="flex justify-between text-sm">
                     <span className="font-medium">{member.name}</span>
                     <span className="text-gray-600">
-                      {group.settings.currency}{formatCurrency(member.amount)} ({member.percentage.toFixed(1)}%)
+                      {formatCurrency(member.amount,currency)} ({member.percentage.toFixed(1)}%)
                     </span>
                   </div>
                   <Progress value={member.percentage} className="h-2" />
@@ -262,7 +298,7 @@ export const GroupAnalytics: React.FC<GroupAnalyticsProps> = ({ group }) => {
                   <div className="flex justify-between text-sm">
                     <span className="font-medium">{category.name}</span>
                     <span className="text-gray-600">
-                      {group.settings.currency}{formatCurrency(category.amount)} ({category.percentage.toFixed(1)}%)
+                      {formatCurrency(category.amount,currency)} ({category.percentage.toFixed(1)}%)
                     </span>
                   </div>
                   <Progress value={category.percentage} className="h-2" />
@@ -286,7 +322,7 @@ export const GroupAnalytics: React.FC<GroupAnalyticsProps> = ({ group }) => {
                 <XAxis dataKey="month" />
                 <YAxis />
                 <Tooltip
-                  formatter={(value: number) => [formatCurrency(value), `Amount(${group.settings.currency})`]}
+                  formatter={(value: number) => [formatCurrency(value,currency), 'Amount']}
                   labelFormatter={(label) => `${label}`}
                 />
                 <Bar dataKey="amount" fill="#3b82f6" />
@@ -323,7 +359,7 @@ export const GroupAnalytics: React.FC<GroupAnalyticsProps> = ({ group }) => {
                   ))}
                 </Pie>
                 <Tooltip
-                  formatter={(value: number) => [formatCurrency(value), 'Amount']}
+                  formatter={(value: number) => [formatCurrency(value,currency), 'Amount']}
                 />
               </RechartsPieChart>
             </ResponsiveContainer>
