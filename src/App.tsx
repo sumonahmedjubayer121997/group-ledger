@@ -11,13 +11,14 @@ import Index from "./pages/Index";
 import NotFound from "./pages/NotFound";
 
 
+
 const queryClient = new QueryClient();
 
 const AppContent = () => {
   const { user, loading } = useAuth();
   const { initializeFirebaseSync, cleanup } = useExpenseStore();
 
-  // Initialize Firebase sync when user is authenticated
+  // Initialize Firebase sync when user is authenticated properly
   useEffect(() => {
     if (user) {
       console.log('Initializing Firebase sync for user:', user.uid);
