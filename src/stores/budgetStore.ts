@@ -136,7 +136,14 @@ export const useBudgetStore = create<BudgetState>()(
             
             switch (budget.type) {
               case 'individual':
-                return isInPeriod && (!userId || expense.paidBy === userId) && !expense.groupId;
+                // For individual budgets, include both personal expenses and group expenses where user paid
+                return isInPeriod && (
+                  // Personal expenses (no groupId and userId matches)
+                  (!expense.groupId && expense.userId === userId) ||
+                  // Group expenses where user paid but we want to track against personal budget
+                  (expense.groupId && expense.paidBy && 
+                   (typeof expense.paidBy === 'string' ? expense.paidBy === userId : expense.paidBy.id === userId))
+                );
               case 'group_category':
                 return isInPeriod && expense.groupId === budget.groupId && 
                        expense.category === budget.category;
@@ -144,7 +151,8 @@ export const useBudgetStore = create<BudgetState>()(
                 return isInPeriod && expense.groupId === budget.groupId;
               case 'user_group':
                 return isInPeriod && expense.groupId === budget.groupId && 
-                       expense.paidBy === budget.userId;
+                       (expense.paidBy && 
+                        (typeof expense.paidBy === 'string' ? expense.paidBy === budget.userId : expense.paidBy.id === budget.userId));
               default:
                 return false;
             }

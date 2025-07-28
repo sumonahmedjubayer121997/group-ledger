@@ -436,7 +436,7 @@ export const ComprehensiveBudgetManagement: React.FC<ComprehensiveBudgetManageme
             <User className="w-5 h-5" />
             <div>
               <h3 className="text-lg font-semibold">Personal Budget Tracking</h3>
-              <p className="text-sm text-muted-foreground">Define and track your personal spending limits</p>
+              <p className="text-sm text-muted-foreground">Define and track your personal spending limits - separate from group expenses</p>
             </div>
           </div>
 

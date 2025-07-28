@@ -6,6 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { AlertTriangle, DollarSign, Users, Target, User } from 'lucide-react';
 import { useBudgetStore } from '@/stores/budgetStore';
 import { useExpenseStore } from '@/stores/expenseStore';
+import { usePersonalExpenseStore } from '@/stores/personalExpenseStore';
 import { useAuth } from '@/contexts/AuthContext';
 
 interface BudgetNotificationCenterProps {
@@ -16,13 +17,25 @@ export const BudgetNotificationCenter: React.FC<BudgetNotificationCenterProps> =
   const { user } = useAuth();
   const { getBudgetUsage, getIndividualBudgets, getAllGroupBudgets } = useBudgetStore();
   const { expenses } = useExpenseStore();
+  const { getPersonalExpenses } = usePersonalExpenseStore();
 
   // Get all relevant budgets
   const individualBudgets = getIndividualBudgets(user?.uid);
   const groupBudgets = groupId ? getAllGroupBudgets(groupId) : [];
   
+  // Get personal expenses and combine with group expenses for individual budget calculation
+  const personalExpenses = user ? getPersonalExpenses(user.uid) : [];
+  const combinedExpensesForPersonalBudgets = [
+    ...personalExpenses.map(expense => ({
+      ...expense,
+      paidBy: { id: user?.uid },
+      groupId: undefined // Personal expenses don't have groupId
+    })),
+    ...expenses.filter(expense => expense.paidBy.id === user?.uid) // Group expenses paid by user
+  ];
+  
   // Calculate budget usages
-  const individualUsages = getBudgetUsage(expenses, user?.uid);
+  const individualUsages = getBudgetUsage(combinedExpensesForPersonalBudgets, user?.uid);
   const groupUsages = groupId ? getBudgetUsage(expenses, user?.uid, groupId) : [];
 
   // Filter for warnings and violations
@@ -62,20 +75,20 @@ export const BudgetNotificationCenter: React.FC<BudgetNotificationCenterProps> =
         <AlertDescription>
           <div className="space-y-1">
             <p>
-              {budget.type === 'individual' && 'Personal budget'}
+              {budget.type === 'individual' && 'Personal budget (includes personal expenses and group expenses you paid)'}
               {budget.type === 'group_category' && `Group category: ${budget.category}`}
               {budget.type === 'group_overall' && 'Overall group budget'}
               {budget.type === 'user_group' && 'Personal group spending'}
               {' • '}
-              Spent: ${usage.spent.toFixed(2)} of ${budget.limit.toFixed(2)}
+              Spent: £{usage.spent.toFixed(2)} of £{budget.limit.toFixed(2)}
             </p>
             {usage.isOverBudget ? (
               <p className="text-red-600 font-medium">
-                Over budget by ${(usage.spent - budget.limit).toFixed(2)}
+                Over budget by £{(usage.spent - budget.limit).toFixed(2)}
               </p>
             ) : (
               <p className="text-yellow-600 font-medium">
-                ${(budget.limit - usage.spent).toFixed(2)} remaining
+                £{(budget.limit - usage.spent).toFixed(2)} remaining
               </p>
             )}
           </div>
@@ -94,6 +107,9 @@ export const BudgetNotificationCenter: React.FC<BudgetNotificationCenterProps> =
         <CardTitle className="flex items-center gap-2">
           <AlertTriangle className="h-5 w-5 text-yellow-500" />
           Budget Alerts
+          <Badge variant="outline">
+            {individualWarnings.length + groupWarnings.length} alert{individualWarnings.length + groupWarnings.length !== 1 ? 's' : ''}
+          </Badge>
         </CardTitle>
       </CardHeader>
       <CardContent className="space-y-4">
