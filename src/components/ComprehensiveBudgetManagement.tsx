@@ -41,7 +41,7 @@ export const ComprehensiveBudgetManagement: React.FC<ComprehensiveBudgetManageme
 
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingBudget, setEditingBudget] = useState<Budget | null>(null);
-  const [activeTab, setActiveTab] = useState('individual');
+  const [activeTab, setActiveTab] = useState('personal');
   
   const [formData, setFormData] = useState({
     name: '',
@@ -120,7 +120,7 @@ export const ComprehensiveBudgetManagement: React.FC<ComprehensiveBudgetManageme
       alertThreshold: budget.alertThreshold.toString(),
       userId: budget.userId || '',
     });
-    setActiveTab(budget.type === 'individual' ? 'individual' : 
+    setActiveTab(budget.type === 'individual' ? 'personal' : 
                budget.type === 'group_category' ? 'group_category' :
                budget.type === 'group_overall' ? 'group_overall' : 'user_group');
     setIsDialogOpen(true);
@@ -418,46 +418,228 @@ export const ComprehensiveBudgetManagement: React.FC<ComprehensiveBudgetManageme
       </div>
 
       <Tabs value={activeTab} onValueChange={setActiveTab}>
-        <TabsList className="grid w-full grid-cols-2 lg:grid-cols-4">
-          <TabsTrigger value="individual">Individual</TabsTrigger>
+        <TabsList className="grid w-full grid-cols-2 lg:grid-cols-5">
+          <TabsTrigger value="personal">Personal Budget</TabsTrigger>
+          <TabsTrigger value="enforcement">Budget Enforcement</TabsTrigger>
           {groupId && (
             <>
-              <TabsTrigger value="group_category">Category</TabsTrigger>
+              <TabsTrigger value="group_category">Group Categories</TabsTrigger>
               <TabsTrigger value="group_overall">Group Overall</TabsTrigger>
-              <TabsTrigger value="user_group">Personal Group</TabsTrigger>
+              <TabsTrigger value="user_group">User in Group</TabsTrigger>
             </>
           )}
         </TabsList>
 
-        {Object.entries(budgetTypeConfig).map(([type, config]) => (
-          <TabsContent key={type} value={type} className="space-y-4">
+        {/* Personal Budget Tab */}
+        <TabsContent value="personal" className="space-y-4">
+          <div className="flex items-center space-x-2">
+            <User className="w-5 h-5" />
+            <div>
+              <h3 className="text-lg font-semibold">Personal Budget Tracking</h3>
+              <p className="text-sm text-muted-foreground">Define and track your personal spending limits</p>
+            </div>
+          </div>
+
+          {(() => {
+            const budgets = getBudgetsByType('individual');
+            return budgets.length === 0 ? (
+              <Card>
+                <CardContent className="text-center py-8">
+                  <User className="w-12 h-12 mx-auto text-muted-foreground mb-4" />
+                  <p className="text-muted-foreground">No personal budgets created yet.</p>
+                </CardContent>
+              </Card>
+            ) : (
+              <div className="grid gap-4">
+                {budgets.map((budget) => renderBudgetCard(budget, 'individual'))}
+              </div>
+            );
+          })()}
+        </TabsContent>
+
+        {/* Budget Enforcement Tab */}
+        <TabsContent value="enforcement" className="space-y-4">
+          <div className="flex items-center space-x-2">
+            <AlertTriangle className="w-5 h-5" />
+            <div>
+              <h3 className="text-lg font-semibold">Budget Enforcement</h3>
+              <p className="text-sm text-muted-foreground">Monitor and enforce budget limits across all budget types</p>
+            </div>
+          </div>
+
+          <div className="grid gap-4">
+            {/* Personal Budget Enforcement */}
+            {(() => {
+              const personalBudgets = getBudgetsByType('individual');
+              const personalUsages = getBudgetUsage(expenses, user?.uid);
+              const violatedPersonal = personalUsages.filter(usage => 
+                personalBudgets.find(b => b.id === usage.budgetId && b.isActive) && usage.isOverBudget
+              );
+
+              return personalBudgets.length > 0 && (
+                <Card className={violatedPersonal.length > 0 ? "border-red-200" : "border-green-200"}>
+                  <CardHeader>
+                    <CardTitle className="flex items-center gap-2">
+                      <User className="w-4 h-4" />
+                      Personal Budget Status
+                      {violatedPersonal.length > 0 && (
+                        <Badge variant="destructive">{violatedPersonal.length} Over Budget</Badge>
+                      )}
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    {violatedPersonal.length === 0 ? (
+                      <p className="text-green-600">All personal budgets are within limits</p>
+                    ) : (
+                      <div className="space-y-2">
+                        {violatedPersonal.map(usage => {
+                          const budget = personalBudgets.find(b => b.id === usage.budgetId);
+                          return budget && (
+                            <div key={budget.id} className="flex items-center justify-between p-2 bg-red-50 rounded">
+                              <span className="font-medium">{budget.name}</span>
+                              <span className="text-red-600">Over by ${(usage.spent - budget.limit).toFixed(2)}</span>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
+              );
+            })()}
+
+            {/* Group Budget Enforcement */}
+            {groupId && (() => {
+              const groupBudgets = [
+                ...getBudgetsByType('group_category'),
+                ...getBudgetsByType('group_overall'),
+                ...getBudgetsByType('user_group')
+              ];
+              const groupUsages = getBudgetUsage(expenses, user?.uid, groupId);
+              const violatedGroup = groupUsages.filter(usage => 
+                groupBudgets.find(b => b.id === usage.budgetId && b.isActive) && usage.isOverBudget
+              );
+
+              return groupBudgets.length > 0 && (
+                <Card className={violatedGroup.length > 0 ? "border-red-200" : "border-green-200"}>
+                  <CardHeader>
+                    <CardTitle className="flex items-center gap-2">
+                      <Users className="w-4 h-4" />
+                      Group Budget Status
+                      {violatedGroup.length > 0 && (
+                        <Badge variant="destructive">{violatedGroup.length} Over Budget</Badge>
+                      )}
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    {violatedGroup.length === 0 ? (
+                      <p className="text-green-600">All group budgets are within limits</p>
+                    ) : (
+                      <div className="space-y-2">
+                        {violatedGroup.map(usage => {
+                          const budget = groupBudgets.find(b => b.id === usage.budgetId);
+                          return budget && (
+                            <div key={budget.id} className="flex items-center justify-between p-2 bg-red-50 rounded">
+                              <span className="font-medium">{budget.name}</span>
+                              <span className="text-red-600">Over by ${(usage.spent - budget.limit).toFixed(2)}</span>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
+              );
+            })()}
+          </div>
+        </TabsContent>
+
+        {/* Group Category Budgets Tab */}
+        {groupId && (
+          <TabsContent value="group_category" className="space-y-4">
             <div className="flex items-center space-x-2">
-              <config.icon className="w-5 h-5" />
+              <Target className="w-5 h-5" />
               <div>
-                <h3 className="text-lg font-semibold">{config.title}</h3>
-                <p className="text-sm text-muted-foreground">{config.description}</p>
+                <h3 className="text-lg font-semibold">Group Category Budgets</h3>
+                <p className="text-sm text-muted-foreground">Category-specific spending limits within the group</p>
               </div>
             </div>
 
             {(() => {
-              const budgets = getBudgetsByType(type as BudgetType);
+              const budgets = getBudgetsByType('group_category');
               return budgets.length === 0 ? (
                 <Card>
                   <CardContent className="text-center py-8">
-                    <config.icon className="w-12 h-12 mx-auto text-muted-foreground mb-4" />
-                    <p className="text-muted-foreground">
-                      No {config.title.toLowerCase()} created yet.
-                    </p>
+                    <Target className="w-12 h-12 mx-auto text-muted-foreground mb-4" />
+                    <p className="text-muted-foreground">No group category budgets created yet.</p>
                   </CardContent>
                 </Card>
               ) : (
                 <div className="grid gap-4">
-                  {budgets.map((budget) => renderBudgetCard(budget, type as BudgetType))}
+                  {budgets.map((budget) => renderBudgetCard(budget, 'group_category'))}
                 </div>
               );
             })()}
           </TabsContent>
-        ))}
+        )}
+
+        {/* Group Overall Budget Tab */}
+        {groupId && (
+          <TabsContent value="group_overall" className="space-y-4">
+            <div className="flex items-center space-x-2">
+              <Users className="w-5 h-5" />
+              <div>
+                <h3 className="text-lg font-semibold">Overall Group Budget</h3>
+                <p className="text-sm text-muted-foreground">Total spending limit for the entire group</p>
+              </div>
+            </div>
+
+            {(() => {
+              const budgets = getBudgetsByType('group_overall');
+              return budgets.length === 0 ? (
+                <Card>
+                  <CardContent className="text-center py-8">
+                    <Users className="w-12 h-12 mx-auto text-muted-foreground mb-4" />
+                    <p className="text-muted-foreground">No overall group budget created yet.</p>
+                  </CardContent>
+                </Card>
+              ) : (
+                <div className="grid gap-4">
+                  {budgets.map((budget) => renderBudgetCard(budget, 'group_overall'))}
+                </div>
+              );
+            })()}
+          </TabsContent>
+        )}
+
+        {/* User Group Budget Tab */}
+        {groupId && (
+          <TabsContent value="user_group" className="space-y-4">
+            <div className="flex items-center space-x-2">
+              <DollarSign className="w-5 h-5" />
+              <div>
+                <h3 className="text-lg font-semibold">User Budget Within Group</h3>
+                <p className="text-sm text-muted-foreground">Individual spending limits within group activities</p>
+              </div>
+            </div>
+
+            {(() => {
+              const budgets = getBudgetsByType('user_group');
+              return budgets.length === 0 ? (
+                <Card>
+                  <CardContent className="text-center py-8">
+                    <DollarSign className="w-12 h-12 mx-auto text-muted-foreground mb-4" />
+                    <p className="text-muted-foreground">No user group budgets created yet.</p>
+                  </CardContent>
+                </Card>
+              ) : (
+                <div className="grid gap-4">
+                  {budgets.map((budget) => renderBudgetCard(budget, 'user_group'))}
+                </div>
+              );
+            })()}
+          </TabsContent>
+        )}
       </Tabs>
     </div>
   );
