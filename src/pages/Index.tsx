@@ -25,6 +25,7 @@ import { fetchGroupMembersWithPhotos } from "@/components/firebaseComponents/Fet
 import { ImportDialog } from "@/components/ImportDialog";
 import { SearchPage } from "./SearchPage";
 import { CategoryManagement } from "@/components/CategoryManagement";
+import { OfflineIndicator } from "@/components/OfflineIndicator";
 
 const Index = () => {
   const { user, userProfile, logout } = useAuth();
@@ -149,6 +150,7 @@ const Index = () => {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-green-50">
+      <OfflineIndicator />
       {/* Mobile Navbar */}
       {isMobile && (
         <MobileNavbar

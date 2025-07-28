@@ -14,6 +14,7 @@ import {
   removeMemberFromGroup as removeMemberFromGroupFirebase,
 } from '@/services/firebaseService';
 import { notificationFirebaseService } from '@/services/notificationFirebaseService';
+import { useOfflineStore } from '@/stores/offlineStore';
 
 export interface Member {
   userId: string;
@@ -270,6 +271,27 @@ export const useExpenseStore = create<ExpenseStore>()(
         },
         
         addExpense: async (expense, userId) => {
+          const isOnline = useOfflineStore.getState().isOnline;
+          
+          if (!isOnline) {
+            // Add to offline queue and local state
+            const tempExpense: Expense = {
+              ...expense,
+              id: `temp_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
+            };
+            
+            set(state => ({
+              expenses: [...state.expenses, tempExpense]
+            }));
+            
+            useOfflineStore.getState().addToQueue({
+              type: 'CREATE_EXPENSE',
+              data: { expense, userId }
+            });
+            
+            return;
+          }
+
           try {
             set({ loading: true, error: null });
             console.log('Adding expense:', expense);
@@ -437,9 +459,27 @@ export const useExpenseStore = create<ExpenseStore>()(
         },
 
         updateExpense: async (id, updatedExpense) => {
+          const isOnline = useOfflineStore.getState().isOnline;
+          const expense = get().expenses.find(e => e.id === id);
+          
+          if (!isOnline && expense) {
+            // Update local state and queue for sync
+            set(state => ({
+              expenses: state.expenses.map(e => 
+                e.id === id ? { ...e, ...updatedExpense } : e
+              )
+            }));
+            
+            useOfflineStore.getState().addToQueue({
+              type: 'UPDATE_EXPENSE',
+              data: { id, updates: updatedExpense, groupId: expense.groupId }
+            });
+            
+            return;
+          }
+
           try {
             set({ loading: true, error: null });
-            const expense = get().expenses.find(e => e.id === id);
             if (expense) {
               await updateExpenseFirebase(expense.groupId, id, updatedExpense);
               
@@ -479,9 +519,25 @@ export const useExpenseStore = create<ExpenseStore>()(
         },
 
         deleteExpense: async (id, groupId) => {
+          const isOnline = useOfflineStore.getState().isOnline;
+          const expense = get().expenses.find(e => e.id === id);
+          
+          if (!isOnline) {
+            // Remove from local state and queue for sync
+            set(state => ({
+              expenses: state.expenses.filter(e => e.id !== id)
+            }));
+            
+            useOfflineStore.getState().addToQueue({
+              type: 'DELETE_EXPENSE',
+              data: { id, groupId }
+            });
+            
+            return;
+          }
+
           try {
             set({ loading: true, error: null });
-            const expense = get().expenses.find(e => e.id === id);
             
             await deleteExpenseFirebase(groupId, id);
             
