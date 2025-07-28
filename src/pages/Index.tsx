@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Plus, Settings, Users, Receipt, TrendingUp, User, BarChart3, Wallet, Upload } from "lucide-react";
+import { Plus, Settings, Users, Receipt, TrendingUp, User, BarChart3, Wallet, Upload, Search } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -23,6 +23,8 @@ import { motion, AnimatePresence } from "framer-motion";
 import { GroupDetailMobileNav } from "@/components/GroupDetailMobileNav";
 import { fetchGroupMembersWithPhotos } from "@/components/firebaseComponents/FetchGroupMembersWithPhotos";
 import { ImportDialog } from "@/components/ImportDialog";
+import { SearchPage } from "./SearchPage";
+
 const Index = () => {
   const { user, userProfile, logout } = useAuth();
   const { groups, expenses, selectedGroup, setSelectedGroup, getBalances, initializeFirebaseSync } = useExpenseStore();
@@ -31,6 +33,7 @@ const Index = () => {
   const [showUserProfile, setShowUserProfile] = useState(false);
   const [showLanding, setShowLanding] = useState(false);
   const [showAuth, setShowAuth] = useState(false);
+  const [showSearch, setShowSearch] = useState(false);
   const [activeTab, setActiveTab] = useState("overview");
   const isMobile = useIsMobile();
   const [enrichedGroups, setEnrichedGroups] = useState([]);
@@ -112,6 +115,10 @@ const Index = () => {
     return <UserProfile onClose={() => setShowUserProfile(false)} />;
   }
 
+  if (showSearch) {
+    return <SearchPage onBack={() => setShowSearch(false)} />;
+  }
+
   if (selectedGroup) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-blue-50 to-green-50">
@@ -161,6 +168,15 @@ const Index = () => {
             </div>
             <div className="flex flex-wrap gap-2 justify-center sm:justify-end">
               <NotificationBell />
+              <Button
+                onClick={() => setShowSearch(true)}
+                variant="outline"
+                size="sm"
+                className="text-xs sm:text-sm"
+              >
+                <Search className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-2" />
+                Search
+              </Button>
               <Button
                 onClick={() => setShowUserProfile(true)}
                 variant="outline"
