@@ -1,11 +1,15 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 
+export type BudgetType = 'individual' | 'group_category' | 'group_overall' | 'user_group';
+
 export interface Budget {
   id: string;
   name: string;
-  category?: string; // undefined means overall budget
-  groupId?: string; // undefined means overall user budget
+  type: BudgetType;
+  category?: string; // for group_category budgets
+  groupId?: string; // for group_category, group_overall, user_group budgets
+  userId?: string; // for user_group budgets
   limit: number;
   period: 'monthly' | 'weekly' | 'yearly';
   alertThreshold: number; // percentage (e.g., 80 for 80%)
@@ -26,10 +30,13 @@ interface BudgetState {
   addBudget: (budget: Omit<Budget, 'id' | 'createdAt'>) => void;
   updateBudget: (id: string, updates: Partial<Budget>) => void;
   deleteBudget: (id: string) => void;
-  getBudgetUsage: (expenses: any[], groupId?: string) => BudgetUsage[];
-  getActiveBudgets: (groupId?: string) => Budget[];
-  getGroupBudgets: (groupId: string) => Budget[];
-  getUserBudgets: () => Budget[];
+  getBudgetUsage: (expenses: any[], userId?: string, groupId?: string) => BudgetUsage[];
+  getActiveBudgets: (type?: BudgetType, groupId?: string, userId?: string) => Budget[];
+  getIndividualBudgets: (userId?: string) => Budget[];
+  getGroupCategoryBudgets: (groupId: string) => Budget[];
+  getGroupOverallBudgets: (groupId: string) => Budget[];
+  getUserGroupBudgets: (groupId: string, userId?: string) => Budget[];
+  getAllGroupBudgets: (groupId: string) => Budget[];
 }
 
 export const useBudgetStore = create<BudgetState>()(
@@ -62,26 +69,51 @@ export const useBudgetStore = create<BudgetState>()(
         }));
       },
 
-      getActiveBudgets: (groupId?: string) => {
+      getActiveBudgets: (type?: BudgetType, groupId?: string, userId?: string) => {
+        return get().budgets.filter(budget => {
+          if (!budget.isActive) return false;
+          if (type && budget.type !== type) return false;
+          if (groupId && budget.groupId !== groupId) return false;
+          if (userId && budget.userId !== userId) return false;
+          return true;
+        });
+      },
+
+      getIndividualBudgets: (userId?: string) => {
         return get().budgets.filter(budget => 
-          budget.isActive && 
-          (groupId ? budget.groupId === groupId : !budget.groupId)
+          budget.type === 'individual' && (!userId || budget.userId === userId)
         );
       },
 
-      getGroupBudgets: (groupId: string) => {
+      getGroupCategoryBudgets: (groupId: string) => {
+        return get().budgets.filter(budget => 
+          budget.type === 'group_category' && budget.groupId === groupId
+        );
+      },
+
+      getGroupOverallBudgets: (groupId: string) => {
+        return get().budgets.filter(budget => 
+          budget.type === 'group_overall' && budget.groupId === groupId
+        );
+      },
+
+      getUserGroupBudgets: (groupId: string, userId?: string) => {
+        return get().budgets.filter(budget => 
+          budget.type === 'user_group' && 
+          budget.groupId === groupId && 
+          (!userId || budget.userId === userId)
+        );
+      },
+
+      getAllGroupBudgets: (groupId: string) => {
         return get().budgets.filter(budget => budget.groupId === groupId);
       },
 
-      getUserBudgets: () => {
-        return get().budgets.filter(budget => !budget.groupId);
-      },
-
-      getBudgetUsage: (expenses, groupId?: string) => {
-        const activeBudgets = get().getActiveBudgets(groupId);
+      getBudgetUsage: (expenses, userId?: string, groupId?: string) => {
+        const allBudgets = get().budgets.filter(budget => budget.isActive);
         const currentDate = new Date();
         
-        return activeBudgets.map((budget) => {
+        return allBudgets.map((budget) => {
           // Calculate period start date
           let periodStart: Date;
           switch (budget.period) {
@@ -97,26 +129,29 @@ export const useBudgetStore = create<BudgetState>()(
               break;
           }
 
-          // Filter expenses for the budget period and group
+          // Filter expenses based on budget type
           const periodExpenses = expenses.filter((expense) => {
             const expenseDate = new Date(expense.date);
             const isInPeriod = expenseDate >= periodStart && expenseDate <= currentDate;
-            const isInGroup = groupId ? expense.groupId === groupId : true;
-            return isInPeriod && isInGroup;
+            
+            switch (budget.type) {
+              case 'individual':
+                return isInPeriod && (!userId || expense.paidBy === userId) && !expense.groupId;
+              case 'group_category':
+                return isInPeriod && expense.groupId === budget.groupId && 
+                       expense.category === budget.category;
+              case 'group_overall':
+                return isInPeriod && expense.groupId === budget.groupId;
+              case 'user_group':
+                return isInPeriod && expense.groupId === budget.groupId && 
+                       expense.paidBy === budget.userId;
+              default:
+                return false;
+            }
           });
 
           // Calculate spent amount
-          let spent = 0;
-          if (budget.category) {
-            // Category-specific budget
-            spent = periodExpenses
-              .filter((expense) => expense.category === budget.category)
-              .reduce((sum, expense) => sum + expense.amount, 0);
-          } else {
-            // Overall budget
-            spent = periodExpenses.reduce((sum, expense) => sum + expense.amount, 0);
-          }
-
+          const spent = periodExpenses.reduce((sum, expense) => sum + expense.amount, 0);
           const percentage = (spent / budget.limit) * 100;
           const isOverBudget = spent > budget.limit;
           const isNearLimit = percentage >= budget.alertThreshold;

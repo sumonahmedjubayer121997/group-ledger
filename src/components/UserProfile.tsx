@@ -27,6 +27,7 @@ import { ProfilePrivacySecurity } from './profile/ProfilePrivacySecurity';
 import { ProfileActivityFeed } from './profile/ProfileActivityFeed';
 import { ProfilePictureUpload } from './ProfilePictureUpload';
 import { ProfileOverallBudget } from './profile/ProfileOverallBudget';
+import { ComprehensiveBudgetManagement } from './ComprehensiveBudgetManagement';
 import { useIsMobile } from '@/hooks/use-mobile';
 
 interface UserProfileProps {
@@ -191,7 +192,13 @@ export const UserProfile: React.FC<UserProfileProps> = ({ onClose }) => {
             </TabsContent>
 
             <TabsContent value="budgets" className="space-y-4">
-              <ProfileOverallBudget />
+              <div className="space-y-6">
+                <ProfileOverallBudget />
+                <div className="pt-6 border-t">
+                  <h3 className="text-lg font-semibold mb-4">All Budget Management</h3>
+                  <ComprehensiveBudgetManagement />
+                </div>
+              </div>
             </TabsContent>
 
             <TabsContent value="settings" className="space-y-4">

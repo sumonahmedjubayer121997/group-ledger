@@ -37,7 +37,7 @@ export const GroupBudgetManagement: React.FC<GroupBudgetManagementProps> = ({ gr
     addBudget, 
     updateBudget, 
     deleteBudget, 
-    getGroupBudgets, 
+    getAllGroupBudgets, 
     getBudgetUsage 
   } = useBudgetStore();
   
@@ -45,7 +45,7 @@ export const GroupBudgetManagement: React.FC<GroupBudgetManagementProps> = ({ gr
   const { expenses } = useExpenseStore();
   const { toast } = useToast();
 
-  const groupBudgets = getGroupBudgets(group.id);
+  const groupBudgets = getAllGroupBudgets(group.id);
   const groupExpenses = expenses.filter(expense => expense.groupId === group.id);
   const budgetUsages = getBudgetUsage(groupExpenses, group.id);
 
@@ -61,6 +61,7 @@ export const GroupBudgetManagement: React.FC<GroupBudgetManagementProps> = ({ gr
 
     addBudget({
       ...newBudget,
+      type: newBudget.category === 'overall' ? 'group_overall' : 'group_category',
       groupId: group.id,
       isActive: true,
     });

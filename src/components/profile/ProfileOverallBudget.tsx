@@ -28,7 +28,7 @@ export const ProfileOverallBudget: React.FC = () => {
     addBudget, 
     updateBudget, 
     deleteBudget, 
-    getUserBudgets, 
+    getIndividualBudgets, 
     getBudgetUsage 
   } = useBudgetStore();
   
@@ -36,7 +36,7 @@ export const ProfileOverallBudget: React.FC = () => {
   const { expenses } = useExpenseStore();
   const { toast } = useToast();
 
-  const userBudgets = getUserBudgets();
+  const userBudgets = getIndividualBudgets();
   const userExpenses = expenses.filter(expense => !expense.groupId); // Personal expenses only
   const budgetUsages = getBudgetUsage(userExpenses);
 
@@ -52,6 +52,7 @@ export const ProfileOverallBudget: React.FC = () => {
 
     addBudget({
       ...newBudget,
+      type: 'individual',
       isActive: true,
     });
 

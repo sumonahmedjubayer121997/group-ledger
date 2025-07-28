@@ -17,6 +17,8 @@ import { UserProfile } from "@/components/UserProfile";
 import { LandingPage } from "@/components/LandingPage";
 import { AuthPage } from "./AuthPage";
 import { Header } from "@/components/Header";
+import { BudgetNotificationCenter } from "@/components/BudgetNotificationCenter";
+import { ComprehensiveBudgetManagement } from "@/components/ComprehensiveBudgetManagement";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { motion, AnimatePresence } from "framer-motion";
 import { GroupDetailMobileNav } from "@/components/GroupDetailMobileNav";
@@ -408,7 +410,7 @@ const Index = () => {
                       Close
                     </Button>
                   </div>
-                  <BudgetManagement />
+                  <ComprehensiveBudgetManagement />
                 </div>
               </div>
             </div>

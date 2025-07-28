@@ -64,7 +64,10 @@ export const BudgetManagement: React.FC<BudgetManagementProps> = ({ isOpen, onCl
     if (editingBudget) {
       updateBudget(editingBudget.id, budgetData);
     } else {
-      addBudget(budgetData);
+      addBudget({
+        ...budgetData,
+        type: 'individual'
+      });
     }
 
     resetForm();

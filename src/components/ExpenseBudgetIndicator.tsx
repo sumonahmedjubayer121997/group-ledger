@@ -9,11 +9,11 @@ interface ExpenseBudgetIndicatorProps {
 }
 
 export const ExpenseBudgetIndicator: React.FC<ExpenseBudgetIndicatorProps> = ({ expense }) => {
-  const { getGroupBudgets, getBudgetUsage } = useBudgetStore();
+  const { getAllGroupBudgets, getBudgetUsage } = useBudgetStore();
   const { expenses } = useExpenseStore();
 
   // Get budgets for this expense's group
-  const groupBudgets = expense.groupId ? getGroupBudgets(expense.groupId) : [];
+  const groupBudgets = expense.groupId ? getAllGroupBudgets(expense.groupId) : [];
   const activeBudgets = groupBudgets.filter(budget => budget.isActive);
 
   if (activeBudgets.length === 0) return null;

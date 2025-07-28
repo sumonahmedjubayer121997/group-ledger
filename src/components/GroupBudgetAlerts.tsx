@@ -17,10 +17,10 @@ export const GroupBudgetAlerts: React.FC<GroupBudgetAlertsProps> = ({
   group, 
   onManageBudgets 
 }) => {
-  const { getGroupBudgets, getBudgetUsage } = useBudgetStore();
+  const { getAllGroupBudgets, getBudgetUsage } = useBudgetStore();
   const { expenses } = useExpenseStore();
 
-  const groupBudgets = getGroupBudgets(group.id);
+  const groupBudgets = getAllGroupBudgets(group.id);
   const activeBudgets = groupBudgets.filter(budget => budget.isActive);
   const groupExpenses = expenses.filter(expense => expense.groupId === group.id);
   const budgetUsages = getBudgetUsage(groupExpenses, group.id);
