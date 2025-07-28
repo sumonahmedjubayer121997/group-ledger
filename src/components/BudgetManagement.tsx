@@ -127,7 +127,7 @@ export const BudgetManagement: React.FC<BudgetManagementProps> = ({ isOpen, onCl
                     <SelectValue placeholder="Select category (leave empty for overall budget)" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="">Overall Budget</SelectItem>
+                    <SelectItem value="overall">Overall Budget</SelectItem>
                     {categories.map((category) => (
                       <SelectItem key={category.id} value={category.name}>
                         {category.name}
