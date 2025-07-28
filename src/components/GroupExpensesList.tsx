@@ -7,9 +7,10 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
 import { Expense, Group } from '@/stores/expenseStore';
 import { useExpenseStore } from '@/stores/expenseStore';
-import { Receipt, Calendar, User, Tag, MoreVertical, Pencil, Trash2, Plus } from 'lucide-react';
+import { Receipt, Calendar, User, Tag, MoreVertical, Pencil, Trash2, Plus, MessageCircle } from 'lucide-react';
 import { ExpenseForm } from './ExpenseForm';
 import { EditExpenseForm } from './EditExpenseForm';
+import { ExpenseComments } from './ExpenseComments';
 import { useToast } from '@/hooks/use-toast';
 import { formatDistanceToNow } from 'date-fns';
 
@@ -28,6 +29,7 @@ export const GroupExpensesList: React.FC<GroupExpensesListProps> = ({
   const { toast } = useToast();
   const [showExpenseForm, setShowExpenseForm] = useState(false);
   const [editingExpense, setEditingExpense] = useState<Expense | null>(null);
+  const [commentsExpense, setCommentsExpense] = useState<Expense | null>(null);
 
   const groupExpenses = expenses
     .filter(expense => expense.groupId === group.id)
@@ -158,6 +160,10 @@ export const GroupExpensesList: React.FC<GroupExpensesListProps> = ({
                         <Pencil className="w-4 h-4 mr-2" />
                         Edit
                       </DropdownMenuItem>
+                      <DropdownMenuItem onClick={() => setCommentsExpense(expense)}>
+                        <MessageCircle className="w-4 h-4 mr-2" />
+                        Comments
+                      </DropdownMenuItem>
                       <AlertDialog>
                         <AlertDialogTrigger asChild>
                           <DropdownMenuItem onSelect={(e) => e.preventDefault()}>
@@ -202,6 +208,14 @@ export const GroupExpensesList: React.FC<GroupExpensesListProps> = ({
           expense={editingExpense}
           isOpen={!!editingExpense}
           onClose={() => setEditingExpense(null)}
+        />
+      )}
+
+      {commentsExpense && (
+        <ExpenseComments
+          expense={commentsExpense}
+          isOpen={!!commentsExpense}
+          onClose={() => setCommentsExpense(null)}
         />
       )}
     </>

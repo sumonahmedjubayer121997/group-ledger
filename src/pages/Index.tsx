@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Plus, Settings, Users, Receipt, TrendingUp, User, BarChart3, Wallet, Upload, Search } from "lucide-react";
+import { Plus, Settings, Users, Receipt, TrendingUp, User, BarChart3, Wallet, Upload, Search, Tag } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -24,6 +24,7 @@ import { GroupDetailMobileNav } from "@/components/GroupDetailMobileNav";
 import { fetchGroupMembersWithPhotos } from "@/components/firebaseComponents/FetchGroupMembersWithPhotos";
 import { ImportDialog } from "@/components/ImportDialog";
 import { SearchPage } from "./SearchPage";
+import { CategoryManagement } from "@/components/CategoryManagement";
 
 const Index = () => {
   const { user, userProfile, logout } = useAuth();
@@ -34,6 +35,7 @@ const Index = () => {
   const [showLanding, setShowLanding] = useState(false);
   const [showAuth, setShowAuth] = useState(false);
   const [showSearch, setShowSearch] = useState(false);
+  const [showCategoryManagement, setShowCategoryManagement] = useState(false);
   const [activeTab, setActiveTab] = useState("overview");
   const isMobile = useIsMobile();
   const [enrichedGroups, setEnrichedGroups] = useState([]);
@@ -185,6 +187,15 @@ const Index = () => {
               >
                 <User className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-2" />
                 Profile
+              </Button>
+              <Button
+                onClick={() => setShowCategoryManagement(true)}
+                variant="outline"
+                size="sm"
+                className="text-xs sm:text-sm"
+              >
+                <Tag className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-2" />
+                Categories
               </Button>
               <Button
                     onClick={() => setShowExpenseForm(true)}
@@ -430,9 +441,20 @@ const Index = () => {
             />
           </motion.div>
         )}
+        {showCategoryManagement && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.2 }}
+          >
+            <CategoryManagement
+              isOpen={showCategoryManagement}
+              onClose={() => setShowCategoryManagement(false)}
+            />
+          </motion.div>
+        )}
         {/* Mobile Bottom Tab Bar */}
-
-        
 
         
 {isMobile && (

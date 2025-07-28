@@ -18,20 +18,22 @@ interface ExpenseFormProps {
   onClose: () => void;
 }
 
-const categories = [
-  'Food & Dining',
-  'Transportation',
-  'Entertainment',
-  'Shopping',
-  'Bills & Utilities',
-  'Travel',
-  'Other',
-];
+import { useCategoryStore } from '@/stores/categoryStore';
 
 export const ExpenseForm: React.FC<ExpenseFormProps> = ({ isOpen, onClose }) => {
   const { groups, addExpense, loading } = useExpenseStore();
+  const { getAllAvailableCategories, initializeDefaultCategories } = useCategoryStore();
   const { user } = useAuth();
   const { toast } = useToast();
+
+  // Initialize categories for user and get available categories
+  React.useEffect(() => {
+    if (user?.uid) {
+      initializeDefaultCategories(user.uid);
+    }
+  }, [user?.uid, initializeDefaultCategories]);
+
+  const availableCategories = user ? getAllAvailableCategories(user.uid) : [];
   
   const [formData, setFormData] = useState({
     description: '',
@@ -224,7 +226,7 @@ export const ExpenseForm: React.FC<ExpenseFormProps> = ({ isOpen, onClose }) => 
                   <SelectValue placeholder="Select category" />
                 </SelectTrigger>
                 <SelectContent>
-                  {categories.map((category) => (
+                  {availableCategories.map((category) => (
                     <SelectItem key={category} value={category}>
                       <div className="flex items-center space-x-2">
                         <Tag className="w-4 h-4" />
