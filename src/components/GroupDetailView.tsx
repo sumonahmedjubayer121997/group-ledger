@@ -20,7 +20,8 @@ import {
   Eye,
   User,
   Archive,
-  ArrowLeft
+  ArrowLeft,
+  Target
 } from 'lucide-react';
 import { GroupSettings } from './GroupSettings';
 import { GroupActivityFeed } from './GroupActivityFeed';
@@ -31,6 +32,8 @@ import { ExpenseForm } from './ExpenseForm';
 import { RecurringExpenseDialog } from './RecurringExpenseDialog';
 import { GroupDetailMobileNav } from './GroupDetailMobileNav';
 import { GroupExpensesList } from './GroupExpensesList';
+import { GroupBudgetManagement } from './GroupBudgetManagement';
+import { GroupBudgetAlerts } from './GroupBudgetAlerts';
 import { fetchGroupMembersWithPhotos } from '@/components/firebaseComponents/FetchGroupMembersWithPhotos';
 
 interface GroupDetailViewProps {
@@ -48,11 +51,12 @@ type MemberWithPhoto = {
 };
 
 export const GroupDetailView: React.FC<GroupDetailViewProps> = ({ group: initialGroup, onBack }) => {
-  const [activeTab, setActiveTab] = useState<'overview' | 'analytics' | 'activity' | 'members' | 'communication' | 'settings'>('overview');
+  const [activeTab, setActiveTab] = useState<'overview' | 'analytics' | 'activity' | 'members' | 'communication' | 'settings' | 'budgets'>('overview');
   const [showExpenseForm, setShowExpenseForm] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
   const [showInvite, setShowInvite] = useState(false);
   const [showRecurring, setShowRecurring] = useState(false);
+  const [showBudgetManagement, setShowBudgetManagement] = useState(false);
   const [groupMembers, setGroupMembers] = useState<MemberWithPhoto[]>([]);
   const [group, setGroup] = useState<Group>(initialGroup);
 
@@ -115,6 +119,7 @@ export const GroupDetailView: React.FC<GroupDetailViewProps> = ({ group: initial
   const tabs = [
     { id: 'overview', label: 'Overview', icon: BarChart3 },
     { id: 'analytics', label: 'Analytics', icon: BarChart3 },
+    { id: 'budgets', label: 'Budgets', icon: Target },
     { id: 'activity', label: 'Activity', icon: Activity },
     { id: 'members', label: 'Members', icon: Users },
     { id: 'settings', label: 'Settings', icon: Settings },
@@ -200,6 +205,13 @@ export const GroupDetailView: React.FC<GroupDetailViewProps> = ({ group: initial
                       Invite
                     </Button>
                   </GroupInviteDialog>
+
+                  <GroupBudgetManagement group={group}>
+                    <Button variant="outline">
+                      <Target className="w-4 h-4 mr-2" />
+                      Budgets
+                    </Button>
+                  </GroupBudgetManagement>
 
                   {isUserAdmin && (
                     <Button
@@ -326,6 +338,12 @@ export const GroupDetailView: React.FC<GroupDetailViewProps> = ({ group: initial
           >
             {activeTab === 'overview' && (
               <div className="space-y-6">
+                {/* Budget Alerts */}
+                <GroupBudgetAlerts 
+                  group={group} 
+                  onManageBudgets={() => setShowBudgetManagement(true)}
+                />
+
                 {/* Recent Expenses */}
                 <GroupExpensesList
                   group={group}
@@ -422,6 +440,20 @@ export const GroupDetailView: React.FC<GroupDetailViewProps> = ({ group: initial
             )}
 
             {activeTab === 'analytics' && <GroupAnalytics group={group} />}
+            {activeTab === 'budgets' && (
+              <div className="space-y-6">
+                <GroupBudgetAlerts 
+                  group={group} 
+                  onManageBudgets={() => setShowBudgetManagement(true)}
+                />
+                <GroupBudgetManagement group={group}>
+                  <Button className="w-full">
+                    <Target className="w-4 h-4 mr-2" />
+                    Manage Group Budgets
+                  </Button>
+                </GroupBudgetManagement>
+              </div>
+            )}
             {activeTab === 'activity' && <GroupActivityFeed group={group} />}
             {activeTab === 'members' && <GroupMemberManagement group={group} />}
             {activeTab === 'communication' && (

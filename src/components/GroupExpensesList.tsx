@@ -11,6 +11,7 @@ import { Receipt, Calendar, User, Tag, MoreVertical, Pencil, Trash2, Plus, Messa
 import { ExpenseForm } from './ExpenseForm';
 import { EditExpenseForm } from './EditExpenseForm';
 import { ExpenseComments } from './ExpenseComments';
+import { ExpenseBudgetIndicator } from './ExpenseBudgetIndicator';
 import { useToast } from '@/hooks/use-toast';
 import { formatDistanceToNow } from 'date-fns';
 
@@ -144,9 +145,12 @@ export const GroupExpensesList: React.FC<GroupExpensesListProps> = ({
                 <div className="flex items-center space-x-2">
                   <div className="text-right flex-shrink-0">
                     <div className="font-semibold text-gray-900 text-sm">{group.settings.currency}{expense.amount.toFixed(2)}</div>
-                    <Badge variant="outline" className="text-xs">
-                      {expense.category}
-                    </Badge>
+                    <div className="flex items-center space-x-1">
+                      <Badge variant="outline" className="text-xs">
+                        {expense.category}
+                      </Badge>
+                      <ExpenseBudgetIndicator expense={expense} />
+                    </div>
                   </div>
                   
                   <DropdownMenu>

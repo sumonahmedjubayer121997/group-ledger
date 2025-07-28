@@ -5,6 +5,7 @@ export interface Budget {
   id: string;
   name: string;
   category?: string; // undefined means overall budget
+  groupId?: string; // undefined means overall user budget
   limit: number;
   period: 'monthly' | 'weekly' | 'yearly';
   alertThreshold: number; // percentage (e.g., 80 for 80%)
@@ -25,8 +26,10 @@ interface BudgetState {
   addBudget: (budget: Omit<Budget, 'id' | 'createdAt'>) => void;
   updateBudget: (id: string, updates: Partial<Budget>) => void;
   deleteBudget: (id: string) => void;
-  getBudgetUsage: (expenses: any[]) => BudgetUsage[];
-  getActiveBudgets: () => Budget[];
+  getBudgetUsage: (expenses: any[], groupId?: string) => BudgetUsage[];
+  getActiveBudgets: (groupId?: string) => Budget[];
+  getGroupBudgets: (groupId: string) => Budget[];
+  getUserBudgets: () => Budget[];
 }
 
 export const useBudgetStore = create<BudgetState>()(
@@ -59,12 +62,23 @@ export const useBudgetStore = create<BudgetState>()(
         }));
       },
 
-      getActiveBudgets: () => {
-        return get().budgets.filter(budget => budget.isActive);
+      getActiveBudgets: (groupId?: string) => {
+        return get().budgets.filter(budget => 
+          budget.isActive && 
+          (groupId ? budget.groupId === groupId : !budget.groupId)
+        );
       },
 
-      getBudgetUsage: (expenses) => {
-        const activeBudgets = get().getActiveBudgets();
+      getGroupBudgets: (groupId: string) => {
+        return get().budgets.filter(budget => budget.groupId === groupId);
+      },
+
+      getUserBudgets: () => {
+        return get().budgets.filter(budget => !budget.groupId);
+      },
+
+      getBudgetUsage: (expenses, groupId?: string) => {
+        const activeBudgets = get().getActiveBudgets(groupId);
         const currentDate = new Date();
         
         return activeBudgets.map((budget) => {
@@ -83,10 +97,12 @@ export const useBudgetStore = create<BudgetState>()(
               break;
           }
 
-          // Filter expenses for the budget period
+          // Filter expenses for the budget period and group
           const periodExpenses = expenses.filter((expense) => {
             const expenseDate = new Date(expense.date);
-            return expenseDate >= periodStart && expenseDate <= currentDate;
+            const isInPeriod = expenseDate >= periodStart && expenseDate <= currentDate;
+            const isInGroup = groupId ? expense.groupId === groupId : true;
+            return isInPeriod && isInGroup;
           });
 
           // Calculate spent amount

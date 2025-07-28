@@ -16,7 +16,8 @@ import {
   Activity,
   Download,
   Edit,
-  ArrowLeft
+  ArrowLeft,
+  Target
 } from 'lucide-react';
 import { ProfileBasicInfo } from './profile/ProfileBasicInfo';
 import { ProfileFinancialSummary } from './profile/ProfileFinancialSummary';
@@ -25,6 +26,7 @@ import { ProfilePreferences } from './profile/ProfilePreferences';
 import { ProfilePrivacySecurity } from './profile/ProfilePrivacySecurity';
 import { ProfileActivityFeed } from './profile/ProfileActivityFeed';
 import { ProfilePictureUpload } from './ProfilePictureUpload';
+import { ProfileOverallBudget } from './profile/ProfileOverallBudget';
 import { useIsMobile } from '@/hooks/use-mobile';
 
 interface UserProfileProps {
@@ -92,6 +94,7 @@ export const UserProfile: React.FC<UserProfileProps> = ({ onClose }) => {
   const tabItems = [
     { value: 'overview', label: 'Overview', icon: User },
     { value: 'financial', label: 'Financial', icon: CreditCard },
+    { value: 'budgets', label: 'Budgets', icon: Target },
     { value: 'settings', label: 'Settings', icon: Settings },
     { value: 'preferences', label: 'Preferences', icon: Bell },
     { value: 'privacy', label: 'Privacy', icon: Shield },
@@ -185,6 +188,10 @@ export const UserProfile: React.FC<UserProfileProps> = ({ onClose }) => {
 
             <TabsContent value="financial" className="space-y-4">
               <ProfileFinancialSummary userProfile={profileData as any} />
+            </TabsContent>
+
+            <TabsContent value="budgets" className="space-y-4">
+              <ProfileOverallBudget />
             </TabsContent>
 
             <TabsContent value="settings" className="space-y-4">
