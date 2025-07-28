@@ -16,8 +16,7 @@ import SpendingTrends from "@/components/SpendingTrends";
 import { UserProfile } from "@/components/UserProfile";
 import { LandingPage } from "@/components/LandingPage";
 import { AuthPage } from "./AuthPage";
-import { MobileNavbar } from "@/components/MobileNavbar";
-import { NotificationBell } from "@/components/NotificationBell";
+import { Header } from "@/components/Header";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { motion, AnimatePresence } from "framer-motion";
 import { GroupDetailMobileNav } from "@/components/GroupDetailMobileNav";
@@ -157,115 +156,24 @@ const Index = () => {
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-green-50">
       <OfflineIndicator />
       
+      {/* Header */}
+      <Header
+        onProfileClick={() => setShowUserProfile(true)}
+        onNewGroupClick={() => setShowGroupForm(true)}
+        onNewExpenseClick={() => setShowExpenseForm(true)}
+        onSearchClick={() => setShowSearch(true)}
+        onCategoriesClick={() => setShowCategoryManagement(true)}
+        onBudgetsClick={() => setShowBudgetManagement(true)}
+        onAIAssistantClick={() => setShowAIChat(true)}
+        onLogout={handleLogout}
+      />
+
       {/* Budget Alerts */}
-      <div className="container mx-auto px-3 pt-2">
+      <div className="container mx-auto px-4 pt-4">
         <BudgetAlerts />
       </div>
-      {/* Mobile Navbar */}
-      {isMobile && (
-        <MobileNavbar
-          onProfileClick={() => setShowUserProfile(true)}
-          onNewGroupClick={() => setShowGroupForm(true)}
-          onLogout={handleLogout}
-        />
-      )}
 
-      <div className="container mx-auto px-3 py-4 sm:px-4 sm:py-6" style={{ paddingBottom: isMobile ? '80px' : '24px' }}>
-        {/* Desktop Header */}
-        {!isMobile && (
-          <div className="flex flex-col gap-3 sm:flex-row sm:justify-between sm:items-center mb-4 sm:mb-6">
-            <div className="text-center sm:text-left">
-              <h1 className="text-xl sm:text-2xl md:text-3xl font-bold text-gray-900">SplitWize</h1>
-              <p className="text-gray-600 text-xs sm:text-sm md:text-base">
-                Split expenses with friends and family
-              </p>
-            </div>
-            <div className="flex flex-wrap gap-2 justify-center sm:justify-end">
-              <NotificationBell />
-              <Button
-                onClick={() => setShowSearch(true)}
-                variant="outline"
-                size="sm"
-                className="text-xs sm:text-sm"
-              >
-                <Search className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-2" />
-                Search
-              </Button>
-              <Button
-                onClick={() => setShowUserProfile(true)}
-                variant="outline"
-                size="sm"
-                className="text-xs sm:text-sm"
-              >
-                <User className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-2" />
-                Profile
-              </Button>
-              <Button
-                onClick={() => setShowCategoryManagement(true)}
-                variant="outline"
-                size="sm"
-                className="text-xs sm:text-sm"
-              >
-                <Tag className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-2" />
-                Categories
-              </Button>
-              <Button
-                onClick={() => setShowBudgetManagement(true)}
-                variant="outline"
-                size="sm"
-                className="text-xs sm:text-sm"
-              >
-                <DollarSign className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-2" />
-                Budgets
-              </Button>
-              <Button
-                onClick={() => setShowAIChat(true)}
-                variant="outline"
-                size="sm"
-                className="text-xs sm:text-sm"
-              >
-                <Bot className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-2" />
-                AI Assistant
-              </Button>
-              <Button
-                    onClick={() => setShowExpenseForm(true)}
-                    className="bg-green-600 hover:bg-green-700 text-xs sm:text-sm"
-                    size="sm"
-                  >
-                    <Plus className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-2" />
-                    Add Expense
-                  </Button>
-                  <ImportDialog>
-                    <Button
-                      variant="outline"
-                      className="text-xs sm:text-sm"
-                      size="sm"
-                    >
-                      <Upload className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-2" />
-                      Import CSV
-                    </Button>
-                  </ImportDialog>
-              <Button
-                onClick={() => setShowGroupForm(true)}
-                className="bg-blue-600 hover:bg-blue-700 text-xs sm:text-sm"
-                size="sm"
-              >
-                <Plus className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-2" />
-                New Group
-              </Button>
-              <Button
-                onClick={handleLogout}
-                variant="outline"
-                size="sm"
-                className="text-xs sm:text-sm"
-              >
-                <Settings className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-2" />
-                Logout
-              </Button>
-            </div>
-          </div>
-        )}
-
+      <div className="container mx-auto px-4 py-6">
         {/* Welcome Message */}
         <motion.div 
           className="mb-4 sm:mb-6"
