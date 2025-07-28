@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Plus, Settings, Users, Receipt, TrendingUp, User, BarChart3, Wallet, Upload, Search, Tag } from "lucide-react";
+import { Plus, Settings, Users, Receipt, TrendingUp, User, BarChart3, Wallet, Upload, Search, Tag, DollarSign } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -25,6 +25,8 @@ import { fetchGroupMembersWithPhotos } from "@/components/firebaseComponents/Fet
 import { ImportDialog } from "@/components/ImportDialog";
 import { SearchPage } from "./SearchPage";
 import { CategoryManagement } from "@/components/CategoryManagement";
+import { BudgetManagement } from "@/components/BudgetManagement";
+import { BudgetAlerts } from "@/components/BudgetAlerts";
 import { OfflineIndicator } from "@/components/OfflineIndicator";
 
 const Index = () => {
@@ -37,6 +39,7 @@ const Index = () => {
   const [showAuth, setShowAuth] = useState(false);
   const [showSearch, setShowSearch] = useState(false);
   const [showCategoryManagement, setShowCategoryManagement] = useState(false);
+  const [showBudgetManagement, setShowBudgetManagement] = useState(false);
   const [activeTab, setActiveTab] = useState("overview");
   const isMobile = useIsMobile();
   const [enrichedGroups, setEnrichedGroups] = useState([]);
@@ -151,6 +154,11 @@ const Index = () => {
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-green-50">
       <OfflineIndicator />
+      
+      {/* Budget Alerts */}
+      <div className="container mx-auto px-3 pt-2">
+        <BudgetAlerts />
+      </div>
       {/* Mobile Navbar */}
       {isMobile && (
         <MobileNavbar
@@ -198,6 +206,15 @@ const Index = () => {
               >
                 <Tag className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-2" />
                 Categories
+              </Button>
+              <Button
+                onClick={() => setShowBudgetManagement(true)}
+                variant="outline"
+                size="sm"
+                className="text-xs sm:text-sm"
+              >
+                <DollarSign className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-2" />
+                Budgets
               </Button>
               <Button
                     onClick={() => setShowExpenseForm(true)}
@@ -454,6 +471,28 @@ const Index = () => {
               isOpen={showCategoryManagement}
               onClose={() => setShowCategoryManagement(false)}
             />
+          </motion.div>
+        )}
+        {showBudgetManagement && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.2 }}
+          >
+            <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4">
+              <div className="bg-white rounded-lg max-w-4xl w-full max-h-[80vh] overflow-y-auto">
+                <div className="p-6">
+                  <div className="flex justify-between items-center mb-4">
+                    <h2 className="text-2xl font-bold">Budget Management</h2>
+                    <Button variant="outline" onClick={() => setShowBudgetManagement(false)}>
+                      Close
+                    </Button>
+                  </div>
+                  <BudgetManagement />
+                </div>
+              </div>
+            </div>
           </motion.div>
         )}
         {/* Mobile Bottom Tab Bar */}
