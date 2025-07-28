@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Plus, Settings, Users, Receipt, TrendingUp, User, BarChart3, Wallet, Upload, Search, Tag, DollarSign } from "lucide-react";
+import { Plus, Settings, Users, Receipt, TrendingUp, User, BarChart3, Wallet, Upload, Search, Tag, DollarSign, Bot } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -28,6 +28,7 @@ import { CategoryManagement } from "@/components/CategoryManagement";
 import { BudgetManagement } from "@/components/BudgetManagement";
 import { BudgetAlerts } from "@/components/BudgetAlerts";
 import { OfflineIndicator } from "@/components/OfflineIndicator";
+import SplitWizeAIChat from "@/components/SplitWizeAIChat";
 
 const Index = () => {
   const { user, userProfile, logout } = useAuth();
@@ -40,6 +41,7 @@ const Index = () => {
   const [showSearch, setShowSearch] = useState(false);
   const [showCategoryManagement, setShowCategoryManagement] = useState(false);
   const [showBudgetManagement, setShowBudgetManagement] = useState(false);
+  const [showAIChat, setShowAIChat] = useState(false);
   const [activeTab, setActiveTab] = useState("overview");
   const isMobile = useIsMobile();
   const [enrichedGroups, setEnrichedGroups] = useState([]);
@@ -215,6 +217,15 @@ const Index = () => {
               >
                 <DollarSign className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-2" />
                 Budgets
+              </Button>
+              <Button
+                onClick={() => setShowAIChat(true)}
+                variant="outline"
+                size="sm"
+                className="text-xs sm:text-sm"
+              >
+                <Bot className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-2" />
+                AI Assistant
               </Button>
               <Button
                     onClick={() => setShowExpenseForm(true)}
@@ -490,6 +501,28 @@ const Index = () => {
                     </Button>
                   </div>
                   <BudgetManagement />
+                </div>
+              </div>
+            </div>
+          </motion.div>
+        )}
+        {showAIChat && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.2 }}
+          >
+            <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4">
+              <div className="bg-white rounded-lg max-w-4xl w-full h-[80vh] flex flex-col">
+                <div className="flex justify-between items-center p-4 border-b">
+                  <h2 className="text-xl font-bold">SplitWize AI Assistant</h2>
+                  <Button variant="outline" onClick={() => setShowAIChat(false)}>
+                    Close
+                  </Button>
+                </div>
+                <div className="flex-1 overflow-hidden">
+                  <SplitWizeAIChat />
                 </div>
               </div>
             </div>
