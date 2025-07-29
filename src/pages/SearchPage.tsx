@@ -14,6 +14,7 @@ export const SearchPage: React.FC<SearchPageProps> = ({ onBack }) => {
   const { user } = useAuth();
   const [searchResults, setSearchResults] = useState({
     expenses: [],
+    personalExpenses: [],
     groups: [],
     members: [],
   });

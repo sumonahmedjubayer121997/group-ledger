@@ -52,7 +52,7 @@ export const SearchAndFilter: React.FC<SearchAndFilterProps> = ({ onResultsChang
     clearFilters,
     searchResults,
     hasActiveFilters,
-  } = useSearch(expenses, groups, allMembers);
+  } = useSearch(expenses, [], groups, allMembers);
 
   React.useEffect(() => {
     onResultsChange?.(searchResults);

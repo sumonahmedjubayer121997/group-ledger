@@ -1,5 +1,6 @@
 import { useState, useMemo } from 'react';
 import { Expense, Group, Member } from '@/stores/expenseStore';
+import { PersonalExpense } from '@/stores/personalExpenseStore';
 
 export interface SearchFilters {
   dateRange: {
@@ -18,12 +19,14 @@ export interface SearchFilters {
 
 export interface SearchResults {
   expenses: Expense[];
+  personalExpenses: PersonalExpense[];
   groups: Group[];
   members: Member[];
 }
 
 export const useSearch = (
   expenses: Expense[],
+  personalExpenses: PersonalExpense[],
   groups: Group[],
   allMembers: Member[]
 ) => {
@@ -72,7 +75,31 @@ export const useSearch = (
         expense.splitAmong.some(member => filters.splitAmong.includes(member.id));
 
       return matchesQuery && matchesDateRange && matchesAmountRange && 
-             matchesCategory && matchesPaidBy && matchesGroup && matchesSplitAmong;
+              matchesCategory && matchesPaidBy && matchesGroup && matchesSplitAmong;
+    });
+
+    // Filter personal expenses
+    let filteredPersonalExpenses = personalExpenses.filter((expense) => {
+      // Text search
+      const matchesQuery = !query || (
+        expense.description.toLowerCase().includes(query) ||
+        expense.category.toLowerCase().includes(query) ||
+        (expense.notes && expense.notes.toLowerCase().includes(query)) ||
+        (expense.tags && expense.tags.some(tag => tag.toLowerCase().includes(query)))
+      );
+
+      // Date range filter
+      const matchesDateRange = (!filters.dateRange.from || new Date(expense.date) >= filters.dateRange.from) &&
+        (!filters.dateRange.to || new Date(expense.date) <= filters.dateRange.to);
+
+      // Amount range filter
+      const matchesAmountRange = (!filters.amountRange.min || expense.amount >= filters.amountRange.min) &&
+        (!filters.amountRange.max || expense.amount <= filters.amountRange.max);
+
+      // Category filter
+      const matchesCategory = filters.categories.length === 0 || filters.categories.includes(expense.category);
+
+      return matchesQuery && matchesDateRange && matchesAmountRange && matchesCategory;
     });
 
     // Filter groups
@@ -106,10 +133,11 @@ export const useSearch = (
 
     return {
       expenses: filteredExpenses,
+      personalExpenses: filteredPersonalExpenses,
       groups: filteredGroups,
       members: filteredMembers,
     };
-  }, [searchQuery, filters, expenses, groups, allMembers]);
+  }, [searchQuery, filters, expenses, personalExpenses, groups, allMembers]);
 
   const updateFilters = (newFilters: Partial<SearchFilters>) => {
     setFilters(prev => ({ ...prev, ...newFilters }));

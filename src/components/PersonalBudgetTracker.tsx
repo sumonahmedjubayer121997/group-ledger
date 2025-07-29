@@ -5,20 +5,26 @@ import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Edit, Trash2, AlertTriangle, DollarSign, TrendingUp, Plus } from 'lucide-react';
-import { usePersonalExpenseStore } from '@/stores/personalExpenseStore';
+import { usePersonalExpenseStore, PersonalExpense } from '@/stores/personalExpenseStore';
 import { useBudgetStore } from '@/stores/budgetStore';
 import { useAuth } from '@/contexts/AuthContext';
 import { PersonalExpenseForm } from './PersonalExpenseForm';
+import { useToast } from '@/hooks/use-toast';
 import { format } from 'date-fns';
 
 export const PersonalBudgetTracker: React.FC = () => {
   const { user } = useAuth();
+  const { toast } = useToast();
+  const [editingExpense, setEditingExpense] = useState<PersonalExpense | null>(null);
+  
   const { 
     personalExpenses, 
     getPersonalExpenses, 
     getTotalPersonalSpending,
     getPersonalSpendingByCategory,
-    getPersonalSpendingByPeriod
+    getPersonalSpendingByPeriod,
+    updatePersonalExpense,
+    deletePersonalExpense
   } = usePersonalExpenseStore();
   const { 
     getIndividualBudgets, 
@@ -51,6 +57,18 @@ export const PersonalBudgetTracker: React.FC = () => {
 
   const monthlySpending = getPersonalSpendingByPeriod(user.uid, 'monthly');
   const weeklySpending = getPersonalSpendingByPeriod(user.uid, 'weekly');
+
+  const handleEditExpense = (expense: PersonalExpense) => {
+    setEditingExpense(expense);
+  };
+
+  const handleDeleteExpense = (expenseId: string) => {
+    deletePersonalExpense(expenseId);
+    toast({
+      title: "Success",
+      description: "Personal expense deleted successfully",
+    });
+  };
 
   return (
     <div className="space-y-6">
@@ -153,7 +171,10 @@ export const PersonalBudgetTracker: React.FC = () => {
           <CardTitle>Add Personal Expense</CardTitle>
         </CardHeader>
         <CardContent>
-          <PersonalExpenseForm />
+          <PersonalExpenseForm 
+            editingExpense={editingExpense} 
+            onEditComplete={() => setEditingExpense(null)}
+          />
         </CardContent>
       </Card>
 
@@ -214,26 +235,43 @@ export const PersonalBudgetTracker: React.FC = () => {
           ) : (
             <div className="space-y-3">
               {recentExpenses.map((expense) => (
-                <div key={expense.id} className="flex items-center justify-between p-3 bg-muted rounded-lg">
-                  <div>
-                    <p className="font-medium">{expense.description}</p>
-                    <p className="text-sm text-muted-foreground">
-                      {expense.category} • {format(new Date(expense.date), 'MMM dd, yyyy')}
-                    </p>
-                    {expense.tags && expense.tags.length > 0 && (
-                      <div className="flex gap-1 mt-1">
-                        {expense.tags.map((tag) => (
-                          <Badge key={tag} variant="outline" className="text-xs">
-                            {tag}
-                          </Badge>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                  <div className="text-right">
-                    <p className="font-semibold">£{expense.amount.toFixed(2)}</p>
-                  </div>
-                </div>
+                 <div key={expense.id} className="flex items-center justify-between p-3 bg-muted rounded-lg">
+                   <div className="flex-1">
+                     <p className="font-medium">{expense.description}</p>
+                     <p className="text-sm text-muted-foreground">
+                       {expense.category} • {format(new Date(expense.date), 'MMM dd, yyyy')}
+                     </p>
+                     {expense.tags && expense.tags.length > 0 && (
+                       <div className="flex gap-1 mt-1">
+                         {expense.tags.map((tag) => (
+                           <Badge key={tag} variant="outline" className="text-xs">
+                             {tag}
+                           </Badge>
+                         ))}
+                       </div>
+                     )}
+                   </div>
+                   <div className="flex items-center gap-2">
+                     <p className="font-semibold">£{expense.amount.toFixed(2)}</p>
+                     <div className="flex gap-1">
+                       <Button
+                         variant="ghost"
+                         size="sm"
+                         onClick={() => handleEditExpense(expense)}
+                       >
+                         <Edit className="h-4 w-4" />
+                       </Button>
+                       <Button
+                         variant="ghost"
+                         size="sm"
+                         onClick={() => handleDeleteExpense(expense.id)}
+                         className="text-destructive hover:text-destructive"
+                       >
+                         <Trash2 className="h-4 w-4" />
+                       </Button>
+                     </div>
+                   </div>
+                 </div>
               ))}
             </div>
           )}

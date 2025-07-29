@@ -30,6 +30,7 @@ import { BudgetManagement } from "@/components/BudgetManagement";
 import { BudgetAlerts } from "@/components/BudgetAlerts";
 import { OfflineIndicator } from "@/components/OfflineIndicator";
 import SplitWizeAIChat from "@/components/SplitWizeAIChat";
+import { AIAssistantFloat } from "@/components/AIAssistantFloat";
 
 const Index = () => {
   const { user, userProfile, logout } = useAuth();
@@ -157,6 +158,7 @@ const Index = () => {
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-green-50">
       <OfflineIndicator />
+      <AIAssistantFloat />
       
       {/* Header */}
       <Header

@@ -29,7 +29,7 @@ export const OfflineIndicator = () => {
   }
 
   return (
-    <div className="fixed top-4 right-4 z-50 flex items-center gap-2">
+    <div className="fixed top-20 right-4 z-50 flex items-center gap-2">
       {!isOnline && (
         <Badge variant="destructive" className="flex items-center gap-2">
           <WifiOff className="h-4 w-4" />

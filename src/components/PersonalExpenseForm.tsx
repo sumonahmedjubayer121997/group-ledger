@@ -11,16 +11,25 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { Badge } from '@/components/ui/badge';
 import { CalendarIcon, Plus, X, Tag } from 'lucide-react';
 import { format } from 'date-fns';
+import { useEffect } from 'react';
 import { cn } from '@/lib/utils';
-import { usePersonalExpenseStore } from '@/stores/personalExpenseStore';
+import { usePersonalExpenseStore, PersonalExpense } from '@/stores/personalExpenseStore';
 import { useCategoryStore } from '@/stores/categoryStore';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
 
-export const PersonalExpenseForm: React.FC = () => {
+interface PersonalExpenseFormProps {
+  editingExpense?: PersonalExpense | null;
+  onEditComplete?: () => void;
+}
+
+export const PersonalExpenseForm: React.FC<PersonalExpenseFormProps> = ({ 
+  editingExpense, 
+  onEditComplete 
+}) => {
   const { user } = useAuth();
   const { toast } = useToast();
-  const { addPersonalExpense } = usePersonalExpenseStore();
+  const { addPersonalExpense, updatePersonalExpense } = usePersonalExpenseStore();
   const { categories } = useCategoryStore();
   
   const [isOpen, setIsOpen] = useState(false);
@@ -33,6 +42,21 @@ export const PersonalExpenseForm: React.FC = () => {
     tags: [] as string[],
   });
   const [newTag, setNewTag] = useState('');
+
+  // Initialize form with editing data if provided
+  useEffect(() => {
+    if (editingExpense) {
+      setFormData({
+        description: editingExpense.description,
+        amount: editingExpense.amount.toString(),
+        category: editingExpense.category,
+        date: new Date(editingExpense.date),
+        notes: editingExpense.notes || '',
+        tags: editingExpense.tags || [],
+      });
+      setIsOpen(true);
+    }
+  }, [editingExpense]);
 
   const resetForm = () => {
     setFormData({
@@ -67,20 +91,40 @@ export const PersonalExpenseForm: React.FC = () => {
       return;
     }
 
-    addPersonalExpense({
-      description: formData.description,
-      amount: parseFloat(formData.amount),
-      category: formData.category,
-      date: formData.date,
-      userId: user.uid,
-      notes: formData.notes || undefined,
-      tags: formData.tags.length > 0 ? formData.tags : undefined,
-    });
+    if (editingExpense) {
+      // Update existing expense
+      updatePersonalExpense(editingExpense.id, {
+        description: formData.description,
+        amount: parseFloat(formData.amount),
+        category: formData.category,
+        date: formData.date,
+        notes: formData.notes || undefined,
+        tags: formData.tags.length > 0 ? formData.tags : undefined,
+      });
 
-    toast({
-      title: "Success",
-      description: "Personal expense added successfully",
-    });
+      toast({
+        title: "Success",
+        description: "Personal expense updated successfully",
+      });
+
+      onEditComplete?.();
+    } else {
+      // Add new expense
+      addPersonalExpense({
+        description: formData.description,
+        amount: parseFloat(formData.amount),
+        category: formData.category,
+        date: formData.date,
+        userId: user.uid,
+        notes: formData.notes || undefined,
+        tags: formData.tags.length > 0 ? formData.tags : undefined,
+      });
+
+      toast({
+        title: "Success",
+        description: "Personal expense added successfully",
+      });
+    }
 
     resetForm();
     setIsOpen(false);
@@ -113,7 +157,7 @@ export const PersonalExpenseForm: React.FC = () => {
       </DialogTrigger>
       <DialogContent className="max-w-md">
         <DialogHeader>
-          <DialogTitle>Add Personal Expense</DialogTitle>
+          <DialogTitle>{editingExpense ? 'Edit Personal Expense' : 'Add Personal Expense'}</DialogTitle>
         </DialogHeader>
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
@@ -237,12 +281,15 @@ export const PersonalExpenseForm: React.FC = () => {
 
           <div className="flex gap-2">
             <Button type="submit" className="flex-1">
-              Add Expense
+              {editingExpense ? 'Update Expense' : 'Add Expense'}
             </Button>
             <Button
               type="button"
               variant="outline"
-              onClick={() => setIsOpen(false)}
+              onClick={() => {
+                setIsOpen(false);
+                onEditComplete?.();
+              }}
             >
               Cancel
             </Button>
