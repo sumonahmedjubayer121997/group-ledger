@@ -131,7 +131,7 @@ const Index = () => {
 
   if (selectedGroup) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-blue-50 to-green-50">
+      <div className="min-h-screen bg-background">
         <GroupDetailView 
           group={selectedGroup} 
           onBack={() => setSelectedGroup(null)} 
@@ -156,7 +156,7 @@ const Index = () => {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-green-50">
+    <div className="min-h-screen bg-background">
       <OfflineIndicator />
       <AIAssistantFloat />
       
@@ -185,12 +185,12 @@ const Index = () => {
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.5 }}
         >
-          <Card className="bg-white/80 backdrop-blur-sm">
+          <Card className="bg-card/80 backdrop-blur-sm border-border">
             <CardHeader className="pb-3 sm:pb-6">
-              <CardTitle className="text-base sm:text-lg md:text-xl">
+              <CardTitle className="text-base sm:text-lg md:text-xl text-card-foreground">
                 Welcome back, {userProfile?.displayName || 'User'}! 👋
               </CardTitle>
-              <CardDescription className="text-xs sm:text-sm">
+              <CardDescription className="text-xs sm:text-sm text-muted-foreground">
                 Here's your expense overview
               </CardDescription>
             </CardHeader>
@@ -199,7 +199,7 @@ const Index = () => {
 
         {/* Debug info - Hidden on mobile */}
         {!isMobile && (
-          <div className="mb-4 text-sm text-gray-600">
+          <div className="mb-4 text-sm text-muted-foreground">
             Groups: {groups.length} | Expenses: {expenses.length} | User: {user?.displayName}
           </div>
         )}
@@ -295,10 +295,10 @@ const Index = () => {
                 transition={{ duration: 0.3 }}
               >
                 <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3 sm:gap-4 mb-4">
-                  <h2 className="text-lg sm:text-xl font-bold">Your Groups</h2>
+                  <h2 className="text-lg sm:text-xl font-bold text-foreground">Your Groups</h2>
                   <Button
                     onClick={() => setShowGroupForm(true)}
-                    className="bg-blue-600 hover:bg-blue-700 text-xs sm:text-sm"
+                    className="bg-primary hover:bg-primary/90 text-primary-foreground text-xs sm:text-sm"
                     size="sm"
                   >
                     <Plus className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-2" />
@@ -320,10 +320,10 @@ const Index = () => {
                 transition={{ duration: 0.3 }}
               >
                 <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3 sm:gap-4">
-                  <h2 className="text-lg sm:text-xl font-bold">All Expenses</h2>
+                  <h2 className="text-lg sm:text-xl font-bold text-foreground">All Expenses</h2>
                   <Button
                     onClick={() => setShowExpenseForm(true)}
-                    className="bg-green-600 hover:bg-green-700 text-xs sm:text-sm"
+                    className="bg-secondary hover:bg-secondary/90 text-secondary-foreground text-xs sm:text-sm"
                     size="sm"
                   >
                     <Plus className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-2" />
@@ -404,10 +404,10 @@ const Index = () => {
             transition={{ duration: 0.2 }}
           >
             <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4">
-              <div className="bg-white rounded-lg max-w-4xl w-full max-h-[80vh] overflow-y-auto">
+              <div className="bg-card rounded-lg max-w-4xl w-full max-h-[80vh] overflow-y-auto border border-border">
                 <div className="p-6">
                   <div className="flex justify-between items-center mb-4">
-                    <h2 className="text-2xl font-bold">Budget Management</h2>
+                    <h2 className="text-2xl font-bold text-card-foreground">Budget Management</h2>
                     <Button variant="outline" onClick={() => setShowBudgetManagement(false)}>
                       Close
                     </Button>
@@ -426,9 +426,9 @@ const Index = () => {
             transition={{ duration: 0.2 }}
           >
             <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4">
-              <div className="bg-white rounded-lg max-w-4xl w-full h-[80vh] flex flex-col">
-                <div className="flex justify-between items-center p-4 border-b">
-                  <h2 className="text-xl font-bold">SplitWize AI Assistant</h2>
+              <div className="bg-card rounded-lg max-w-4xl w-full h-[80vh] flex flex-col border border-border">
+                <div className="flex justify-between items-center p-4 border-b border-border">
+                  <h2 className="text-xl font-bold text-card-foreground">SplitWize AI Assistant</h2>
                   <Button variant="outline" onClick={() => setShowAIChat(false)}>
                     Close
                   </Button>
@@ -445,7 +445,7 @@ const Index = () => {
         
 {isMobile && (
    
-    <div className="fixed bottom-0 inset-x-0 z-50 bg-white border-t shadow-sm px-4 py-2 max-w-[100%] w-full sm:max-w-md mx-auto overflow-x-hidden">
+    <div className="fixed bottom-0 inset-x-0 z-50 bg-card border-t border-border shadow-sm px-4 py-2 max-w-[100%] w-full sm:max-w-md mx-auto overflow-x-hidden">
   <GroupDetailMobileNav
     tabs={tabItems}
     activeTab={activeTab}
