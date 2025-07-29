@@ -14,6 +14,7 @@ import {
   Settings,
   ChevronDown
 } from "lucide-react";
+import { ModeToggle } from "@/components/mode-toggle";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -219,6 +220,10 @@ export const Header = ({
                         <User className="h-4 w-4 mr-3" />
                         Profile
                       </Button>
+                      
+                      <div className="px-2 py-1">
+                        <ModeToggle />
+                      </div>
                     </div>
                   </div>
 
@@ -259,6 +264,7 @@ export const Header = ({
 
         {/* Actions */}
         <div className="flex items-center space-x-2">
+          <ModeToggle />
           <NotificationBell />
           
           {/* Quick Actions */}
