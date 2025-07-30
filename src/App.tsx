@@ -54,6 +54,12 @@ const AppContent = () => {
     <BrowserRouter>
       <Routes>
         <Route path="/" element={<Index />} />
+        <Route path="/profile" element={<Index />} />
+        <Route path="/search" element={<Index />} />
+        <Route path="/categories" element={<Index />} />
+        <Route path="/budgets" element={<Index />} />
+        <Route path="/ai-assistant" element={<Index />} />
+        <Route path="/groups/:groupId" element={<Index />} />
         {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
         <Route path="*" element={<NotFound />} />
       </Routes>

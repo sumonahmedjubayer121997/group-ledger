@@ -14,6 +14,7 @@ import {
   Settings,
   ChevronDown
 } from "lucide-react";
+import { Link } from "react-router-dom";
 import { ModeToggle } from "@/components/mode-toggle";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
@@ -136,23 +137,27 @@ export const Header = ({
                         Quick Actions
                       </h3>
                       
-                      <Button
-                        variant="ghost"
-                        className="w-full justify-start h-10"
-                        onClick={() => handleMenuItemClick(onNewExpenseClick)}
-                      >
-                        <Plus className="h-4 w-4 mr-3" />
-                        Add Expense
-                      </Button>
-                      
-                      <Button
-                        variant="ghost"
-                        className="w-full justify-start h-10"
-                        onClick={() => handleMenuItemClick(onNewGroupClick)}
-                      >
-                        <Users className="h-4 w-4 mr-3" />
-                        New Group
-                      </Button>
+                       <Link to="/">
+                         <Button
+                           variant="ghost"
+                           className="w-full justify-start h-10"
+                           onClick={() => setIsSheetOpen(false)}
+                         >
+                           <Plus className="h-4 w-4 mr-3" />
+                           Add Expense
+                         </Button>
+                       </Link>
+                       
+                       <Link to="/">
+                         <Button
+                           variant="ghost"
+                           className="w-full justify-start h-10"
+                           onClick={() => setIsSheetOpen(false)}
+                         >
+                           <Users className="h-4 w-4 mr-3" />
+                           New Group
+                         </Button>
+                       </Link>
                       
                       <ImportDialog>
                         <Button
@@ -170,41 +175,49 @@ export const Header = ({
                         Tools
                       </h3>
                       
-                      <Button
-                        variant="ghost"
-                        className="w-full justify-start h-10"
-                        onClick={() => handleMenuItemClick(onSearchClick)}
-                      >
-                        <Search className="h-4 w-4 mr-3" />
-                        Search
-                      </Button>
-                      
-                      <Button
-                        variant="ghost"
-                        className="w-full justify-start h-10"
-                        onClick={() => handleMenuItemClick(onCategoriesClick)}
-                      >
-                        <Tag className="h-4 w-4 mr-3" />
-                        Categories
-                      </Button>
-                      
-                      <Button
-                        variant="ghost"
-                        className="w-full justify-start h-10"
-                        onClick={() => handleMenuItemClick(onBudgetsClick)}
-                      >
-                        <DollarSign className="h-4 w-4 mr-3" />
-                        Budgets
-                      </Button>
-                      
-                      <Button
-                        variant="ghost"
-                        className="w-full justify-start h-10"
-                        onClick={() => handleMenuItemClick(onAIAssistantClick)}
-                      >
-                        <Bot className="h-4 w-4 mr-3" />
-                        AI Assistant
-                      </Button>
+                       <Link to="/search">
+                         <Button
+                           variant="ghost"
+                           className="w-full justify-start h-10"
+                           onClick={() => setIsSheetOpen(false)}
+                         >
+                           <Search className="h-4 w-4 mr-3" />
+                           Search
+                         </Button>
+                       </Link>
+                       
+                       <Link to="/categories">
+                         <Button
+                           variant="ghost"
+                           className="w-full justify-start h-10"
+                           onClick={() => setIsSheetOpen(false)}
+                         >
+                           <Tag className="h-4 w-4 mr-3" />
+                           Categories
+                         </Button>
+                       </Link>
+                       
+                       <Link to="/budgets">
+                         <Button
+                           variant="ghost"
+                           className="w-full justify-start h-10"
+                           onClick={() => setIsSheetOpen(false)}
+                         >
+                           <DollarSign className="h-4 w-4 mr-3" />
+                           Budgets
+                         </Button>
+                       </Link>
+                       
+                       <Link to="/ai-assistant">
+                         <Button
+                           variant="ghost"
+                           className="w-full justify-start h-10"
+                           onClick={() => setIsSheetOpen(false)}
+                         >
+                           <Bot className="h-4 w-4 mr-3" />
+                           AI Assistant
+                         </Button>
+                       </Link>
                     </div>
 
                     <div className="space-y-1 pt-4">
@@ -212,14 +225,16 @@ export const Header = ({
                         Account
                       </h3>
                       
-                      <Button
-                        variant="ghost"
-                        className="w-full justify-start h-10"
-                        onClick={() => handleMenuItemClick(onProfileClick)}
-                      >
-                        <User className="h-4 w-4 mr-3" />
-                        Profile
-                      </Button>
+                       <Link to="/profile">
+                         <Button
+                           variant="ghost"
+                           className="w-full justify-start h-10"
+                           onClick={() => setIsSheetOpen(false)}
+                         >
+                           <User className="h-4 w-4 mr-3" />
+                           Profile
+                         </Button>
+                       </Link>
                       
                       <div className="px-2 py-1">
                         <ModeToggle />
@@ -269,25 +284,27 @@ export const Header = ({
           
           {/* Quick Actions */}
           <div className="hidden md:flex items-center space-x-1">
-            <Button
-              onClick={onSearchClick}
-              variant="ghost"
-              size="sm"
-              className="h-9"
-            >
-              <Search className="h-4 w-4 mr-2" />
-              Search
-            </Button>
+            <Link to="/search">
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-9"
+              >
+                <Search className="h-4 w-4 mr-2" />
+                Search
+              </Button>
+            </Link>
             
-            <Button
-              onClick={onAIAssistantClick}
-              variant="ghost"
-              size="sm"
-              className="h-9"
-            >
-              <Bot className="h-4 w-4 mr-2" />
-              AI Assistant
-            </Button>
+            <Link to="/ai-assistant">
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-9"
+              >
+                <Bot className="h-4 w-4 mr-2" />
+                AI Assistant
+              </Button>
+            </Link>
           </div>
 
           {/* Management Dropdown */}
@@ -300,14 +317,18 @@ export const Header = ({
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" className="w-48">
-              <DropdownMenuItem onClick={onCategoriesClick}>
-                <Tag className="h-4 w-4 mr-2" />
-                Categories
-              </DropdownMenuItem>
-              <DropdownMenuItem onClick={onBudgetsClick}>
-                <DollarSign className="h-4 w-4 mr-2" />
-                Budgets
-              </DropdownMenuItem>
+              <Link to="/categories">
+                <DropdownMenuItem>
+                  <Tag className="h-4 w-4 mr-2" />
+                  Categories
+                </DropdownMenuItem>
+              </Link>
+              <Link to="/budgets">
+                <DropdownMenuItem>
+                  <DollarSign className="h-4 w-4 mr-2" />
+                  Budgets
+                </DropdownMenuItem>
+              </Link>
               <DropdownMenuSeparator />
               <ImportDialog>
                 <DropdownMenuItem onSelect={(e) => e.preventDefault()}>
@@ -318,27 +339,29 @@ export const Header = ({
             </DropdownMenuContent>
           </DropdownMenu>
 
-          {/* Primary Actions */}
-          <div className="flex items-center space-x-2">
-            <Button
-              onClick={onNewExpenseClick}
-              size="sm"
-              className="h-9"
-            >
-              <Plus className="h-4 w-4 mr-2" />
-              Add Expense
-            </Button>
-            
-            <Button
-              onClick={onNewGroupClick}
-              variant="outline"
-              size="sm"
-              className="h-9 hidden sm:flex"
-            >
-              <Users className="h-4 w-4 mr-2" />
-              New Group
-            </Button>
-          </div>
+            {/* Primary Actions */}
+            <div className="flex items-center space-x-2">
+              <Link to="/">
+                <Button
+                  size="sm"
+                  className="h-9"
+                >
+                  <Plus className="h-4 w-4 mr-2" />
+                  Add Expense
+                </Button>
+              </Link>
+              
+              <Link to="/">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="h-9 hidden sm:flex"
+                >
+                  <Users className="h-4 w-4 mr-2" />
+                  New Group
+                </Button>
+              </Link>
+            </div>
 
           {/* Profile Dropdown */}
           <DropdownMenu>
@@ -366,10 +389,12 @@ export const Header = ({
                 </p>
               </div>
               <DropdownMenuSeparator />
-              <DropdownMenuItem onClick={onProfileClick}>
-                <User className="h-4 w-4 mr-2" />
-                Profile
-              </DropdownMenuItem>
+              <Link to="/profile">
+                <DropdownMenuItem>
+                  <User className="h-4 w-4 mr-2" />
+                  Profile
+                </DropdownMenuItem>
+              </Link>
               <DropdownMenuSeparator />
               <DropdownMenuItem 
                 onClick={onLogout}
