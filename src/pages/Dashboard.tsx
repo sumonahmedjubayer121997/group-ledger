@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo, useCallback } from "react";
 import { Plus, Users, Receipt, TrendingUp, BarChart3 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -39,31 +39,42 @@ const Dashboard = () => {
 
   useEffect(() => {
     const loadGroupsWithMembers = async () => {
-      if (!user?.uid) return;
+      if (!user?.uid || groups.length === 0) return;
 
-      // Already syncing groups from Firestore
-      await initializeFirebaseSync(user.uid); 
+      try {
+        // Only enrich groups that haven't been enriched yet
+        const unenrichedGroups = groups.filter(group => !group.members);
+        if (unenrichedGroups.length === 0 && enrichedGroups.length > 0) return;
 
-      // After syncing, enrich each group with member details
-      const enriched = await Promise.all(
-        groups.map(async (group) => {
-          const members = await fetchGroupMembersWithPhotos(group.id);
-          return { ...group, members };
-        })
-      );
+        const enriched = await Promise.all(
+          unenrichedGroups.map(async (group) => {
+            const members = await fetchGroupMembersWithPhotos(group.id);
+            return { ...group, members };
+          })
+        );
 
-      setEnrichedGroups(enriched);
+        // Merge with existing enriched groups
+        const allEnriched = groups.map(group => {
+          const enrichedGroup = enriched.find(e => e.id === group.id);
+          return enrichedGroup || (enrichedGroups.find(eg => eg.id === group.id) || group);
+        });
+
+        setEnrichedGroups(allEnriched);
+      } catch (error) {
+        console.error('Error loading group members:', error);
+        setEnrichedGroups(groups);
+      }
     };
 
     loadGroupsWithMembers();
-  }, [user?.uid, initializeFirebaseSync, groups]);
+  }, [groups, user?.uid, enrichedGroups]);
 
-  const handleGroupClick = (group: any) => {
+  const handleGroupClick = useCallback((group: any) => {
     setSelectedGroup(group);
     navigate(`/groups/${group.id}`);
-  };
+  }, [setSelectedGroup, navigate]);
 
-  const balances = getBalances();
+  const balances = useMemo(() => getBalances(), [getBalances]);
 
   const tabItems = [
     { value: "overview", id: "overview", label: "Overview", icon: BarChart3 },

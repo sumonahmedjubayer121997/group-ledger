@@ -27,9 +27,8 @@ const Index = () => {
 
   // Initialize Firebase sync when user is authenticated
   useEffect(() => {
-    console.log('Index useEffect - user:', user?.uid);
     if (user?.uid) {
-      console.log('Initializing Firebase sync for user:', user.uid);
+      console.log('Index: Initializing Firebase sync for user:', user.uid);
       initializeFirebaseSync(user.uid);
     }
   }, [user?.uid, initializeFirebaseSync]);
