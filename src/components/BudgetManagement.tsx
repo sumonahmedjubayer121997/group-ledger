@@ -11,6 +11,7 @@ import { AlertTriangle, Plus, Edit, Trash2, DollarSign } from 'lucide-react';
 import { useBudgetStore, Budget } from '../stores/budgetStore';
 import { useCategoryStore } from '../stores/categoryStore';
 import { useExpenseStore } from '../stores/expenseStore';
+import { useAuth } from '../contexts/AuthContext';
 
 interface BudgetManagementProps {
   isOpen?: boolean;
@@ -21,6 +22,7 @@ export const BudgetManagement: React.FC<BudgetManagementProps> = ({ isOpen, onCl
   const { budgets, addBudget, updateBudget, deleteBudget, getBudgetUsage } = useBudgetStore();
   const { categories } = useCategoryStore();
   const { expenses } = useExpenseStore();
+  const { user } = useAuth();
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingBudget, setEditingBudget] = useState<Budget | null>(null);
 
@@ -62,12 +64,12 @@ export const BudgetManagement: React.FC<BudgetManagementProps> = ({ isOpen, onCl
     };
 
     if (editingBudget) {
-      updateBudget(editingBudget.id, budgetData);
+      updateBudget(editingBudget.id, budgetData, user?.uid || '');
     } else {
       addBudget({
         ...budgetData,
         type: 'individual'
-      });
+      }, user?.uid || '');
     }
 
     resetForm();
@@ -291,7 +293,7 @@ export const BudgetManagement: React.FC<BudgetManagementProps> = ({ isOpen, onCl
                       <Button
                         size="sm"
                         variant="outline"
-                        onClick={() => deleteBudget(budget.id)}
+                        onClick={() => deleteBudget(budget.id, user?.uid || '')}
                       >
                         <Trash2 className="w-3 h-3 mr-1" />
                         Delete

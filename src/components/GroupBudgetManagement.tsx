@@ -12,6 +12,7 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { useBudgetStore, Budget } from '@/stores/budgetStore';
 import { useCategoryStore } from '@/stores/categoryStore';
 import { useExpenseStore } from '@/stores/expenseStore';
+import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
 import { Trash2, Edit3, Plus, Target, AlertTriangle, CheckCircle } from 'lucide-react';
 import { Group } from '@/stores/expenseStore';
@@ -44,6 +45,7 @@ export const GroupBudgetManagement: React.FC<GroupBudgetManagementProps> = ({ gr
   const { categories } = useCategoryStore();
   const { expenses } = useExpenseStore();
   const { toast } = useToast();
+  const { user } = useAuth();
 
   const groupBudgets = getAllGroupBudgets(group.id);
   const groupExpenses = expenses.filter(expense => expense.groupId === group.id);
@@ -64,7 +66,7 @@ export const GroupBudgetManagement: React.FC<GroupBudgetManagementProps> = ({ gr
       type: newBudget.category === 'overall' ? 'group_overall' : 'group_category',
       groupId: group.id,
       isActive: true,
-    });
+    }, user?.uid || '');
 
     toast({
       title: "Success",
@@ -96,7 +98,7 @@ export const GroupBudgetManagement: React.FC<GroupBudgetManagementProps> = ({ gr
 
     updateBudget(editingBudget.id, {
       ...newBudget,
-    });
+    }, user?.uid || '');
 
     toast({
       title: "Success",
@@ -114,7 +116,7 @@ export const GroupBudgetManagement: React.FC<GroupBudgetManagementProps> = ({ gr
   };
 
   const handleDeleteBudget = (budgetId: string) => {
-    deleteBudget(budgetId);
+    deleteBudget(budgetId, user?.uid || '');
     toast({
       title: "Success",
       description: "Budget deleted successfully",
@@ -286,7 +288,7 @@ export const GroupBudgetManagement: React.FC<GroupBudgetManagementProps> = ({ gr
                             <div className="flex items-center space-x-2">
                               <Switch
                                 checked={budget.isActive}
-                                onCheckedChange={(checked) => updateBudget(budget.id, { isActive: checked })}
+                                onCheckedChange={(checked) => updateBudget(budget.id, { isActive: checked }, user?.uid || '')}
                               />
                               <Button
                                 variant="ghost"

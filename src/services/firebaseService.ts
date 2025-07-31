@@ -864,14 +864,16 @@ export const removeMemberFromGroup = async (groupId: string, memberId: string) =
 };
 
 // Personal Budget Functions
-export const createPersonalBudget = async (budget: Omit<Budget, 'id' | 'createdAt'>) => {
+export const createPersonalBudget = async (budget: Omit<Budget, 'id' | 'createdAt'>, userId: string) => {
   try {
     const budgetData = {
       ...budget,
+      userId,
       createdAt: serverTimestamp(),
     };
     
-    const docRef = await addDoc(collection(db, 'personalBudgets'), budgetData);
+    const userBudgetsRef = collection(db, 'users', userId, 'budgets');
+    const docRef = await addDoc(userBudgetsRef, budgetData);
     console.log('Personal budget created with ID:', docRef.id);
     return docRef.id;
   } catch (error) {
@@ -880,9 +882,9 @@ export const createPersonalBudget = async (budget: Omit<Budget, 'id' | 'createdA
   }
 };
 
-export const updatePersonalBudget = async (budgetId: string, updates: Partial<Budget>) => {
+export const updatePersonalBudget = async (budgetId: string, updates: Partial<Budget>, userId: string) => {
   try {
-    const budgetRef = doc(db, 'personalBudgets', budgetId);
+    const budgetRef = doc(db, 'users', userId, 'budgets', budgetId);
     await updateDoc(budgetRef, updates);
     console.log('Personal budget updated:', budgetId);
   } catch (error) {
@@ -891,9 +893,9 @@ export const updatePersonalBudget = async (budgetId: string, updates: Partial<Bu
   }
 };
 
-export const deletePersonalBudget = async (budgetId: string) => {
+export const deletePersonalBudget = async (budgetId: string, userId: string) => {
   try {
-    await deleteDoc(doc(db, 'personalBudgets', budgetId));
+    await deleteDoc(doc(db, 'users', userId, 'budgets', budgetId));
     console.log('Personal budget deleted:', budgetId);
   } catch (error) {
     console.error('Error deleting personal budget:', error);
@@ -903,11 +905,8 @@ export const deletePersonalBudget = async (budgetId: string) => {
 
 export const getUserPersonalBudgets = async (userId: string): Promise<Budget[]> => {
   try {
-    const q = query(
-      collection(db, 'personalBudgets'),
-      where('userId', '==', userId),
-      orderBy('createdAt', 'desc')
-    );
+    const userBudgetsRef = collection(db, 'users', userId, 'budgets');
+    const q = query(userBudgetsRef, orderBy('createdAt', 'desc'));
     
     const querySnapshot = await getDocs(q);
     const budgets: Budget[] = [];
@@ -932,11 +931,8 @@ export const subscribeToUserPersonalBudgets = (
   userId: string,
   callback: (budgets: Budget[]) => void
 ) => {
-  const q = query(
-    collection(db, 'personalBudgets'),
-    where('userId', '==', userId),
-    orderBy('createdAt', 'desc')
-  );
+  const userBudgetsRef = collection(db, 'users', userId, 'budgets');
+  const q = query(userBudgetsRef, orderBy('createdAt', 'desc'));
 
   return onSnapshot(q, (querySnapshot) => {
     const budgets: Budget[] = [];

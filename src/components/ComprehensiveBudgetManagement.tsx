@@ -92,13 +92,13 @@ export const ComprehensiveBudgetManagement: React.FC<ComprehensiveBudgetManageme
     };
 
     if (editingBudget) {
-      updateBudget(editingBudget.id, budgetData);
+      updateBudget(editingBudget.id, budgetData, user?.uid || '');
       toast({
         title: "Success",
         description: "Budget updated successfully",
       });
     } else {
-      addBudget(budgetData);
+      addBudget(budgetData, user?.uid || '');
       toast({
         title: "Success",
         description: "Budget created successfully",
@@ -235,7 +235,7 @@ export const ComprehensiveBudgetManagement: React.FC<ComprehensiveBudgetManageme
               <Button
                 size="sm"
                 variant="outline"
-                onClick={() => deleteBudget(budget.id)}
+                onClick={() => deleteBudget(budget.id, user?.uid || '')}
               >
                 <Trash2 className="w-3 h-3 mr-1" />
                 Delete

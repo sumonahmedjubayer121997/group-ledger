@@ -40,9 +40,9 @@ interface BudgetState {
   cleanup: () => void;
   
   // CRUD operations
-  addBudget: (budget: Omit<Budget, 'id' | 'createdAt'>) => Promise<void>;
-  updateBudget: (id: string, updates: Partial<Budget>) => Promise<void>;
-  deleteBudget: (id: string) => Promise<void>;
+  addBudget: (budget: Omit<Budget, 'id' | 'createdAt'>, userId: string) => Promise<void>;
+  updateBudget: (id: string, updates: Partial<Budget>, userId: string) => Promise<void>;
+  deleteBudget: (id: string, userId: string) => Promise<void>;
   
   // Query methods
   getBudgetUsage: (expenses: any[], userId?: string, groupId?: string) => BudgetUsage[];
@@ -83,10 +83,10 @@ export const useBudgetStore = create<BudgetState>()((set, get) => ({
     }
   },
 
-  addBudget: async (budget) => {
+  addBudget: async (budget, userId: string) => {
     try {
       set({ isLoading: true });
-      await createPersonalBudget(budget);
+      await createPersonalBudget(budget, userId);
       // The real-time listener will update the state
     } catch (error) {
       console.error('Error adding budget:', error);
@@ -95,10 +95,10 @@ export const useBudgetStore = create<BudgetState>()((set, get) => ({
     }
   },
 
-  updateBudget: async (id, updates) => {
+  updateBudget: async (id, updates, userId: string) => {
     try {
       set({ isLoading: true });
-      await updatePersonalBudget(id, updates);
+      await updatePersonalBudget(id, updates, userId);
       // The real-time listener will update the state
     } catch (error) {
       console.error('Error updating budget:', error);
@@ -107,10 +107,10 @@ export const useBudgetStore = create<BudgetState>()((set, get) => ({
     }
   },
 
-  deleteBudget: async (id) => {
+  deleteBudget: async (id, userId: string) => {
     try {
       set({ isLoading: true });
-      await deletePersonalBudget(id);
+      await deletePersonalBudget(id, userId);
       // The real-time listener will update the state
     } catch (error) {
       console.error('Error deleting budget:', error);
