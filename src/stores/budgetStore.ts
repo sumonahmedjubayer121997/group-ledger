@@ -1,5 +1,10 @@
 import { create } from 'zustand';
-import { persist } from 'zustand/middleware';
+import { 
+  createPersonalBudget, 
+  updatePersonalBudget, 
+  deletePersonalBudget, 
+  subscribeToUserPersonalBudgets 
+} from '@/services/firebaseService';
 
 export type BudgetType = 'individual' | 'group_category' | 'group_overall' | 'user_group';
 
@@ -27,9 +32,19 @@ export interface BudgetUsage {
 
 interface BudgetState {
   budgets: Budget[];
-  addBudget: (budget: Omit<Budget, 'id' | 'createdAt'>) => void;
-  updateBudget: (id: string, updates: Partial<Budget>) => void;
-  deleteBudget: (id: string) => void;
+  isLoading: boolean;
+  unsubscribe: (() => void) | null;
+  
+  // Firebase sync methods
+  initializeFirebaseSync: (userId: string) => void;
+  cleanup: () => void;
+  
+  // CRUD operations
+  addBudget: (budget: Omit<Budget, 'id' | 'createdAt'>) => Promise<void>;
+  updateBudget: (id: string, updates: Partial<Budget>) => Promise<void>;
+  deleteBudget: (id: string) => Promise<void>;
+  
+  // Query methods
   getBudgetUsage: (expenses: any[], userId?: string, groupId?: string) => BudgetUsage[];
   getActiveBudgets: (type?: BudgetType, groupId?: string, userId?: string) => Budget[];
   getIndividualBudgets: (userId?: string) => Budget[];
@@ -39,35 +54,70 @@ interface BudgetState {
   getAllGroupBudgets: (groupId: string) => Budget[];
 }
 
-export const useBudgetStore = create<BudgetState>()(
-  persist(
-    (set, get) => ({
-      budgets: [],
+export const useBudgetStore = create<BudgetState>()((set, get) => ({
+  budgets: [],
+  isLoading: false,
+  unsubscribe: null,
 
-      addBudget: (budget) => {
-        const newBudget: Budget = {
-          ...budget,
-          id: Date.now().toString(),
-          createdAt: new Date(),
-        };
-        set((state) => ({
-          budgets: [...state.budgets, newBudget],
-        }));
-      },
+  initializeFirebaseSync: (userId: string) => {
+    // Clean up any existing subscription
+    const currentUnsubscribe = get().unsubscribe;
+    if (currentUnsubscribe) {
+      currentUnsubscribe();
+    }
 
-      updateBudget: (id, updates) => {
-        set((state) => ({
-          budgets: state.budgets.map((budget) =>
-            budget.id === id ? { ...budget, ...updates } : budget
-          ),
-        }));
-      },
+    set({ isLoading: true });
 
-      deleteBudget: (id) => {
-        set((state) => ({
-          budgets: state.budgets.filter((budget) => budget.id !== id),
-        }));
-      },
+    const unsubscribe = subscribeToUserPersonalBudgets(userId, (budgets) => {
+      set({ budgets, isLoading: false });
+    });
+
+    set({ unsubscribe });
+  },
+
+  cleanup: () => {
+    const unsubscribe = get().unsubscribe;
+    if (unsubscribe) {
+      unsubscribe();
+      set({ unsubscribe: null, budgets: [] });
+    }
+  },
+
+  addBudget: async (budget) => {
+    try {
+      set({ isLoading: true });
+      await createPersonalBudget(budget);
+      // The real-time listener will update the state
+    } catch (error) {
+      console.error('Error adding budget:', error);
+      set({ isLoading: false });
+      throw error;
+    }
+  },
+
+  updateBudget: async (id, updates) => {
+    try {
+      set({ isLoading: true });
+      await updatePersonalBudget(id, updates);
+      // The real-time listener will update the state
+    } catch (error) {
+      console.error('Error updating budget:', error);
+      set({ isLoading: false });
+      throw error;
+    }
+  },
+
+  deleteBudget: async (id) => {
+    try {
+      set({ isLoading: true });
+      await deletePersonalBudget(id);
+      // The real-time listener will update the state
+    } catch (error) {
+      console.error('Error deleting budget:', error);
+      set({ isLoading: false });
+      throw error;
+    }
+  },
 
       getActiveBudgets: (type?: BudgetType, groupId?: string, userId?: string) => {
         return get().budgets.filter(budget => {
@@ -173,9 +223,4 @@ export const useBudgetStore = create<BudgetState>()(
           };
         });
       },
-    }),
-    {
-      name: 'budget-storage',
-    }
-  )
-);
+}));

@@ -15,6 +15,7 @@ import BudgetsPage from "./BudgetsPage";
 import AIAssistantPage from "./AIAssistantPage";
 import GroupDetailPage from "./GroupDetailPage";
 import { useNavigate, useLocation } from "react-router-dom";
+import { useBudgetFirebaseSync } from '@/hooks/useBudgetFirebaseSync';
 
 const Index = () => {
   const { user, userProfile, logout } = useAuth();
@@ -24,6 +25,8 @@ const Index = () => {
   const navigate = useNavigate();
   const location = useLocation();
 
+  // Initialize Firebase sync for budgets
+  useBudgetFirebaseSync();
 
   // Initialize Firebase sync when user is authenticated
   useEffect(() => {

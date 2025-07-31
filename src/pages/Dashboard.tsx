@@ -17,6 +17,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { GroupDetailMobileNav } from "@/components/GroupDetailMobileNav";
 import { fetchGroupMembersWithPhotos } from "@/components/firebaseComponents/FetchGroupMembersWithPhotos";
 import { useNavigate } from "react-router-dom";
+import { useBudgetFirebaseSync } from '@/hooks/useBudgetFirebaseSync';
 
 const Dashboard = () => {
   const { user, userProfile } = useAuth();
@@ -27,6 +28,9 @@ const Dashboard = () => {
   const isMobile = useIsMobile();
   const [enrichedGroups, setEnrichedGroups] = useState([]);
   const navigate = useNavigate();
+
+  // Initialize Firebase sync for expenses and budgets
+  useBudgetFirebaseSync();
 
   // Initialize Firebase sync when user is authenticated
   useEffect(() => {

@@ -19,6 +19,7 @@ import {
 import { User, getAuth } from 'firebase/auth';
 import { db } from '@/lib/firebase';
 import { Group, Expense, Member, Settlement } from '@/stores/expenseStore';
+import { Budget } from '@/stores/budgetStore';
 import { findSimilarEmails } from '@/components/firebaseComponents/FindSimilarEmails';
 import { logAllUserEmails } from '@/components/firebaseComponents/LogAllUserEmail';
 import { findSimilarEmailUIDs } from '@/components/firebaseComponents/FindSimilarUIDs';
@@ -860,4 +861,95 @@ export const removeMemberFromGroup = async (groupId: string, memberId: string) =
     console.error('Error removing member from group:', error);
     throw error;
   }
+};
+
+// Personal Budget Functions
+export const createPersonalBudget = async (budget: Omit<Budget, 'id' | 'createdAt'>) => {
+  try {
+    const budgetData = {
+      ...budget,
+      createdAt: serverTimestamp(),
+    };
+    
+    const docRef = await addDoc(collection(db, 'personalBudgets'), budgetData);
+    console.log('Personal budget created with ID:', docRef.id);
+    return docRef.id;
+  } catch (error) {
+    console.error('Error creating personal budget:', error);
+    throw error;
+  }
+};
+
+export const updatePersonalBudget = async (budgetId: string, updates: Partial<Budget>) => {
+  try {
+    const budgetRef = doc(db, 'personalBudgets', budgetId);
+    await updateDoc(budgetRef, updates);
+    console.log('Personal budget updated:', budgetId);
+  } catch (error) {
+    console.error('Error updating personal budget:', error);
+    throw error;
+  }
+};
+
+export const deletePersonalBudget = async (budgetId: string) => {
+  try {
+    await deleteDoc(doc(db, 'personalBudgets', budgetId));
+    console.log('Personal budget deleted:', budgetId);
+  } catch (error) {
+    console.error('Error deleting personal budget:', error);
+    throw error;
+  }
+};
+
+export const getUserPersonalBudgets = async (userId: string): Promise<Budget[]> => {
+  try {
+    const q = query(
+      collection(db, 'personalBudgets'),
+      where('userId', '==', userId),
+      orderBy('createdAt', 'desc')
+    );
+    
+    const querySnapshot = await getDocs(q);
+    const budgets: Budget[] = [];
+    
+    querySnapshot.forEach((doc) => {
+      const data = doc.data();
+      budgets.push({
+        id: doc.id,
+        ...data,
+        createdAt: data.createdAt?.toDate() || new Date(),
+      } as Budget);
+    });
+    
+    return budgets;
+  } catch (error) {
+    console.error('Error fetching user personal budgets:', error);
+    throw error;
+  }
+};
+
+export const subscribeToUserPersonalBudgets = (
+  userId: string,
+  callback: (budgets: Budget[]) => void
+) => {
+  const q = query(
+    collection(db, 'personalBudgets'),
+    where('userId', '==', userId),
+    orderBy('createdAt', 'desc')
+  );
+
+  return onSnapshot(q, (querySnapshot) => {
+    const budgets: Budget[] = [];
+    querySnapshot.forEach((doc) => {
+      const data = doc.data();
+      budgets.push({
+        id: doc.id,
+        ...data,
+        createdAt: data.createdAt?.toDate() || new Date(),
+      } as Budget);
+    });
+    callback(budgets);
+  }, (error) => {
+    console.error('Error in personal budgets subscription:', error);
+  });
 };
