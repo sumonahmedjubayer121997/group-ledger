@@ -1,8 +1,7 @@
-
-import React from 'react';
-import { Button } from '@/components/ui/button';
-import { motion } from 'framer-motion';
-import { useIsMobile } from '@/hooks/use-mobile';
+import React from "react";
+import { Button } from "@/components/ui/button";
+import { motion } from "framer-motion";
+import { useIsMobile } from "@/hooks/use-mobile";
 
 interface Tab {
   id: string;
@@ -26,38 +25,32 @@ export const GroupDetailMobileNav: React.FC<GroupDetailMobileNavProps> = ({
   if (!isMobile) return null;
 
   return (
-    <div className="w-full sm:max-w-full px-4 py-3">
-  <div className="flex w-full overflow-x-auto scrollbar-hide space-x-2 justify-between">
-    {tabs.map((tab) => {
-      const Icon = tab.icon;
-      const isActive = activeTab === tab.id;
+    <div className="w-full px-1">
+      <div className="flex w-full overflow-x-auto scrollbar-hide space-x-1 justify-between">
+        {tabs.map((tab) => {
+          const Icon = tab.icon;
+          const isActive = activeTab === tab.id;
 
-      return (
-        <Button
-          key={tab.id || tab.label}
-          variant={isActive ? "default" : "ghost"}
-          size="sm"
-          onClick={() => onTabChange(tab.id || tab.label)}
-          className="flex items-center space-x-2 min-w-fit px-3 h-9 justify-center"
-        >
-          <Icon className="w-4 h-4" />
-          {isActive ? (
-            <motion.span
-              initial={{ opacity: 0, width: 0 }}
-              animate={{ opacity: 1, width: "auto" }}
-              exit={{ opacity: 0, width: 0 }}
-              className="text-xs font-medium"
+          return (
+            <Button
+              key={tab.id || tab.label}
+              variant={isActive ? "default" : "ghost"}
+              size="sm"
+              onClick={() => onTabChange(tab.id || tab.label)}
+              className={`flex flex-col items-center justify-center min-w-0 px-1 py-2 h-14 flex-1 touch-manipulation ${
+                isActive
+                  ? "bg-blue-500 text-white shadow-sm"
+                  : "text-gray-600 hover:text-gray-900"
+              } transition-colors duration-200`}
             >
-              {tab.label}
-            </motion.span>
-          ) : (
-            <span className="sr-only">{tab.label}</span>
-          )}
-        </Button>
-      );
-    })}
-  </div>
-</div>
-
+              <Icon className="w-4 h-4 mb-1" />
+              <span className="text-xs font-medium truncate max-w-full leading-tight">
+                {tab.label}
+              </span>
+            </Button>
+          );
+        })}
+      </div>
+    </div>
   );
 };
