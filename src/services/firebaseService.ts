@@ -1090,6 +1090,13 @@ export const updateGroupBudget = async (
 ) => {
   try {
     const budgetRef = doc(db, "groups", groupId, "budgets", budgetId);
+    
+    // Check if document exists before updating
+    const budgetSnap = await getDoc(budgetRef);
+    if (!budgetSnap.exists()) {
+      throw new Error(`Budget document ${budgetId} does not exist in group ${groupId}`);
+    }
+    
     await updateDoc(budgetRef, updates);
     console.log("Group budget updated:", budgetId);
   } catch (error) {
@@ -1100,7 +1107,15 @@ export const updateGroupBudget = async (
 
 export const deleteGroupBudget = async (budgetId: string, groupId: string) => {
   try {
-    await deleteDoc(doc(db, "groups", groupId, "budgets", budgetId));
+    const budgetRef = doc(db, "groups", groupId, "budgets", budgetId);
+    
+    // Check if document exists before deleting
+    const budgetSnap = await getDoc(budgetRef);
+    if (!budgetSnap.exists()) {
+      throw new Error(`Budget document ${budgetId} does not exist in group ${groupId}`);
+    }
+    
+    await deleteDoc(budgetRef);
     console.log("Group budget deleted:", budgetId);
   } catch (error) {
     console.error("Error deleting group budget:", error);

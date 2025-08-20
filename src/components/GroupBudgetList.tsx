@@ -52,18 +52,21 @@ export const GroupBudgetList: React.FC<GroupBudgetListProps> = ({
 
   const handleDeleteBudget = async (budgetId: string) => {
     try {
+      setDeletingBudgetId(budgetId);
       await deleteBudget(budgetId, user?.uid || "", group.id);
       toast({
         title: "Success",
         description: "Budget deleted successfully",
       });
-      setDeletingBudgetId(null);
-    } catch (error) {
+    } catch (error: any) {
+      console.error("Delete budget error:", error);
       toast({
         title: "Error",
-        description: "Failed to delete budget",
+        description: error.message || "Failed to delete budget",
         variant: "destructive",
       });
+    } finally {
+      setDeletingBudgetId(null);
     }
   };
 
