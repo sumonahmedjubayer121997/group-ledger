@@ -132,10 +132,13 @@ export const useBudgetStore = create<BudgetState>()((set, get) => ({
 
   updateBudget: async (id, updates, userId: string, groupId?: string) => {
     try {
+      console.log("Updating budget:", { id, updates, userId, groupId });
       set({ isLoading: true });
       if (groupId) {
+        console.log("Calling updateGroupBudget with:", { id, updates, groupId });
         await updateGroupBudget(id, updates, groupId);
       } else {
+        console.log("Calling updatePersonalBudget with:", { id, updates, userId });
         await updatePersonalBudget(id, updates, userId);
       }
       // The real-time listener will update the state

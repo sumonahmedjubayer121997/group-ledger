@@ -44,7 +44,9 @@ export const GroupBudgetList: React.FC<GroupBudgetListProps> = ({
   const [deletingBudgetId, setDeletingBudgetId] = useState<string | null>(null);
 
   const groupBudgets = getAllGroupBudgets(group.id);
+  console.log("All group budgets:", groupBudgets);
   const activeBudgets = groupBudgets.filter((budget) => budget.isActive);
+  console.log("Active budgets:", activeBudgets);
   const groupExpenses = expenses.filter(
     (expense) => expense.groupId === group.id
   );
@@ -161,6 +163,9 @@ export const GroupBudgetList: React.FC<GroupBudgetListProps> = ({
                         size="sm"
                         onClick={(e) => {
                           e.stopPropagation();
+                          console.log("Edit button clicked for budget:", budget);
+                          console.log("Budget ID:", budget.id);
+                          console.log("Group ID:", group.id);
                           onEditBudget(budget);
                         }}
                         className="text-blue-600 hover:text-blue-700"
