@@ -118,7 +118,11 @@ export const GroupBudgetList: React.FC<GroupBudgetListProps> = ({
             const StatusIcon = status.icon;
 
             return (
-              <div key={budget.id} className="border rounded-lg p-4 space-y-3">
+              <div 
+                key={budget.id} 
+                className="border rounded-lg p-4 space-y-3 cursor-pointer hover:bg-gray-50 transition-colors"
+                onClick={() => onEditBudget?.(budget)}
+              >
                 {/* Budget Header */}
                 <div className="flex items-center justify-between">
                   <div className="flex items-center space-x-3">
@@ -147,12 +151,15 @@ export const GroupBudgetList: React.FC<GroupBudgetListProps> = ({
                       </div>
                     </div>
                   </div>
-                  <div className="flex items-center space-x-2">
+                  <div className="flex items-center space-x-2" onClick={(e) => e.stopPropagation()}>
                     {onEditBudget && (
                       <Button
                         variant="ghost"
                         size="sm"
-                        onClick={() => onEditBudget(budget)}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          onEditBudget(budget);
+                        }}
                         className="text-blue-600 hover:text-blue-700"
                       >
                         <Edit3 className="w-4 h-4" />
@@ -164,6 +171,7 @@ export const GroupBudgetList: React.FC<GroupBudgetListProps> = ({
                           variant="ghost"
                           size="sm"
                           className="text-red-600 hover:text-red-700"
+                          onClick={(e) => e.stopPropagation()}
                         >
                           <Trash2 className="w-4 h-4" />
                         </Button>

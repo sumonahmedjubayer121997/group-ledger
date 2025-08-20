@@ -153,8 +153,8 @@ export const GroupBudgetAlerts: React.FC<GroupBudgetAlertsProps> = ({
   }
 
   return (
-    <div className="space-y-3">
-      {/* Over Budget Alerts */}
+    <div className="space-y-4">
+      {/* Over Budget Alerts - Matching the design from the image */}
       {overBudgetUsages.map((usage) => {
         const budget = activeBudgets.find((b) => b.id === usage.budgetId);
         if (!budget) return null;
@@ -162,35 +162,38 @@ export const GroupBudgetAlerts: React.FC<GroupBudgetAlertsProps> = ({
         const overage = usage.spent - budget.limit;
 
         return (
-          <Alert key={budget.id} className="border-red-200 bg-red-50">
-            <AlertTriangle className="h-4 w-4 text-red-600" />
-            <AlertTitle className="text-red-800">
-              Budget Exceeded: {budget.name}
-            </AlertTitle>
-            <AlertDescription className="text-red-700">
-              <div className="flex items-center justify-between mt-2">
-                <div className="space-y-1">
-                  <p className="text-sm">
-                    Spent:{" "}
-                    <span className="font-semibold">
-                      {group.settings.currency} {usage.spent.toFixed(2)}
-                    </span>
-                    of {group.settings.currency} {budget.limit.toFixed(2)} limit
-                  </p>
-                  <p className="text-xs">
-                    Over by:{" "}
-                    <span className="font-semibold text-red-600">
-                      {group.settings.currency} {overage.toFixed(2)}
-                    </span>
-                  </p>
-                </div>
-                <Badge variant="destructive" className="shrink-0">
-                  <AlertTriangle className="w-3 h-3 mr-1" />
-                  {usage.percentage.toFixed(0)}%
-                </Badge>
+          <div
+            key={budget.id}
+            className="flex items-start space-x-3 p-4 bg-red-50 border border-red-200 rounded-lg cursor-pointer hover:bg-red-100 transition-colors"
+            onClick={() => onManageBudgets?.()}
+          >
+            <AlertTriangle className="w-5 h-5 text-red-600 mt-0.5 flex-shrink-0" />
+            <div className="flex-1 min-w-0">
+              <h3 className="text-red-800 font-semibold text-base mb-1">
+                Budget Exceeded: {budget.name}
+              </h3>
+              <div className="space-y-1">
+                <p className="text-red-700 text-sm">
+                  Spent:{" "}
+                  <span className="font-semibold">
+                    {group.settings.currency} {usage.spent.toFixed(2)}
+                  </span>
+                  of {group.settings.currency} {budget.limit.toFixed(2)} limit
+                </p>
+                <p className="text-red-700 text-sm">
+                  Over by:{" "}
+                  <span className="font-semibold">
+                    {group.settings.currency} {overage.toFixed(2)}
+                  </span>
+                </p>
               </div>
-            </AlertDescription>
-          </Alert>
+            </div>
+            <div className="flex-shrink-0">
+              <Badge variant="destructive" className="text-sm font-bold px-3 py-1">
+                {usage.percentage.toFixed(0)}%
+              </Badge>
+            </div>
+          </div>
         );
       })}
 
@@ -202,169 +205,61 @@ export const GroupBudgetAlerts: React.FC<GroupBudgetAlertsProps> = ({
         const remaining = budget.limit - usage.spent;
 
         return (
-          <Alert key={budget.id} className="border-yellow-200 bg-yellow-50">
-            <TrendingUp className="h-4 w-4 text-yellow-600" />
-            <AlertTitle className="text-yellow-800">
-              Approaching Limit: {budget.name}
-            </AlertTitle>
-            <AlertDescription className="text-yellow-700">
-              <div className="flex items-center justify-between mt-2">
-                <div className="space-y-1">
-                  <p className="text-sm">
-                    Spent:{" "}
-                    <span className="font-semibold">
-                      {group.settings.currency} {usage.spent.toFixed(2)}
-                    </span>
-                    of {group.settings.currency} {budget.limit.toFixed(2)} limit
-                  </p>
-                  <p className="text-xs">
-                    Remaining:{" "}
-                    <span className="font-semibold text-yellow-600">
-                      {group.settings.currency} {remaining.toFixed(2)}
-                    </span>
-                  </p>
-                </div>
-                <Badge
-                  variant="outline"
-                  className="text-yellow-600 border-yellow-300 shrink-0"
-                >
-                  <TrendingUp className="w-3 h-3 mr-1" />
-                  {usage.percentage.toFixed(0)}%
-                </Badge>
+          <div
+            key={budget.id}
+            className="flex items-start space-x-3 p-4 bg-yellow-50 border border-yellow-200 rounded-lg cursor-pointer hover:bg-yellow-100 transition-colors"
+            onClick={() => onManageBudgets?.()}
+          >
+            <TrendingUp className="w-5 h-5 text-yellow-600 mt-0.5 flex-shrink-0" />
+            <div className="flex-1 min-w-0">
+              <h3 className="text-yellow-800 font-semibold text-base mb-1">
+                Approaching Limit: {budget.name}
+              </h3>
+              <div className="space-y-1">
+                <p className="text-yellow-700 text-sm">
+                  Spent:{" "}
+                  <span className="font-semibold">
+                    {group.settings.currency} {usage.spent.toFixed(2)}
+                  </span>
+                  of {group.settings.currency} {budget.limit.toFixed(2)} limit
+                </p>
+                <p className="text-yellow-700 text-sm">
+                  Remaining:{" "}
+                  <span className="font-semibold">
+                    {group.settings.currency} {remaining.toFixed(2)}
+                  </span>
+                </p>
               </div>
-            </AlertDescription>
-          </Alert>
+            </div>
+            <div className="flex-shrink-0">
+              <Badge variant="outline" className="text-yellow-600 border-yellow-300 text-sm font-bold px-3 py-1">
+                {usage.percentage.toFixed(0)}%
+              </Badge>
+            </div>
+          </div>
         );
       })}
 
-      {/* Quick Actions */}
+      {/* Quick Action to Manage Budgets */}
       {onManageBudgets &&
         (overBudgetUsages.length > 0 || nearLimitUsages.length > 0) && (
-          <Card className="border-blue-200 bg-blue-50/50">
-            <CardContent className="p-3">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center space-x-2">
-                  <DollarSign className="w-4 h-4 text-blue-600" />
-                  <span className="text-sm text-blue-700">
-                    Need to adjust your budgets?
-                  </span>
-                </div>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={onManageBudgets}
-                  className="text-blue-600 border-blue-200 hover:bg-blue-100"
-                >
-                  Manage Budgets
-                </Button>
-              </div>
-            </CardContent>
-          </Card>
-        )}
-
-      {/* All Budgets Summary */}
-      <Card>
-        <CardContent className="p-4">
-          <h4 className="text-sm font-semibold text-gray-900 mb-3">
-            All Active Budgets ({activeBudgets.length})
-          </h4>
-          <div className="space-y-3">
-            {activeBudgets.map((budget) => {
-              const usage = budgetUsages.find((u) => u.budgetId === budget.id);
-              const spent = usage?.spent || 0;
-              const percentage = usage?.percentage || 0;
-              const remaining = budget.limit - spent;
-              const isOverBudget = usage?.isOverBudget || false;
-              const isNearLimit = usage?.isNearLimit || false;
-
-              return (
-                <div
-                  key={budget.id}
-                  className="flex items-center justify-between p-3 bg-gray-50 rounded-lg"
-                >
-                  <div className="flex-1">
-                    <div className="flex items-center space-x-2">
-                      <h5 className="text-sm font-medium text-gray-900">
-                        {budget.name}
-                      </h5>
-                      <Badge variant="outline" className="text-xs">
-                        {budget.category === "overall"
-                          ? "Overall"
-                          : budget.category || "Overall"}
-                      </Badge>
-                      {isOverBudget && (
-                        <Badge variant="destructive" className="text-xs">
-                          Over Budget
-                        </Badge>
-                      )}
-                      {isNearLimit && !isOverBudget && (
-                        <Badge
-                          variant="outline"
-                          className="text-xs text-yellow-600 border-yellow-300"
-                        >
-                          Near Limit
-                        </Badge>
-                      )}
-                    </div>
-                    <div className="mt-1 text-xs text-gray-600">
-                      {group.settings.currency} {spent.toFixed(2)} of{" "}
-                      {group.settings.currency} {budget.limit.toFixed(2)} •{" "}
-                      {budget.period}
-                    </div>
-                    <div className="mt-2 w-full bg-gray-200 rounded-full h-2">
-                      <div
-                        className={`h-2 rounded-full transition-all duration-300 ${
-                          isOverBudget
-                            ? "bg-red-500"
-                            : isNearLimit
-                            ? "bg-yellow-500"
-                            : "bg-green-500"
-                        }`}
-                        style={{ width: `${Math.min(percentage, 100)}%` }}
-                      />
-                    </div>
-                  </div>
-                  <div className="ml-4 text-right">
-                    <div
-                      className={`text-sm font-medium ${
-                        isOverBudget
-                          ? "text-red-600"
-                          : isNearLimit
-                          ? "text-yellow-600"
-                          : "text-gray-900"
-                      }`}
-                    >
-                      {percentage.toFixed(0)}%
-                    </div>
-                    <div className="text-xs text-gray-500">
-                      {isOverBudget
-                        ? `${group.settings.currency} ${Math.abs(
-                            remaining
-                          ).toFixed(2)} over`
-                        : `${group.settings.currency} ${remaining.toFixed(
-                            2
-                          )} left`}
-                    </div>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-          {onManageBudgets && (
-            <div className="mt-4 pt-3 border-t border-gray-200">
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={onManageBudgets}
-                className="w-full text-blue-600 border-blue-200 hover:bg-blue-50"
-              >
-                <Target className="w-4 h-4 mr-2" />
-                Manage Budgets
-              </Button>
+          <div className="flex items-center justify-between p-4 bg-blue-50 border border-blue-200 rounded-lg">
+            <div className="flex items-center space-x-2">
+              <DollarSign className="w-5 h-5 text-blue-600" />
+              <span className="text-blue-700 font-medium">
+                Need to adjust your budgets?
+              </span>
             </div>
-          )}
-        </CardContent>
-      </Card>
+            <Button
+              variant="default"
+              size="sm"
+              onClick={onManageBudgets}
+              className="bg-blue-600 hover:bg-blue-700 text-white font-medium px-4"
+            >
+              Manage Budgets
+            </Button>
+          </div>
+        )}
     </div>
   );
 };

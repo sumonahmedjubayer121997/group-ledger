@@ -42,6 +42,7 @@ import { GroupBudgetManagement } from "./GroupBudgetManagement";
 import { GroupBudgetAlerts } from "./GroupBudgetAlerts";
 import { GroupBudgetList } from "./GroupBudgetList";
 import { fetchGroupMembersWithPhotos } from "@/components/firebaseComponents/FetchGroupMembersWithPhotos";
+import { useBudgetValidation } from "@/hooks/useBudgetValidation";
 
 interface GroupDetailViewProps {
   group: Group;
@@ -110,6 +111,9 @@ export const GroupDetailView: React.FC<GroupDetailViewProps> = ({
     useExpenseStore();
   const isMobile = useIsMobile();
   const { user } = useAuth();
+
+  // Enable budget validation for real-time alerts
+  useBudgetValidation(group.id);
 
   const groupExpenses = getGroupExpenses(group.id);
   const balances = getBalances().filter((balance) =>
