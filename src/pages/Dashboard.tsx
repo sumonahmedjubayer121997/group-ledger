@@ -1,7 +1,13 @@
 import { useState, useEffect, useMemo, useCallback } from "react";
 import { Plus, Users, Receipt, TrendingUp, BarChart3 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useAuth } from "@/contexts/AuthContext";
 import { useExpenseStore } from "@/stores/expenseStore";
@@ -17,11 +23,17 @@ import { motion, AnimatePresence } from "framer-motion";
 import { GroupDetailMobileNav } from "@/components/GroupDetailMobileNav";
 import { fetchGroupMembersWithPhotos } from "@/components/firebaseComponents/FetchGroupMembersWithPhotos";
 import { useNavigate } from "react-router-dom";
-import { useBudgetFirebaseSync } from '@/hooks/useBudgetFirebaseSync';
+import { useBudgetFirebaseSync } from "@/hooks/useBudgetFirebaseSync";
 
 const Dashboard = () => {
   const { user, userProfile } = useAuth();
-  const { groups, expenses, setSelectedGroup, getBalances, initializeFirebaseSync } = useExpenseStore();
+  const {
+    groups,
+    expenses,
+    setSelectedGroup,
+    getBalances,
+    initializeFirebaseSync,
+  } = useExpenseStore();
   const [showGroupForm, setShowGroupForm] = useState(false);
   const [showExpenseForm, setShowExpenseForm] = useState(false);
   const [activeTab, setActiveTab] = useState("overview");
@@ -34,9 +46,14 @@ const Dashboard = () => {
 
   // Initialize Firebase sync when user is authenticated
   useEffect(() => {
-    console.log('Dashboard useEffect - user:', user?.uid, 'groups length:', groups.length);
+    console.log(
+      "Dashboard useEffect - user:",
+      user?.uid,
+      "groups length:",
+      groups.length
+    );
     if (user?.uid) {
-      console.log('Initializing Firebase sync for user:', user.uid);
+      console.log("Initializing Firebase sync for user:", user.uid);
       initializeFirebaseSync(user.uid);
     }
   }, [user?.uid, initializeFirebaseSync]);
@@ -47,7 +64,7 @@ const Dashboard = () => {
 
       try {
         // Only enrich groups that haven't been enriched yet
-        const unenrichedGroups = groups.filter(group => !group.members);
+        const unenrichedGroups = groups.filter((group) => !group.members);
         if (unenrichedGroups.length === 0 && enrichedGroups.length > 0) return;
 
         const enriched = await Promise.all(
@@ -58,14 +75,18 @@ const Dashboard = () => {
         );
 
         // Merge with existing enriched groups
-        const allEnriched = groups.map(group => {
-          const enrichedGroup = enriched.find(e => e.id === group.id);
-          return enrichedGroup || (enrichedGroups.find(eg => eg.id === group.id) || group);
+        const allEnriched = groups.map((group) => {
+          const enrichedGroup = enriched.find((e) => e.id === group.id);
+          return (
+            enrichedGroup ||
+            enrichedGroups.find((eg) => eg.id === group.id) ||
+            group
+          );
         });
 
         setEnrichedGroups(allEnriched);
       } catch (error) {
-        console.error('Error loading group members:', error);
+        console.error("Error loading group members:", error);
         setEnrichedGroups(groups);
       }
     };
@@ -73,10 +94,13 @@ const Dashboard = () => {
     loadGroupsWithMembers();
   }, [groups, user?.uid, enrichedGroups]);
 
-  const handleGroupClick = useCallback((group: any) => {
-    setSelectedGroup(group);
-    navigate(`/groups/${group.id}`);
-  }, [setSelectedGroup, navigate]);
+  const handleGroupClick = useCallback(
+    (group: any) => {
+      setSelectedGroup(group);
+      navigate(`/groups/${group.id}`);
+    },
+    [setSelectedGroup, navigate]
+  );
 
   const balances = useMemo(() => getBalances(), [getBalances]);
 
@@ -84,19 +108,24 @@ const Dashboard = () => {
     { value: "overview", id: "overview", label: "Overview", icon: BarChart3 },
     { value: "groups", id: "groups", label: "Groups", icon: Users },
     { value: "expenses", id: "expenses", label: "Expenses", icon: Receipt },
-    { value: "analytics", id: "analytics", label: "Analytics", icon: TrendingUp },
+    {
+      value: "analytics",
+      id: "analytics",
+      label: "Analytics",
+      icon: TrendingUp,
+    },
   ];
 
   const contentVariants = {
     initial: { opacity: 0, y: 20 },
     animate: { opacity: 1, y: 0 },
-    exit: { opacity: 0, y: -20 }
+    exit: { opacity: 0, y: -20 },
   };
 
   return (
     <div className="container mx-auto px-4 py-6">
       {/* Welcome Message */}
-      <motion.div 
+      <motion.div
         className="mb-4 sm:mb-6"
         initial={{ opacity: 0, y: -20 }}
         animate={{ opacity: 1, y: 0 }}
@@ -105,7 +134,7 @@ const Dashboard = () => {
         <Card className="bg-card/80 backdrop-blur-sm border-border">
           <CardHeader className="pb-3 sm:pb-6">
             <CardTitle className="text-base sm:text-lg md:text-xl text-card-foreground">
-              Welcome back, {userProfile?.displayName || 'User'}! 👋
+              Welcome back, {userProfile?.displayName || "User"}! 👋
             </CardTitle>
             <CardDescription className="text-xs sm:text-sm text-muted-foreground">
               Here's your expense overview
@@ -117,31 +146,56 @@ const Dashboard = () => {
       {/* Debug info - Hidden on mobile */}
       {!isMobile && (
         <div className="mb-4 text-sm text-muted-foreground">
-          Groups: {groups.length} | Expenses: {expenses.length} | User: {user?.displayName}
+          Groups: {groups.length} | Expenses: {expenses.length} | User:{" "}
+          {user?.displayName}
         </div>
       )}
 
       {/* Tabs */}
-      <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4 sm:space-y-6">
+      <Tabs
+        value={activeTab}
+        onValueChange={setActiveTab}
+        className="space-y-4 sm:space-y-6"
+      >
         {!isMobile && (
-          <TabsList className="grid w-full grid-cols-4 gap-1 sm:gap-2 p-1">
-            {tabItems.map((item) => {
-              const Icon = item.icon;
-              
-              return (
-                <TabsTrigger 
-                  key={item.value}
-                  value={item.value} 
-                  className="relative flex items-center justify-center space-x-2 px-2 py-2 text-xs sm:text-sm min-h-[48px] sm:min-h-auto whitespace-nowrap min-w-fit"
-                >
-                  <Icon className="h-4 w-4" />
-                  {!isMobile && (
-                    <span className="truncate">{item.label}</span>
-                  )}
-                </TabsTrigger>
-              );
-            })}
-          </TabsList>
+          <div className="relative w-full">
+            <TabsList className="inline-flex h-12 items-center justify-center rounded-xl bg-muted/50 p-1 text-muted-foreground w-full backdrop-blur-sm border border-border/50">
+              {tabItems.map((item) => {
+                const Icon = item.icon;
+                const isActive = activeTab === item.value;
+
+                return (
+                  <TabsTrigger
+                    key={item.value}
+                    value={item.value}
+                    className="relative inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-lg px-4 py-2 text-sm font-medium ring-offset-background transition-all duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 
+                    data-[state=active]:bg-background data-[state=active]:text-foreground data-[state=active]:shadow-md 
+                    hover:bg-background/50 hover:text-foreground/80 flex-1 min-h-[40px]
+                    data-[state=active]:scale-[1.02] transform"
+                  >
+                    <Icon
+                      className={`h-4 w-4 transition-colors duration-200 ${
+                        isActive ? "text-primary" : ""
+                      }`}
+                    />
+                    <span className="truncate font-medium">{item.label}</span>
+                    {isActive && (
+                      <motion.div
+                        layoutId="activeTab"
+                        className="absolute inset-0 rounded-lg bg-gradient-to-r from-primary/10 to-primary/5 border border-primary/20"
+                        initial={false}
+                        transition={{
+                          type: "spring",
+                          stiffness: 500,
+                          damping: 30,
+                        }}
+                      />
+                    )}
+                  </TabsTrigger>
+                );
+              })}
+            </TabsList>
+          </div>
         )}
 
         <AnimatePresence mode="wait">
@@ -159,21 +213,31 @@ const Dashboard = () => {
                 <BalanceCard balances={balances} />
                 <Card>
                   <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                    <CardTitle className="text-xs sm:text-sm font-medium">Total Groups</CardTitle>
+                    <CardTitle className="text-xs sm:text-sm font-medium">
+                      Total Groups
+                    </CardTitle>
                     <Users className="h-3 w-3 sm:h-4 sm:w-4 text-muted-foreground" />
                   </CardHeader>
                   <CardContent>
-                    <div className="text-lg sm:text-2xl font-bold">{groups.length}</div>
-                    <p className="text-xs text-muted-foreground">Active groups</p>
+                    <div className="text-lg sm:text-2xl font-bold">
+                      {groups.length}
+                    </div>
+                    <p className="text-xs text-muted-foreground">
+                      Active groups
+                    </p>
                   </CardContent>
                 </Card>
                 <Card>
                   <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                    <CardTitle className="text-xs sm:text-sm font-medium">Total Expenses</CardTitle>
+                    <CardTitle className="text-xs sm:text-sm font-medium">
+                      Total Expenses
+                    </CardTitle>
                     <Receipt className="h-3 w-3 sm:h-4 sm:w-4 text-muted-foreground" />
                   </CardHeader>
                   <CardContent>
-                    <div className="text-lg sm:text-2xl font-bold">{expenses.length}</div>
+                    <div className="text-lg sm:text-2xl font-bold">
+                      {expenses.length}
+                    </div>
                     <p className="text-xs text-muted-foreground">All time</p>
                   </CardContent>
                 </Card>
@@ -193,7 +257,9 @@ const Dashboard = () => {
               transition={{ duration: 0.3 }}
             >
               <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3 sm:gap-4 mb-4">
-                <h2 className="text-lg sm:text-xl font-bold text-foreground">Your Groups</h2>
+                <h2 className="text-lg sm:text-xl font-bold text-foreground">
+                  Your Groups
+                </h2>
                 <Button
                   onClick={() => setShowGroupForm(true)}
                   className="bg-primary hover:bg-primary/90 text-primary-foreground text-xs sm:text-sm"
@@ -203,7 +269,10 @@ const Dashboard = () => {
                   New Group
                 </Button>
               </div>
-              <GroupList groups={enrichedGroups} onGroupClick={handleGroupClick} />
+              <GroupList
+                groups={enrichedGroups}
+                onGroupClick={handleGroupClick}
+              />
             </motion.div>
           </TabsContent>
 
@@ -218,7 +287,9 @@ const Dashboard = () => {
               transition={{ duration: 0.3 }}
             >
               <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3 sm:gap-4">
-                <h2 className="text-lg sm:text-xl font-bold text-foreground">All Expenses</h2>
+                <h2 className="text-lg sm:text-xl font-bold text-foreground">
+                  All Expenses
+                </h2>
                 <Button
                   onClick={() => setShowExpenseForm(true)}
                   className="bg-secondary hover:bg-secondary/90 text-secondary-foreground text-xs sm:text-sm"

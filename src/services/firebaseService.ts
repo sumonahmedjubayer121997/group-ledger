@@ -1,28 +1,28 @@
-import { 
-  collection, 
-  doc, 
-  addDoc, 
-  updateDoc, 
-  deleteDoc, 
-  getDocs, 
-  getDoc, 
-  query, 
-  where, 
-  orderBy, 
+import {
+  collection,
+  doc,
+  addDoc,
+  updateDoc,
+  deleteDoc,
+  getDocs,
+  getDoc,
+  query,
+  where,
+  orderBy,
   onSnapshot,
   serverTimestamp,
   arrayUnion,
   arrayRemove,
   setDoc,
-  deleteField
-} from 'firebase/firestore';
-import { User, getAuth } from 'firebase/auth';
-import { db } from '@/lib/firebase';
-import { Group, Expense, Member, Settlement } from '@/stores/expenseStore';
-import { Budget } from '@/stores/budgetStore';
-import { findSimilarEmails } from '@/components/firebaseComponents/FindSimilarEmails';
-import { logAllUserEmails } from '@/components/firebaseComponents/LogAllUserEmail';
-import { findSimilarEmailUIDs } from '@/components/firebaseComponents/FindSimilarUIDs';
+  deleteField,
+} from "firebase/firestore";
+import { User, getAuth } from "firebase/auth";
+import { db } from "@/lib/firebase";
+import { Group, Expense, Member, Settlement } from "@/stores/expenseStore";
+import { Budget } from "@/stores/budgetStore";
+import { findSimilarEmails } from "@/components/firebaseComponents/FindSimilarEmails";
+import { logAllUserEmails } from "@/components/firebaseComponents/LogAllUserEmail";
+import { findSimilarEmailUIDs } from "@/components/firebaseComponents/FindSimilarUIDs";
 // User Profile Interface
 export interface UserProfile {
   uid: string;
@@ -45,18 +45,23 @@ export interface UserProfile {
   };
   displayName?: string;
   emailVerified?: boolean;
-  role?: 'user' | 'admin';
+  role?: "user" | "admin";
   createdAt?: Date;
   lastLoginAt?: Date;
 }
 
 // User Operations
-export const createUserProfile = async (userProfileOrUid: Omit<UserProfile, 'joinedAt' | 'lastActivity' | 'stats'> | string, data?: { email: string; name: string; verified: boolean }): Promise<UserProfile> => {
+export const createUserProfile = async (
+  userProfileOrUid:
+    | Omit<UserProfile, "joinedAt" | "lastActivity" | "stats">
+    | string,
+  data?: { email: string; name: string; verified: boolean }
+): Promise<UserProfile> => {
   try {
     // Handle both old and new function signatures
-    let userProfile: Omit<UserProfile, 'joinedAt' | 'lastActivity' | 'stats'>;
-    
-    if (typeof userProfileOrUid === 'string' && data) {
+    let userProfile: Omit<UserProfile, "joinedAt" | "lastActivity" | "stats">;
+
+    if (typeof userProfileOrUid === "string" && data) {
       // New signature: uid and data object
       userProfile = {
         uid: userProfileOrUid,
@@ -64,17 +69,20 @@ export const createUserProfile = async (userProfileOrUid: Omit<UserProfile, 'joi
         name: data.name,
         verified: data.verified,
         preferences: {
-          currency: 'USD',
-          theme: 'light',
-          language: 'en',
+          currency: "USD",
+          theme: "light",
+          language: "en",
         },
       };
     } else {
       // Old signature: complete userProfile object
-      userProfile = userProfileOrUid as Omit<UserProfile, 'joinedAt' | 'lastActivity' | 'stats'>;
+      userProfile = userProfileOrUid as Omit<
+        UserProfile,
+        "joinedAt" | "lastActivity" | "stats"
+      >;
     }
-    
-    const userRef = doc(db, 'users', userProfile.uid);
+
+    const userRef = doc(db, "users", userProfile.uid);
     const userData = {
       ...userProfile,
       joinedAt: serverTimestamp(),
@@ -85,9 +93,9 @@ export const createUserProfile = async (userProfileOrUid: Omit<UserProfile, 'joi
         totalOwed: 0,
       },
     };
-    
+
     await setDoc(userRef, userData);
-    
+
     // Return with proper Date types and compatibility properties
     return {
       ...userProfile,
@@ -101,58 +109,72 @@ export const createUserProfile = async (userProfileOrUid: Omit<UserProfile, 'joi
       // Add compatibility properties
       displayName: userProfile.name,
       emailVerified: userProfile.verified,
-      role: 'user' as const,
+      role: "user" as const,
       createdAt: new Date(),
       lastLoginAt: new Date(),
     };
   } catch (error) {
-    console.error('Error creating user profile:', error);
+    console.error("Error creating user profile:", error);
     throw error;
   }
 };
 
-export const getUserProfile = async (uid: string): Promise<UserProfile | null> => {
+export const getUserProfile = async (
+  uid: string
+): Promise<UserProfile | null> => {
   try {
-    const userRef = doc(db, 'users', uid);
+    console.log(`🔍 Firebase: Fetching user profile for UID: ${uid}`);
+    const userRef = doc(db, "users", uid);
     const userDoc = await getDoc(userRef);
-    
+
     if (userDoc.exists()) {
       const data = userDoc.data();
-  const profile = {
-  uid: userDoc.id,
-  ...data,
-  joinedAt: data.joinedAt?.toDate() || new Date(),
-  lastActivity: data.lastActivity?.toDate() || new Date(),
+      console.log(`✅ Firebase: Raw user data for ${uid}:`, data);
+      console.log(`📸 Firebase: PhotoURL for ${uid}:`, data.photoURL);
 
-  // Ensure defaults
-  stats: {
-    groupsJoined: data.stats?.groupsJoined || 0,
-    totalPaid: data.stats?.totalPaid || 0,
-    totalOwed: data.stats?.totalOwed || 0,
-  },
+      const profile = {
+        uid: userDoc.id,
+        ...data,
+        joinedAt: data.joinedAt?.toDate() || new Date(),
+        lastActivity: data.lastActivity?.toDate() || new Date(),
 
-  // Add compatibility properties
-  displayName: data.name,
-  emailVerified: data.verified,
-  role: 'user' as const,
-  createdAt: data.joinedAt?.toDate() || new Date(),
-  lastLoginAt: data.lastActivity?.toDate() || new Date(),
-} as UserProfile;
+        // Ensure defaults
+        stats: {
+          groupsJoined: data.stats?.groupsJoined || 0,
+          totalPaid: data.stats?.totalPaid || 0,
+          totalOwed: data.stats?.totalOwed || 0,
+        },
 
-    
-    return profile;
+        // Add compatibility properties
+        displayName: data.name,
+        emailVerified: data.verified,
+        role: "user" as const,
+        createdAt: data.joinedAt?.toDate() || new Date(),
+        lastLoginAt: data.lastActivity?.toDate() || new Date(),
+      } as UserProfile;
+
+      console.log(`✅ Firebase: Processed profile for ${uid}:`, profile);
+      return profile;
+    } else {
+      console.log(`❌ Firebase: No document found for UID: ${uid}`);
     }
-    
+
     return null;
   } catch (error) {
-    console.error('Error fetching user profile:', error);
+    console.error(
+      `❌ Firebase: Error fetching user profile for ${uid}:`,
+      error
+    );
     throw error;
   }
 };
 
-export const updateUserProfile = async (uid: string, updates: Partial<UserProfile>) => {
+export const updateUserProfile = async (
+  uid: string,
+  updates: Partial<UserProfile>
+) => {
   try {
-    const userRef = doc(db, 'users', uid);
+    const userRef = doc(db, "users", uid);
     await updateDoc(userRef, {
       ...updates,
       lastActivity: serverTimestamp(),
@@ -160,17 +182,19 @@ export const updateUserProfile = async (uid: string, updates: Partial<UserProfil
       updatedAt: serverTimestamp(),
     });
   } catch (error) {
-    console.error('Error updating user profile:', error);
+    console.error("Error updating user profile:", error);
     throw error;
   }
 };
 
-export const getUserByEmail = async (email: string): Promise<UserProfile | null> => {
+export const getUserByEmail = async (
+  email: string
+): Promise<UserProfile | null> => {
   try {
-    const usersRef = collection(db, 'users');
-    const q = query(usersRef, where('email', '==', email));
+    const usersRef = collection(db, "users");
+    const q = query(usersRef, where("email", "==", email));
     const querySnapshot = await getDocs(q);
-    
+
     if (!querySnapshot.empty) {
       const userDoc = querySnapshot.docs[0];
       const data = userDoc.data();
@@ -186,15 +210,15 @@ export const getUserByEmail = async (email: string): Promise<UserProfile | null>
         },
         displayName: data.name,
         emailVerified: data.verified,
-        role: 'user' as const,
+        role: "user" as const,
         createdAt: data.joinedAt?.toDate() || new Date(),
         lastLoginAt: data.lastActivity?.toDate() || new Date(),
       } as UserProfile;
     }
-    
+
     return null;
   } catch (error) {
-    console.error('Error fetching user by email:', error);
+    console.error("Error fetching user by email:", error);
     return null;
   }
 };
@@ -203,7 +227,7 @@ export const mergeTemporaryUserWithRealUser = async (realUser: User) => {
   const userId = realUser.uid;
   const email = realUser.email;
   if (!userId || !email) {
-    console.error('❌ mergeTemporaryUserWithRealUser: Missing userId or email');
+    console.error("❌ mergeTemporaryUserWithRealUser: Missing userId or email");
     return;
   }
 
@@ -211,7 +235,7 @@ export const mergeTemporaryUserWithRealUser = async (realUser: User) => {
   console.log("Merging temp user for:", realUser.email, realUser.uid);
 
   // 🔎 STEP 1: Look for any temp user by email
-  const groupsSnapshot = await getDocs(collection(db, 'groups'));
+  const groupsSnapshot = await getDocs(collection(db, "groups"));
 
   for (const groupDoc of groupsSnapshot.docs) {
     const groupId = groupDoc.id;
@@ -225,7 +249,7 @@ export const mergeTemporaryUserWithRealUser = async (realUser: User) => {
 
     if (tempEntry) {
       const [tempId, tempUserData] = tempEntry;
-      const groupRef = doc(db, 'groups', groupId);
+      const groupRef = doc(db, "groups", groupId);
 
       // ✅ Merge user data
       await updateDoc(groupRef, {
@@ -238,19 +262,19 @@ export const mergeTemporaryUserWithRealUser = async (realUser: User) => {
       });
 
       // 🔧 Cleanup: remove from 'users' collection if temp profile exists
-      const tempUserRef = doc(db, 'users', tempId);
+      const tempUserRef = doc(db, "users", tempId);
       const tempUserSnap = await getDoc(tempUserRef);
       if (tempUserSnap.exists()) {
         await deleteDoc(tempUserRef);
       }
 
       // 🔄 Subcollections update
-      await setDoc(doc(db, 'groups', groupId, 'members', userId), {
+      await setDoc(doc(db, "groups", groupId, "members", userId), {
         role: (tempUserData as any).role,
         joinedAt: (tempUserData as any).joinedAt || serverTimestamp(),
       });
 
-      await setDoc(doc(db, 'users', userId, 'groups', groupId), {
+      await setDoc(doc(db, "users", userId, "groups", groupId), {
         groupId,
         role: (tempUserData as any).role,
         joinedAt: (tempUserData as any).joinedAt || serverTimestamp(),
@@ -261,34 +285,38 @@ export const mergeTemporaryUserWithRealUser = async (realUser: User) => {
   }
 };
 
-
-  
-
-
 // Group Operations
 // ✅ Full working createGroup() function fixed with safe fallbacks
-export const createGroup = async (groupData: Omit<Group, 'id'>, userId: string) => {
+export const createGroup = async (
+  groupData: Omit<Group, "id">,
+  userId: string
+) => {
   try {
-    console.log('Creating group with userId:', userId);
+    console.log("Creating group with userId:", userId);
 
     // Get current user's profile, create if it doesn't exist
     let currentUserProfile = await getUserProfile(userId);
     if (!currentUserProfile) {
-      console.log('User profile not found, attempting to create it from auth...');
+      console.log(
+        "User profile not found, attempting to create it from auth..."
+      );
       // Try to get the user from Firebase Auth to create profile
       const auth = getAuth();
       const currentUser = auth.currentUser;
       if (currentUser) {
         await createUserProfile(currentUser.uid, {
-          email: currentUser.email || '',
-          name: currentUser.displayName || currentUser.email?.split('@')[0] || 'User',
-          verified: currentUser.emailVerified
+          email: currentUser.email || "",
+          name:
+            currentUser.displayName ||
+            currentUser.email?.split("@")[0] ||
+            "User",
+          verified: currentUser.emailVerified,
         });
         currentUserProfile = await getUserProfile(userId);
       }
-      
+
       if (!currentUserProfile) {
-        throw new Error('Unable to create or retrieve user profile');
+        throw new Error("Unable to create or retrieve user profile");
       }
     }
 
@@ -297,51 +325,52 @@ export const createGroup = async (groupData: Omit<Group, 'id'>, userId: string) 
 
     // Add current user as admin using profile fallback
     users[userId] = {
-      name: currentUserProfile.name || 'Unknown',
-      email: currentUserProfile.email || 'unknown@example.com',
-      role: 'admin',
+      name: currentUserProfile.name || "Unknown",
+      email: currentUserProfile.email || "unknown@example.com",
+      role: "admin",
       joinedAt: serverTimestamp(),
     };
-    findSimilarEmails(groupData.members.map(m => m.email).join(', '))
-   
-     findSimilarEmailUIDs(groupData.members.map(m => m.email).join(', '));
- 
+    findSimilarEmails(groupData.members.map((m) => m.email).join(", "));
 
-console.log("🔍 groupData.members", groupData.members);
-console.log("📌 Type:", typeof groupData.members);
-console.log("📌 IsArray?", Array.isArray(groupData.members));
-console.log("users:", users);
+    findSimilarEmailUIDs(groupData.members.map((m) => m.email).join(", "));
+
+    console.log("🔍 groupData.members", groupData.members);
+    console.log("📌 Type:", typeof groupData.members);
+    console.log("📌 IsArray?", Array.isArray(groupData.members));
+    console.log("users:", users);
 
     // Process members - ensure it's an array
-    const membersArray = Array.isArray(groupData.members) ? groupData.members : [];
-    
+    const membersArray = Array.isArray(groupData.members)
+      ? groupData.members
+      : [];
+
     for (const member of membersArray) {
-  const memberId = member.id;
-  const existingUser = await getUserProfile(memberId);
-  console.log("👤 Checking user profile for memberId:", memberId);
+      const memberId = member.id;
+      const existingUser = await getUserProfile(memberId);
+      console.log("👤 Checking user profile for memberId:", memberId);
 
-  const name = (member.name || existingUser?.name || 'Unknown').trim();
-  const email = (member.email || existingUser?.email || '').trim(); 
+      const name = (member.name || existingUser?.name || "Unknown").trim();
+      const email = (member.email || existingUser?.email || "").trim();
 
-  users[memberId] = {
-    name,
-    email,
-    role: member.role,
-    joinedAt: serverTimestamp(),
-    isTemporary: !existingUser
-  };
-}
+      users[memberId] = {
+        name,
+        email,
+        role: member.role,
+        joinedAt: serverTimestamp(),
+        isTemporary: !existingUser,
+      };
+    }
 
     const firestoreGroup = {
       name: groupData.name.trim(),
-      description: groupData.description?.trim() || '',
+      description: groupData.description?.trim() || "",
       users,
       createdBy: userId,
       createdAt: serverTimestamp(),
-      groupType: groupData.groupType || 'private',
+      groupType: groupData.groupType || "private",
       inviteCode: groupData.inviteCode || crypto.randomUUID(),
       settings: groupData.settings || {
-        currency: 'USD',
+        currency: "USD",
         simplifyDebts: true,
         notifications: true,
         recurringBills: false,
@@ -349,42 +378,45 @@ console.log("users:", users);
       isArchived: groupData.isArchived || false,
     };
 
-    console.log('Creating group with new structure:', firestoreGroup);
-    console.log('Users object structure:', firestoreGroup.users);
+    console.log("Creating group with new structure:", firestoreGroup);
+    console.log("Users object structure:", firestoreGroup.users);
 
-    const docRef = await addDoc(collection(db, 'groups'), firestoreGroup);
+    const docRef = await addDoc(collection(db, "groups"), firestoreGroup);
     const groupId = docRef.id;
-    
-    console.log('Group created with ID:', groupId);
+
+    console.log("Group created with ID:", groupId);
 
     const batch = [];
     for (const [uid, userData] of Object.entries(users)) {
       if (!userData.isTemporary) {
-        const memberRef = doc(db, 'groups', groupId, 'members', uid);
-        batch.push(setDoc(memberRef, {
-          role: userData.role,
-          joinedAt: serverTimestamp(),
-        }));
+        const memberRef = doc(db, "groups", groupId, "members", uid);
+        batch.push(
+          setDoc(memberRef, {
+            role: userData.role,
+            joinedAt: serverTimestamp(),
+          })
+        );
 
-        const userGroupRef = doc(db, 'users', uid, 'groups', groupId);
-        batch.push(setDoc(userGroupRef, {
-          groupId,
-          role: userData.role,
-          joinedAt: serverTimestamp(),
-        }));
+        const userGroupRef = doc(db, "users", uid, "groups", groupId);
+        batch.push(
+          setDoc(userGroupRef, {
+            groupId,
+            role: userData.role,
+            joinedAt: serverTimestamp(),
+          })
+        );
       }
     }
 
     await Promise.all(batch);
 
-      await updateUserProfile(userId, {
-    stats: {
-      groupsJoined: (currentUserProfile.stats?.groupsJoined || 0) + 1,
-      totalPaid: currentUserProfile.stats?.totalPaid || 0,
-      totalOwed: currentUserProfile.stats?.totalOwed || 0,
-    },
-  });
-
+    await updateUserProfile(userId, {
+      stats: {
+        groupsJoined: (currentUserProfile.stats?.groupsJoined || 0) + 1,
+        totalPaid: currentUserProfile.stats?.totalPaid || 0,
+        totalOwed: currentUserProfile.stats?.totalOwed || 0,
+      },
+    });
 
     const membersReturnArray = Object.entries(users).map(([id, userData]) => ({
       id,
@@ -401,32 +433,34 @@ console.log("users:", users);
       createdAt: new Date(),
     };
   } catch (error) {
-    console.error('Error creating group:', error);
+    console.error("Error creating group:", error);
     throw error;
   }
 };
 
 export const updateGroup = async (groupId: string, updates: Partial<Group>) => {
   try {
-    const groupRef = doc(db, 'groups', groupId);
+    const groupRef = doc(db, "groups", groupId);
     await updateDoc(groupRef, {
       ...updates,
       updatedAt: serverTimestamp(),
     });
   } catch (error) {
-    console.error('Error updating group:', error);
+    console.error("Error updating group:", error);
     throw error;
   }
-};/**
+};
+/**
  * Fetch a single group by its ID from Firestore.
  * @param groupId The Firestore document ID of the group.
  * @returns The Group object or null if not found.
  */
 
-
-export const fetchGroupById = async (groupId: string): Promise<Group | null> => {
+export const fetchGroupById = async (
+  groupId: string
+): Promise<Group | null> => {
   try {
-    const groupRef = doc(db, 'groups', groupId);
+    const groupRef = doc(db, "groups", groupId);
     const groupSnap = await getDoc(groupRef);
 
     if (!groupSnap.exists()) return null;
@@ -434,93 +468,98 @@ export const fetchGroupById = async (groupId: string): Promise<Group | null> => 
     const data = groupSnap.data();
 
     // Debug: log the raw Firestore data
-    console.log('Firestore group data:', data);
+    console.log("Firestore group data:", data);
 
     // Transform users/members object to members array
-    const membersArray = Object.entries(data.users || {}).map(([uid, userData]: [string, any]) => ({
-  userId: uid,
-  id: uid,
-  name: userData.name || 'Unknown',
-  email: userData.email || '',
-  role: userData.role as 'admin' | 'member',
-  joinedAt: userData.joinedAt?.toDate ? userData.joinedAt.toDate() : new Date(),
-}));
+    const membersArray = Object.entries(data.users || {}).map(
+      ([uid, userData]: [string, any]) => ({
+        userId: uid,
+        id: uid,
+        name: userData.name || "Unknown",
+        email: userData.email || "",
+        role: userData.role as "admin" | "member",
+        joinedAt: userData.joinedAt?.toDate
+          ? userData.joinedAt.toDate()
+          : new Date(),
+      })
+    );
 
- 
-    console.log('Transformed members array:', membersArray);
+    console.log("Transformed members array:", membersArray);
     const group: Group = {
       id: groupSnap.id,
-      name: data.name || 'Unnamed Group',
-      description: data.description || '',
-      photo: data.photo || '',
-      coverImage: data.coverImage || '',
+      name: data.name || "Unnamed Group",
+      description: data.description || "",
+      photo: data.photo || "",
+      coverImage: data.coverImage || "",
       members: membersArray,
-      createdBy: data.createdBy || '',
+      createdBy: data.createdBy || "",
       createdAt: data.createdAt?.toDate ? data.createdAt.toDate() : new Date(),
-      groupType: data.groupType || 'private',
-      inviteCode: data.inviteCode || '',
+      groupType: data.groupType || "private",
+      inviteCode: data.inviteCode || "",
       settings: data.settings || {
-        currency: 'USD',
+        currency: "USD",
         simplifyDebts: true,
         notifications: true,
         recurringBills: false,
       },
       isArchived: data.isArchived || false,
       tags: data.tags || [],
-      location: data.location || '',
+      location: data.location || "",
     };
 
     // Debug: log the constructed group object
-    console.log('Constructed group object:', group);
+    console.log("Constructed group object:", group);
 
     return group;
   } catch (error) {
-    console.error('Error fetching group by ID:', error);
+    console.error("Error fetching group by ID:", error);
     return null;
   }
 };
 
 export const getUserGroups = async (userId: string) => {
   try {
-    console.log('Fetching groups for user:', userId);
-    
+    console.log("Fetching groups for user:", userId);
+
     // Query using the new users structure
-    const groupsRef = collection(db, 'groups');
+    const groupsRef = collection(db, "groups");
     const q = query(
       groupsRef,
-      where(`users.${userId}.role`, 'in', ['admin', 'member'])
+      where(`users.${userId}.role`, "in", ["admin", "member"])
     );
-    
+
     const querySnapshot = await getDocs(q);
     const groups: Group[] = [];
-    
-    console.log('Found groups:', querySnapshot.size);
-    
+
+    console.log("Found groups:", querySnapshot.size);
+
     querySnapshot.forEach((doc) => {
       const data = doc.data();
-      console.log('Processing group:', doc.id, data);
-      
+      console.log("Processing group:", doc.id, data);
+
       // Transform users object to members array
-      const membersArray = Object.entries(data.users || {}).map(([uid, userData]: [string, any]) => ({
-        userId: uid,
-        id: uid,
-        name: userData.name || 'Unknown',
-        email: userData.email || '',
-        role: userData.role as 'admin' | 'member',
-        joinedAt: userData.joinedAt?.toDate() || new Date(),
-      }));
+      const membersArray = Object.entries(data.users || {}).map(
+        ([uid, userData]: [string, any]) => ({
+          userId: uid,
+          id: uid,
+          name: userData.name || "Unknown",
+          email: userData.email || "",
+          role: userData.role as "admin" | "member",
+          joinedAt: userData.joinedAt?.toDate() || new Date(),
+        })
+      );
 
       const group: Group = {
         id: doc.id,
-        name: data.name || 'Unnamed Group',
-        description: data.description || '',
+        name: data.name || "Unnamed Group",
+        description: data.description || "",
         members: membersArray,
         createdAt: data.createdAt?.toDate() || new Date(),
-        createdBy: data.createdBy || '',
-        groupType: data.groupType || 'private',
-        inviteCode: data.inviteCode || '',
+        createdBy: data.createdBy || "",
+        groupType: data.groupType || "private",
+        inviteCode: data.inviteCode || "",
         settings: data.settings || {
-          currency: 'USD',
+          currency: "USD",
           simplifyDebts: true,
           notifications: true,
           recurringBills: false,
@@ -530,21 +569,29 @@ export const getUserGroups = async (userId: string) => {
 
       groups.push(group);
     });
-    
-    console.log('Processed groups:', groups.length);
+
+    console.log("Processed groups:", groups.length);
     return groups;
   } catch (error) {
-    console.error('Error fetching groups:', error);
+    console.error("Error fetching groups:", error);
     throw error;
   }
 };
 
 // Expense Operations
-export const createExpense = async (expenseData: Omit<Expense, 'id'>, userId: string) => {
+export const createExpense = async (
+  expenseData: Omit<Expense, "id">,
+  userId: string
+) => {
   try {
-    console.log('Creating expense in Firebase:', expenseData);
-    const expenseRef = collection(db, 'groups', expenseData.groupId, 'expenses');
-    
+    console.log("Creating expense in Firebase:", expenseData);
+    const expenseRef = collection(
+      db,
+      "groups",
+      expenseData.groupId,
+      "expenses"
+    );
+
     // Clean the expense data to remove undefined fields
     const cleanExpenseData = {
       description: expenseData.description,
@@ -560,49 +607,56 @@ export const createExpense = async (expenseData: Omit<Expense, 'id'>, userId: st
     };
 
     // Only add splitData if it's not undefined and not empty
-    if (expenseData.splitData && Object.keys(expenseData.splitData).length > 0) {
+    if (
+      expenseData.splitData &&
+      Object.keys(expenseData.splitData).length > 0
+    ) {
       (cleanExpenseData as any).splitData = expenseData.splitData;
     }
 
-    console.log('Creating expense with clean data:', cleanExpenseData);
+    console.log("Creating expense with clean data:", cleanExpenseData);
     const docRef = await addDoc(expenseRef, cleanExpenseData);
-    console.log('Expense created with ID:', docRef.id);
+    console.log("Expense created with ID:", docRef.id);
     return { id: docRef.id, ...expenseData };
   } catch (error) {
-    console.error('Error creating expense:', error);
+    console.error("Error creating expense:", error);
     throw error;
   }
 };
 
-export const updateExpense = async (groupId: string, expenseId: string, updates: Partial<Expense>) => {
+export const updateExpense = async (
+  groupId: string,
+  expenseId: string,
+  updates: Partial<Expense>
+) => {
   try {
-    const expenseRef = doc(db, 'groups', groupId, 'expenses', expenseId);
+    const expenseRef = doc(db, "groups", groupId, "expenses", expenseId);
     await updateDoc(expenseRef, {
       ...updates,
       updatedAt: serverTimestamp(),
     });
   } catch (error) {
-    console.error('Error updating expense:', error);
+    console.error("Error updating expense:", error);
     throw error;
   }
 };
 
 export const deleteExpense = async (groupId: string, expenseId: string) => {
   try {
-    const expenseRef = doc(db, 'groups', groupId, 'expenses', expenseId);
+    const expenseRef = doc(db, "groups", groupId, "expenses", expenseId);
     await deleteDoc(expenseRef);
   } catch (error) {
-    console.error('Error deleting expense:', error);
+    console.error("Error deleting expense:", error);
     throw error;
   }
 };
 
 export const getGroupExpenses = async (groupId: string) => {
   try {
-    const expensesRef = collection(db, 'groups', groupId, 'expenses');
-    const q = query(expensesRef, orderBy('date', 'desc'));
+    const expensesRef = collection(db, "groups", groupId, "expenses");
+    const q = query(expensesRef, orderBy("date", "desc"));
     const querySnapshot = await getDocs(q);
-    
+
     const expenses: Expense[] = [];
     querySnapshot.forEach((doc) => {
       const data = doc.data();
@@ -612,98 +666,134 @@ export const getGroupExpenses = async (groupId: string) => {
         date: data.date?.toDate() || new Date(),
       } as Expense);
     });
-    
+
     return expenses;
   } catch (error) {
-    console.error('Error fetching expenses:', error);
+    console.error("Error fetching expenses:", error);
     throw error;
   }
 };
 
 // Real-time listeners
-export const subscribeToUserGroups = (userId: string, callback: (groups: Group[]) => void) => {
-  console.log('Setting up groups subscription for user:', userId);
-  const groupsRef = collection(db, 'groups');
+export const subscribeToUserGroups = (
+  userId: string,
+  callback: (groups: Group[]) => void
+) => {
+  console.log("Setting up groups subscription for user:", userId);
+  const groupsRef = collection(db, "groups");
   const q = query(
     groupsRef,
-    where(`users.${userId}.role`, 'in', ['admin', 'member'])
+    where(`users.${userId}.role`, "in", ["admin", "member"])
   );
-  
-  return onSnapshot(q, (snapshot) => {
-    console.log('📡 Groups snapshot received, size:', snapshot.size);
-    console.log('🔍 Query used for user:', userId, `-> users.${userId}.role in [admin, member]`);
-    const groups: Group[] = [];
-    
-    snapshot.forEach((doc) => {
-      const data = doc.data();
-      console.log('📋 Processing group from subscription:', doc.id, data.name);
-      console.log('👥 Group users structure:', data.users);
-      
-      // Transform users object to members array
-      const membersArray = Object.entries(data.users || {}).map(([uid, userData]: [string, any]) => ({
-        userId: uid,
-        id: uid,
-        name: userData.name || 'Unknown',
-        email: userData.email || '',
-        role: userData.role as 'admin' | 'member',
-        joinedAt: userData.joinedAt?.toDate() || new Date(),
-      }));
 
-      const group: Group = {
-        id: doc.id,
-        name: data.name || 'Unnamed Group',
-        description: data.description || '',
-        members: membersArray,
-        createdAt: data.createdAt?.toDate() || new Date(),
-        createdBy: data.createdBy || '',
-        groupType: data.groupType || 'private',
-        inviteCode: data.inviteCode || '',
-        settings: data.settings || {
-          currency: 'USD',
-          simplifyDebts: true,
-          notifications: true,
-          recurringBills: false,
-        },
-        isArchived: data.isArchived || false,
-      };
+  return onSnapshot(
+    q,
+    (snapshot) => {
+      console.log("📡 Groups snapshot received, size:", snapshot.size);
+      console.log(
+        "🔍 Query used for user:",
+        userId,
+        `-> users.${userId}.role in [admin, member]`
+      );
+      const groups: Group[] = [];
 
-      groups.push(group);
-    });
-    
-    console.log('Firebase groups subscription updated with groups:', groups.length);
-    callback(groups);
-  }, (error) => {
-    console.error('Error in groups subscription:', error);
-  });
+      snapshot.forEach((doc) => {
+        const data = doc.data();
+        console.log(
+          "📋 Processing group from subscription:",
+          doc.id,
+          data.name
+        );
+        console.log("👥 Group users structure:", data.users);
+
+        // Transform users object to members array
+        const membersArray = Object.entries(data.users || {}).map(
+          ([uid, userData]: [string, any]) => ({
+            userId: uid,
+            id: uid,
+            name: userData.name || "Unknown",
+            email: userData.email || "",
+            role: userData.role as "admin" | "member",
+            joinedAt: userData.joinedAt?.toDate() || new Date(),
+          })
+        );
+
+        const group: Group = {
+          id: doc.id,
+          name: data.name || "Unnamed Group",
+          description: data.description || "",
+          members: membersArray,
+          createdAt: data.createdAt?.toDate() || new Date(),
+          createdBy: data.createdBy || "",
+          groupType: data.groupType || "private",
+          inviteCode: data.inviteCode || "",
+          settings: data.settings || {
+            currency: "USD",
+            simplifyDebts: true,
+            notifications: true,
+            recurringBills: false,
+          },
+          isArchived: data.isArchived || false,
+        };
+
+        groups.push(group);
+      });
+
+      console.log(
+        "Firebase groups subscription updated with groups:",
+        groups.length
+      );
+      callback(groups);
+    },
+    (error) => {
+      console.error("Error in groups subscription:", error);
+    }
+  );
 };
 
-export const subscribeToGroupExpenses = (groupId: string, callback: (expenses: Expense[]) => void) => {
-  console.log('Setting up expense subscription for group:', groupId);
-  const expensesRef = collection(db, 'groups', groupId, 'expenses');
-  const q = query(expensesRef, orderBy('date', 'desc'));
-  
-  return onSnapshot(q, (snapshot) => {
-    console.log('Expense subscription triggered for group:', groupId, 'Changes:', snapshot.docChanges().length);
-    const expenses: Expense[] = [];
-    snapshot.forEach((doc) => {
-      const data = doc.data();
-      expenses.push({
-        id: doc.id,
-        ...data,
-        date: data.date?.toDate() || new Date(),
-      } as Expense);
-    });
-    console.log('Calling callback with expenses:', expenses);
-    callback(expenses);
-  }, (error) => {
-    console.error('Error in expense subscription for group:', groupId, error);
-  });
+export const subscribeToGroupExpenses = (
+  groupId: string,
+  callback: (expenses: Expense[]) => void
+) => {
+  console.log("Setting up expense subscription for group:", groupId);
+  const expensesRef = collection(db, "groups", groupId, "expenses");
+  const q = query(expensesRef, orderBy("date", "desc"));
+
+  return onSnapshot(
+    q,
+    (snapshot) => {
+      console.log(
+        "Expense subscription triggered for group:",
+        groupId,
+        "Changes:",
+        snapshot.docChanges().length
+      );
+      const expenses: Expense[] = [];
+      snapshot.forEach((doc) => {
+        const data = doc.data();
+        expenses.push({
+          id: doc.id,
+          ...data,
+          date: data.date?.toDate() || new Date(),
+        } as Expense);
+      });
+      console.log("Calling callback with expenses:", expenses);
+      callback(expenses);
+    },
+    (error) => {
+      console.error("Error in expense subscription for group:", groupId, error);
+    }
+  );
 };
 
 // Member management with new structure
-export const addMemberToGroup = async (groupId: string, member: Member, userId: string) => {
+export const addMemberToGroup = async (
+  groupId: string,
+  member: Member,
+  userId: string
+) => {
   try {
-    let userIdToUse = '';
+    let userIdToUse = "";
     let isTemporary = false;
 
     // 🔍 Step 1: First try to find a similar or exact user
@@ -728,35 +818,35 @@ export const addMemberToGroup = async (groupId: string, member: Member, userId: 
         name: member.name,
         verified: false,
         preferences: {
-          currency: 'USD',
-          theme: 'light',
-          language: 'en',
+          currency: "USD",
+          theme: "light",
+          language: "en",
         },
       });
       userProfile = await getUserProfile(userIdToUse);
     }
 
     // 👥 Step 3: Add to group's `users` object
-    await updateDoc(doc(db, 'groups', groupId), {
+    await updateDoc(doc(db, "groups", groupId), {
       [`users.${userIdToUse}`]: {
         name: userProfile.name,
         email: userProfile.email,
-        role: member.role || 'member',
+        role: member.role || "member",
         joinedAt: serverTimestamp(),
         isTemporary,
       },
     });
 
     // 📂 Step 4: Add to group's `members` subcollection
-    await setDoc(doc(db, 'groups', groupId, 'members', userIdToUse), {
-      role: member.role || 'member',
+    await setDoc(doc(db, "groups", groupId, "members", userIdToUse), {
+      role: member.role || "member",
       joinedAt: serverTimestamp(),
     });
 
     // 🔗 Step 5: Add to user's `groups` subcollection
-    await setDoc(doc(db, 'users', userIdToUse, 'groups', groupId), {
+    await setDoc(doc(db, "users", userIdToUse, "groups", groupId), {
       groupId,
-      role: member.role || 'member',
+      role: member.role || "member",
       joinedAt: serverTimestamp(),
     });
 
@@ -772,36 +862,35 @@ export const addMemberToGroup = async (groupId: string, member: Member, userId: 
 
     console.log(`✅ Member added to group ${groupId}:`, userProfile.email);
   } catch (error) {
-    console.error('❌ Error adding member to group:', error);
+    console.error("❌ Error adding member to group:", error);
     throw error;
   }
 };
 
 export const getGroupMembers = async (groupId: string): Promise<Member[]> => {
   try {
-    const membersRef = collection(db, 'groups', groupId, 'members');
+    const membersRef = collection(db, "groups", groupId, "members");
     const querySnapshot = await getDocs(membersRef);
-    
+
     const members: Member[] = [];
     querySnapshot.forEach((doc) => {
       const data = doc.data();
       members.push({
         userId: doc.id,
         id: doc.id,
-        name: data.name || 'Unknown',
-        email: data.email || '',
-        role: data.role as 'admin' | 'member',
+        name: data.name || "Unknown",
+        email: data.email || "",
+        role: data.role as "admin" | "member",
         joinedAt: data.joinedAt?.toDate() || new Date(),
       });
     });
-    
+
     return members;
   } catch (error) {
-    console.error('Error fetching group members:', error);
+    console.error("Error fetching group members:", error);
     throw error;
   }
 };
-
 
 export const deleteGroup = async (groupId: string) => {
   try {
@@ -812,41 +901,45 @@ export const deleteGroup = async (groupId: string) => {
   }
 };
 
-export const updateMemberRole = async (groupId: string, memberId: string, newRole: 'admin' | 'member') => {
+export const updateMemberRole = async (
+  groupId: string,
+  memberId: string,
+  newRole: "admin" | "member"
+) => {
   try {
-    const memberRef = doc(db, 'groups', groupId, 'members', memberId);
+    const memberRef = doc(db, "groups", groupId, "members", memberId);
     await updateDoc(memberRef, { role: newRole });
 
     // Also update in the users object
-    const groupRef = doc(db, 'groups', groupId);
+    const groupRef = doc(db, "groups", groupId);
     await updateDoc(groupRef, {
       [`users.${memberId}.role`]: newRole,
     });
   } catch (error) {
-    console.error('Error updating member role:', error);
+    console.error("Error updating member role:", error);
     throw error;
   }
 };
 
-
-
-
-export const removeMemberFromGroup = async (groupId: string, memberId: string) => {
+export const removeMemberFromGroup = async (
+  groupId: string,
+  memberId: string
+) => {
   try {
     // Remove from group's users object
-    const groupRef = doc(db, 'groups', groupId);
+    const groupRef = doc(db, "groups", groupId);
     await updateDoc(groupRef, {
       [`users.${memberId}`]: null,
     });
-    
+
     // Remove from members subcollection
-    const memberRef = doc(db, 'groups', groupId, 'members', memberId);
+    const memberRef = doc(db, "groups", groupId, "members", memberId);
     await deleteDoc(memberRef);
-    
+
     // Remove from user's groups subcollection
-    const userGroupRef = doc(db, 'users', memberId, 'groups', groupId);
+    const userGroupRef = doc(db, "users", memberId, "groups", groupId);
     await deleteDoc(userGroupRef);
-    
+
     // Update user stats
     const userProfile = await getUserProfile(memberId);
     if (userProfile) {
@@ -858,59 +951,71 @@ export const removeMemberFromGroup = async (groupId: string, memberId: string) =
       });
     }
   } catch (error) {
-    console.error('Error removing member from group:', error);
+    console.error("Error removing member from group:", error);
     throw error;
   }
 };
 
 // Personal Budget Functions
-export const createPersonalBudget = async (budget: Omit<Budget, 'id' | 'createdAt'>, userId: string) => {
+export const createPersonalBudget = async (
+  budget: Omit<Budget, "id" | "createdAt">,
+  userId: string
+) => {
   try {
     const budgetData = {
       ...budget,
       userId,
       createdAt: serverTimestamp(),
     };
-    
-    const userBudgetsRef = collection(db, 'users', userId, 'budgets');
+
+    const userBudgetsRef = collection(db, "users", userId, "budgets");
     const docRef = await addDoc(userBudgetsRef, budgetData);
-    console.log('Personal budget created with ID:', docRef.id);
+    console.log("Personal budget created with ID:", docRef.id);
     return docRef.id;
   } catch (error) {
-    console.error('Error creating personal budget:', error);
+    console.error("Error creating personal budget:", error);
     throw error;
   }
 };
 
-export const updatePersonalBudget = async (budgetId: string, updates: Partial<Budget>, userId: string) => {
+export const updatePersonalBudget = async (
+  budgetId: string,
+  updates: Partial<Budget>,
+  userId: string
+) => {
   try {
-    const budgetRef = doc(db, 'users', userId, 'budgets', budgetId);
+    const budgetRef = doc(db, "users", userId, "budgets", budgetId);
     await updateDoc(budgetRef, updates);
-    console.log('Personal budget updated:', budgetId);
+    console.log("Personal budget updated:", budgetId);
   } catch (error) {
-    console.error('Error updating personal budget:', error);
+    console.error("Error updating personal budget:", error);
     throw error;
   }
 };
 
-export const deletePersonalBudget = async (budgetId: string, userId: string) => {
+export const deletePersonalBudget = async (
+  budgetId: string,
+  userId: string
+) => {
   try {
-    await deleteDoc(doc(db, 'users', userId, 'budgets', budgetId));
-    console.log('Personal budget deleted:', budgetId);
+    await deleteDoc(doc(db, "users", userId, "budgets", budgetId));
+    console.log("Personal budget deleted:", budgetId);
   } catch (error) {
-    console.error('Error deleting personal budget:', error);
+    console.error("Error deleting personal budget:", error);
     throw error;
   }
 };
 
-export const getUserPersonalBudgets = async (userId: string): Promise<Budget[]> => {
+export const getUserPersonalBudgets = async (
+  userId: string
+): Promise<Budget[]> => {
   try {
-    const userBudgetsRef = collection(db, 'users', userId, 'budgets');
-    const q = query(userBudgetsRef, orderBy('createdAt', 'desc'));
-    
+    const userBudgetsRef = collection(db, "users", userId, "budgets");
+    const q = query(userBudgetsRef, orderBy("createdAt", "desc"));
+
     const querySnapshot = await getDocs(q);
     const budgets: Budget[] = [];
-    
+
     querySnapshot.forEach((doc) => {
       const data = doc.data();
       budgets.push({
@@ -919,10 +1024,10 @@ export const getUserPersonalBudgets = async (userId: string): Promise<Budget[]> 
         createdAt: data.createdAt?.toDate() || new Date(),
       } as Budget);
     });
-    
+
     return budgets;
   } catch (error) {
-    console.error('Error fetching user personal budgets:', error);
+    console.error("Error fetching user personal budgets:", error);
     throw error;
   }
 };
@@ -931,11 +1036,86 @@ export const subscribeToUserPersonalBudgets = (
   userId: string,
   callback: (budgets: Budget[]) => void
 ) => {
-  const userBudgetsRef = collection(db, 'users', userId, 'budgets');
-  const q = query(userBudgetsRef, orderBy('createdAt', 'desc'));
+  const userBudgetsRef = collection(db, "users", userId, "budgets");
+  const q = query(userBudgetsRef, orderBy("createdAt", "desc"));
 
-  return onSnapshot(q, (querySnapshot) => {
+  return onSnapshot(
+    q,
+    (querySnapshot) => {
+      const budgets: Budget[] = [];
+      querySnapshot.forEach((doc) => {
+        const data = doc.data();
+        budgets.push({
+          id: doc.id,
+          ...data,
+          createdAt: data.createdAt?.toDate() || new Date(),
+        } as Budget);
+      });
+      callback(budgets);
+    },
+    (error) => {
+      console.error("Error in personal budgets subscription:", error);
+    }
+  );
+};
+
+// Group Budget Functions
+export const createGroupBudget = async (
+  budget: Omit<Budget, "id" | "createdAt">,
+  groupId: string,
+  userId: string
+) => {
+  try {
+    const budgetData = {
+      ...budget,
+      groupId,
+      userId,
+      createdAt: serverTimestamp(),
+    };
+
+    const groupBudgetsRef = collection(db, "groups", groupId, "budgets");
+    const docRef = await addDoc(groupBudgetsRef, budgetData);
+    console.log("Group budget created with ID:", docRef.id);
+    return docRef.id;
+  } catch (error) {
+    console.error("Error creating group budget:", error);
+    throw error;
+  }
+};
+
+export const updateGroupBudget = async (
+  budgetId: string,
+  updates: Partial<Budget>,
+  groupId: string
+) => {
+  try {
+    const budgetRef = doc(db, "groups", groupId, "budgets", budgetId);
+    await updateDoc(budgetRef, updates);
+    console.log("Group budget updated:", budgetId);
+  } catch (error) {
+    console.error("Error updating group budget:", error);
+    throw error;
+  }
+};
+
+export const deleteGroupBudget = async (budgetId: string, groupId: string) => {
+  try {
+    await deleteDoc(doc(db, "groups", groupId, "budgets", budgetId));
+    console.log("Group budget deleted:", budgetId);
+  } catch (error) {
+    console.error("Error deleting group budget:", error);
+    throw error;
+  }
+};
+
+export const getGroupBudgets = async (groupId: string): Promise<Budget[]> => {
+  try {
+    const groupBudgetsRef = collection(db, "groups", groupId, "budgets");
+    const q = query(groupBudgetsRef, orderBy("createdAt", "desc"));
+
+    const querySnapshot = await getDocs(q);
     const budgets: Budget[] = [];
+
     querySnapshot.forEach((doc) => {
       const data = doc.data();
       budgets.push({
@@ -944,8 +1124,83 @@ export const subscribeToUserPersonalBudgets = (
         createdAt: data.createdAt?.toDate() || new Date(),
       } as Budget);
     });
-    callback(budgets);
-  }, (error) => {
-    console.error('Error in personal budgets subscription:', error);
+
+    return budgets;
+  } catch (error) {
+    console.error("Error fetching group budgets:", error);
+    throw error;
+  }
+};
+
+export const subscribeToGroupBudgets = (
+  groupId: string,
+  callback: (budgets: Budget[]) => void
+) => {
+  const groupBudgetsRef = collection(db, "groups", groupId, "budgets");
+  const q = query(groupBudgetsRef, orderBy("createdAt", "desc"));
+
+  return onSnapshot(
+    q,
+    (querySnapshot) => {
+      const budgets: Budget[] = [];
+      querySnapshot.forEach((doc) => {
+        const data = doc.data();
+        budgets.push({
+          id: doc.id,
+          ...data,
+          createdAt: data.createdAt?.toDate() || new Date(),
+        } as Budget);
+      });
+      callback(budgets);
+    },
+    (error) => {
+      console.error("Error in group budgets subscription:", error);
+    }
+  );
+};
+
+// Subscribe to all budgets for a user (personal + group budgets)
+export const subscribeToUserAllBudgets = (
+  userId: string,
+  userGroups: Group[],
+  callback: (budgets: Budget[]) => void
+) => {
+  let allBudgets: Budget[] = [];
+  let personalBudgets: Budget[] = [];
+  let groupBudgets: Budget[] = [];
+
+  const unsubscribers: (() => void)[] = [];
+
+  const updateCallback = () => {
+    const combinedBudgets = [...personalBudgets, ...groupBudgets];
+    callback(combinedBudgets);
+  };
+
+  // Subscribe to personal budgets
+  const personalUnsubscriber = subscribeToUserPersonalBudgets(
+    userId,
+    (budgets) => {
+      personalBudgets = budgets;
+      updateCallback();
+    }
+  );
+  unsubscribers.push(personalUnsubscriber);
+
+  // Subscribe to group budgets for each group the user is part of
+  userGroups.forEach((group) => {
+    const groupUnsubscriber = subscribeToGroupBudgets(group.id, (budgets) => {
+      // Remove old budgets for this group and add new ones
+      groupBudgets = groupBudgets.filter(
+        (budget) => budget.groupId !== group.id
+      );
+      groupBudgets = [...groupBudgets, ...budgets];
+      updateCallback();
+    });
+    unsubscribers.push(groupUnsubscriber);
   });
+
+  // Return cleanup function
+  return () => {
+    unsubscribers.forEach((unsubscriber) => unsubscriber());
+  };
 };

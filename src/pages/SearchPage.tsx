@@ -1,10 +1,10 @@
-import React, { useState } from 'react';
-import { Button } from '@/components/ui/button';
-import { ArrowLeft } from 'lucide-react';
-import { SearchAndFilter } from '@/components/SearchAndFilter';
-import { SearchResults } from '@/components/SearchResults';
-import { useAuth } from '@/contexts/AuthContext';
-import { AuthPage } from './AuthPage';
+import React, { useState } from "react";
+import { Button } from "@/components/ui/button";
+import { ArrowLeft } from "lucide-react";
+import { SearchAndFilter } from "@/components/SearchAndFilter";
+import { SearchResults } from "@/components/SearchResults";
+import { useAuth } from "@/contexts/AuthContext";
+import { AuthPage } from "./AuthPage";
 
 interface SearchPageProps {
   onBack: () => void;
@@ -18,29 +18,37 @@ export const SearchPage: React.FC<SearchPageProps> = ({ onBack }) => {
     groups: [],
     members: [],
   });
-  const [searchQuery, setSearchQuery] = useState('');
+  const [searchQuery, setSearchQuery] = useState("");
 
   if (!user) {
     return <AuthPage onBack={onBack} />;
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-green-50">
+    <div className="min-h-screen bg-gradient-to-br from-background via-muted/20 to-primary/5 dark:from-background dark:via-muted/10 dark:to-primary/5">
       <div className="container mx-auto px-4 py-6 max-w-4xl">
         {/* Header */}
         <div className="flex items-center gap-4 mb-6">
-          <Button variant="ghost" onClick={onBack} className="p-2">
+          <Button
+            variant="ghost"
+            onClick={onBack}
+            className="p-2 hover:bg-muted"
+          >
             <ArrowLeft className="h-4 w-4" />
           </Button>
           <div>
-            <h1 className="text-2xl font-bold text-gray-900">Search & Filter</h1>
-            <p className="text-gray-600">Find expenses, groups, and members</p>
+            <h1 className="text-2xl font-bold text-foreground">
+              Search & Filter
+            </h1>
+            <p className="text-muted-foreground">
+              Find expenses, groups, and members
+            </p>
           </div>
         </div>
 
         {/* Search and Filter Component */}
         <div className="space-y-6">
-          <SearchAndFilter 
+          <SearchAndFilter
             onResultsChange={(results) => {
               setSearchResults(results);
               // You could also track the search query here if needed

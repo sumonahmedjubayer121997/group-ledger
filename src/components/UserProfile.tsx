@@ -1,34 +1,39 @@
-
-import React, { useState } from 'react';
-import { useAuth } from '@/contexts/AuthContext';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
-import { ScrollArea } from '@/components/ui/scroll-area';
-import { 
-  User, 
-  Settings, 
-  CreditCard, 
-  Bell, 
-  Shield, 
+import React, { useState } from "react";
+import { useAuth } from "@/contexts/AuthContext";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import {
+  User,
+  Settings,
+  CreditCard,
+  Bell,
+  Shield,
   Activity,
   Download,
   Edit,
   ArrowLeft,
-  Target
-} from 'lucide-react';
-import { ProfileBasicInfo } from './profile/ProfileBasicInfo';
-import { ProfileFinancialSummary } from './profile/ProfileFinancialSummary';
-import { ProfileAccountSettings } from './profile/ProfileAccountSettings';
-import { ProfilePreferences } from './profile/ProfilePreferences';
-import { ProfilePrivacySecurity } from './profile/ProfilePrivacySecurity';
-import { ProfileActivityFeed } from './profile/ProfileActivityFeed';
-import { ProfilePictureUpload } from './ProfilePictureUpload';
-import { ProfileOverallBudget } from './profile/ProfileOverallBudget';
-import { ComprehensiveBudgetManagement } from './ComprehensiveBudgetManagement';
-import { useIsMobile } from '@/hooks/use-mobile';
+  Target,
+} from "lucide-react";
+import { ProfileBasicInfo } from "./profile/ProfileBasicInfo";
+import { ProfileFinancialSummary } from "./profile/ProfileFinancialSummary";
+import { ProfileAccountSettings } from "./profile/ProfileAccountSettings";
+import { ProfilePreferences } from "./profile/ProfilePreferences";
+import { ProfilePrivacySecurity } from "./profile/ProfilePrivacySecurity";
+import { ProfileActivityFeed } from "./profile/ProfileActivityFeed";
+import { ProfilePictureUpload } from "./ProfilePictureUpload";
+import { ProfileOverallBudget } from "./profile/ProfileOverallBudget";
+import { ComprehensiveBudgetManagement } from "./ComprehensiveBudgetManagement";
+import { useIsMobile } from "@/hooks/use-mobile";
 
 interface UserProfileProps {
   onClose?: () => void;
@@ -36,11 +41,20 @@ interface UserProfileProps {
 
 export const UserProfile: React.FC<UserProfileProps> = ({ onClose }) => {
   const { user, userProfile, loading } = useAuth();
-  const [activeTab, setActiveTab] = useState('overview');
-  const [profilePhotoURL, setProfilePhotoURL] = useState(userProfile?.photoURL || '');
+  const [activeTab, setActiveTab] = useState("overview");
+  const [profilePhotoURL, setProfilePhotoURL] = useState(
+    userProfile?.photoURL || ""
+  );
   const isMobile = useIsMobile();
 
-  console.log('UserProfile render - user:', user?.uid, 'userProfile:', userProfile?.displayName, 'loading:', loading);
+  console.log(
+    "UserProfile render - user:",
+    user?.uid,
+    "userProfile:",
+    userProfile?.displayName,
+    "loading:",
+    loading
+  );
 
   if (loading) {
     return (
@@ -65,26 +79,26 @@ export const UserProfile: React.FC<UserProfileProps> = ({ onClose }) => {
   // Create a fallback userProfile if it doesn't exist
   const profileData = userProfile || {
     uid: user.uid,
-    email: user.email || '',
-    displayName: user.displayName || 'User',
+    email: user.email || "",
+    displayName: user.displayName || "User",
     photoURL: profilePhotoURL || user.photoURL,
     phoneNumber: user.phoneNumber,
     emailVerified: user.emailVerified,
-    role: 'user' as const,
+    role: "user" as const,
     createdAt: new Date(),
     lastLoginAt: new Date(),
     preferences: {
-      currency: '$',
+      currency: "$",
       notifications: true,
-      theme: 'light' as const,
+      theme: "light" as const,
     },
   };
 
   const getInitials = (name: string) => {
     return name
-      .split(' ')
-      .map(n => n[0])
-      .join('')
+      .split(" ")
+      .map((n) => n[0])
+      .join("")
       .toUpperCase();
   };
 
@@ -93,17 +107,17 @@ export const UserProfile: React.FC<UserProfileProps> = ({ onClose }) => {
   };
 
   const tabItems = [
-    { value: 'overview', label: 'Overview', icon: User },
-    { value: 'financial', label: 'Financial', icon: CreditCard },
-    { value: 'budgets', label: 'Budgets', icon: Target },
-    { value: 'settings', label: 'Settings', icon: Settings },
-    { value: 'preferences', label: 'Preferences', icon: Bell },
-    { value: 'privacy', label: 'Privacy', icon: Shield },
-    { value: 'activity', label: 'Activity', icon: Activity },
+    { value: "overview", label: "Overview", icon: User },
+    { value: "financial", label: "Financial", icon: CreditCard },
+    { value: "budgets", label: "Budgets", icon: Target },
+    { value: "settings", label: "Settings", icon: Settings },
+    { value: "preferences", label: "Preferences", icon: Bell },
+    { value: "privacy", label: "Privacy", icon: Shield },
+    { value: "activity", label: "Activity", icon: Activity },
   ];
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-green-50">
+    <div className="min-h-screen bg-gradient-to-br from-background via-muted/20 to-primary/5 dark:from-background dark:via-muted/10 dark:to-primary/5">
       <div className="max-w-4xl mx-auto p-3 sm:p-6 space-y-4 sm:space-y-6">
         {/* Mobile Header */}
         {isMobile && (
@@ -114,7 +128,7 @@ export const UserProfile: React.FC<UserProfileProps> = ({ onClose }) => {
                 Back
               </Button>
             )}
-            <h1 className="text-lg font-semibold">Profile</h1>
+            <h1 className="text-lg font-semibold text-foreground">Profile</h1>
             <div className="w-16" /> {/* Spacer */}
           </div>
         )}
@@ -123,21 +137,25 @@ export const UserProfile: React.FC<UserProfileProps> = ({ onClose }) => {
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
           <div className="flex items-center space-x-4">
             <div className="relative">
-              <Avatar className="h-16 w-16 sm:h-20 sm:w-20">
-                <AvatarImage src={profilePhotoURL || profileData.photoURL || undefined} />
-                <AvatarFallback className="text-sm sm:text-lg font-semibold">
-                  {getInitials(profileData.displayName || 'User')}
+              <Avatar className="h-16 w-16 sm:h-20 sm:w-20 border-2 border-border">
+                <AvatarImage
+                  src={profilePhotoURL || profileData.photoURL || undefined}
+                />
+                <AvatarFallback className="text-sm sm:text-lg font-semibold bg-primary/10 text-primary">
+                  {getInitials(profileData.displayName || "User")}
                 </AvatarFallback>
               </Avatar>
               <div className="absolute -bottom-1 -right-1 sm:-bottom-2 sm:-right-2">
-                <ProfilePictureUpload 
-                  currentPhotoURL={profilePhotoURL || profileData.photoURL || undefined}
+                <ProfilePictureUpload
+                  currentPhotoURL={
+                    profilePhotoURL || profileData.photoURL || undefined
+                  }
                   onPhotoChange={handlePhotoChange}
                 />
               </div>
             </div>
             <div className="flex-1 min-w-0">
-              <h1 className="text-lg sm:text-2xl font-bold truncate">
+              <h1 className="text-lg sm:text-2xl font-bold truncate text-foreground">
                 {(profileData as any).name || (profileData as any).displayName}
               </h1>
               <p className="text-muted-foreground text-sm sm:text-base truncate">
@@ -145,10 +163,14 @@ export const UserProfile: React.FC<UserProfileProps> = ({ onClose }) => {
               </p>
               <div className="flex flex-wrap items-center gap-2 mt-2">
                 <Badge variant="secondary" className="text-xs">
-                  👤 {profileData.role === 'admin' ? 'Admin' : 'User'}
+                  👤 {profileData.role === "admin" ? "Admin" : "User"}
                 </Badge>
-                {((profileData as any).verified || (profileData as any).emailVerified) && (
-                  <Badge variant="outline" className="text-green-600 text-xs">
+                {((profileData as any).verified ||
+                  (profileData as any).emailVerified) && (
+                  <Badge
+                    variant="outline"
+                    className="text-green-500 border-green-500/30 text-xs dark:text-green-400 dark:border-green-400/30"
+                  >
                     ✅ Verified
                   </Badge>
                 )}
@@ -166,16 +188,21 @@ export const UserProfile: React.FC<UserProfileProps> = ({ onClose }) => {
         <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
           <div className="w-full">
             <ScrollArea className="w-full">
-              <TabsList className="grid w-full grid-cols-3 sm:grid-cols-6 gap-1 p-1 h-auto">
+              <TabsList className="grid w-full grid-cols-3 sm:grid-cols-6 gap-1 p-1 h-auto bg-muted/50 backdrop-blur-sm border border-border/50">
                 {tabItems.map((item) => (
-                  <TabsTrigger 
+                  <TabsTrigger
                     key={item.value}
-                    value={item.value} 
-                    className="flex flex-col sm:flex-row items-center gap-1 sm:gap-2 p-2 sm:p-3 text-xs sm:text-sm min-h-[60px] sm:min-h-auto"
+                    value={item.value}
+                    className="flex flex-col sm:flex-row items-center gap-1 sm:gap-2 p-2 sm:p-3 text-xs sm:text-sm min-h-[60px] sm:min-h-auto
+                    data-[state=active]:bg-background data-[state=active]:text-foreground data-[state=active]:shadow-sm
+                    hover:bg-background/50 hover:text-foreground/80 transition-all duration-200
+                    data-[state=active]:scale-[1.02] transform"
                   >
                     <item.icon className="h-3 w-3 sm:h-4 sm:w-4" />
                     <span className="hidden sm:inline">{item.label}</span>
-                    <span className="sm:hidden text-[10px] leading-tight">{item.label}</span>
+                    <span className="sm:hidden text-[10px] leading-tight">
+                      {item.label}
+                    </span>
                   </TabsTrigger>
                 ))}
               </TabsList>
@@ -194,15 +221,20 @@ export const UserProfile: React.FC<UserProfileProps> = ({ onClose }) => {
             <TabsContent value="budgets" className="space-y-4">
               <div className="space-y-6">
                 <ProfileOverallBudget />
-                <div className="pt-6 border-t">
-                  <h3 className="text-lg font-semibold mb-4">All Budget Management</h3>
+                <div className="pt-6 border-t border-border">
+                  <h3 className="text-lg font-semibold mb-4 text-foreground">
+                    All Budget Management
+                  </h3>
                   <ComprehensiveBudgetManagement />
                 </div>
               </div>
             </TabsContent>
 
             <TabsContent value="settings" className="space-y-4">
-              <ProfileAccountSettings user={user} userProfile={profileData as any} />
+              <ProfileAccountSettings
+                user={user}
+                userProfile={profileData as any}
+              />
             </TabsContent>
 
             <TabsContent value="preferences" className="space-y-4">
@@ -210,7 +242,10 @@ export const UserProfile: React.FC<UserProfileProps> = ({ onClose }) => {
             </TabsContent>
 
             <TabsContent value="privacy" className="space-y-4">
-              <ProfilePrivacySecurity user={user} userProfile={profileData as any} />
+              <ProfilePrivacySecurity
+                user={user}
+                userProfile={profileData as any}
+              />
             </TabsContent>
 
             <TabsContent value="activity" className="space-y-4">

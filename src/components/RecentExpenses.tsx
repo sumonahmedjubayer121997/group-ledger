@@ -1,16 +1,39 @@
-
-import React, { useState } from 'react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
-import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
-import { Expense, useExpenseStore } from '@/stores/expenseStore';
-import { Receipt, Calendar, User, Tag, MoreVertical, Pencil, Trash2, Plus } from 'lucide-react';
-import { ExpenseForm } from './ExpenseForm';
-import { EditExpenseForm } from './EditExpenseForm';
-import { useToast } from '@/hooks/use-toast';
-import { formatDistanceToNow } from 'date-fns';
+import React, { useState } from "react";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
+import { Expense, useExpenseStore } from "@/stores/expenseStore";
+import {
+  Receipt,
+  Calendar,
+  User,
+  Tag,
+  MoreVertical,
+  Pencil,
+  Trash2,
+  Plus,
+} from "lucide-react";
+import { ExpenseForm } from "./ExpenseForm";
+import { EditExpenseForm } from "./EditExpenseForm";
+import { useToast } from "@/hooks/use-toast";
+import { formatDistanceToNow } from "date-fns";
 
 interface RecentExpensesProps {
   expenses: Expense[];
@@ -47,18 +70,22 @@ export const RecentExpenses: React.FC<RecentExpensesProps> = ({ expenses }) => {
 
   if (recentExpenses.length === 0) {
     return (
-      <Card className="bg-white shadow-lg border-0">
+      <Card className="bg-card/80 backdrop-blur-sm border-border shadow-lg">
         <CardHeader className="px-4 py-4 sm:px-6 sm:py-6">
-          <CardTitle className="flex items-center space-x-2 text-lg sm:text-2xl">
+          <CardTitle className="flex items-center space-x-2 text-lg sm:text-2xl text-card-foreground">
             <Receipt className="w-4 h-4 sm:w-5 sm:h-5 text-blue-500" />
             <span>Recent Expenses</span>
           </CardTitle>
         </CardHeader>
         <CardContent className="px-4 py-0 pb-4 sm:px-6 sm:pb-6">
           <div className="text-center py-6 sm:py-8">
-            <Receipt className="w-10 h-10 sm:w-12 sm:h-12 text-gray-300 mx-auto mb-3 sm:mb-4" />
-            <p className="text-gray-600 mb-2 text-sm sm:text-base">No expenses yet</p>
-            <p className="text-xs sm:text-sm text-gray-500">Add your first expense to get started!</p>
+            <Receipt className="w-10 h-10 sm:w-12 sm:h-12 text-muted-foreground/50 mx-auto mb-3 sm:mb-4" />
+            <p className="text-muted-foreground mb-2 text-sm sm:text-base">
+              No expenses yet
+            </p>
+            <p className="text-xs sm:text-sm text-muted-foreground/70">
+              Add your first expense to get started!
+            </p>
           </div>
         </CardContent>
       </Card>
@@ -66,24 +93,30 @@ export const RecentExpenses: React.FC<RecentExpensesProps> = ({ expenses }) => {
   }
 
   return (
-    <Card className="bg-white shadow-lg border-0">
+    <Card className="bg-card/80 backdrop-blur-sm border-border shadow-lg">
       <CardHeader className="px-4 py-4 sm:px-6 sm:py-6">
         <CardTitle className="flex items-center justify-between">
           <div className="flex items-center space-x-2">
             <Receipt className="w-4 h-4 sm:w-5 sm:h-5 text-blue-500" />
-            <span className="text-lg sm:text-2xl">Recent Expenses</span>
+            <span className="text-lg sm:text-2xl text-card-foreground">
+              Recent Expenses
+            </span>
           </div>
           <div className="flex space-x-2">
-            <Button 
+            <Button
               onClick={() => setShowExpenseForm(true)}
-              size="sm" 
+              size="sm"
               variant="outline"
-              className="text-green-600 border-green-200 hover:bg-green-50"
+              className="text-green-500 border-green-500/30 hover:bg-green-500/10 hover:border-green-500/50 dark:text-green-400 dark:border-green-400/30 dark:hover:bg-green-400/10"
             >
               <Plus className="w-3 h-3 mr-1" />
               Add
             </Button>
-            <Button variant="outline" size="sm" className="text-blue-600 border-blue-200 hover:bg-blue-50 hidden sm:flex">
+            <Button
+              variant="outline"
+              size="sm"
+              className="text-blue-500 border-blue-500/30 hover:bg-blue-500/10 hover:border-blue-500/50 dark:text-blue-400 dark:border-blue-400/30 dark:hover:bg-blue-400/10 hidden sm:flex"
+            >
               View All
             </Button>
           </div>
@@ -92,33 +125,49 @@ export const RecentExpenses: React.FC<RecentExpensesProps> = ({ expenses }) => {
       <CardContent className="px-4 py-0 pb-4 sm:px-6 sm:pb-6">
         <div className="space-y-3 sm:space-y-4">
           {recentExpenses.map((expense) => (
-            <div key={expense.id} className="flex items-center justify-between p-3 sm:p-4 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors">
+            <div
+              key={expense.id}
+              className="flex items-center justify-between p-3 sm:p-4 bg-muted/30 rounded-lg hover:bg-muted/50 transition-colors border border-border/50"
+            >
               <div className="flex items-center space-x-3 sm:space-x-4 min-w-0 flex-1">
-                <div className="w-8 h-8 sm:w-10 sm:h-10 bg-blue-100 rounded-full flex items-center justify-center flex-shrink-0">
-                  <Tag className="w-4 h-4 sm:w-5 sm:h-5 text-blue-600" />
+                <div className="w-8 h-8 sm:w-10 sm:h-10 bg-primary/10 rounded-full flex items-center justify-center flex-shrink-0 border border-primary/20">
+                  <Tag className="w-4 h-4 sm:w-5 sm:h-5 text-primary" />
                 </div>
                 <div className="min-w-0 flex-1">
-                  <h4 className="font-semibold text-gray-900 text-sm sm:text-base truncate">{expense.description}</h4>
-                  <div className="flex flex-col sm:flex-row sm:items-center sm:space-x-4 text-xs sm:text-sm text-gray-500 space-y-1 sm:space-y-0">
+                  <h4 className="font-semibold text-card-foreground text-sm sm:text-base truncate">
+                    {expense.description}
+                  </h4>
+                  <div className="flex flex-col sm:flex-row sm:items-center sm:space-x-4 text-xs sm:text-sm text-muted-foreground space-y-1 sm:space-y-0">
                     <div className="flex items-center space-x-1">
                       <User className="w-3 h-3 flex-shrink-0" />
-                      <span className="truncate">Paid by {expense.paidBy.name}</span>
+                      <span className="truncate">
+                        Paid by {expense.paidBy.name}
+                      </span>
                     </div>
                     <div className="flex items-center space-x-1">
                       <Calendar className="w-3 h-3 flex-shrink-0" />
-                      <span>{formatDistanceToNow(new Date(expense.date), { addSuffix: true })}</span>
+                      <span>
+                        {formatDistanceToNow(new Date(expense.date), {
+                          addSuffix: true,
+                        })}
+                      </span>
                     </div>
                   </div>
                 </div>
               </div>
               <div className="flex items-center space-x-2">
                 <div className="text-right flex-shrink-0">
-                  <div className="font-semibold text-gray-900 text-sm sm:text-base">${expense.amount.toFixed(2)}</div>
-                  <Badge variant="outline" className="text-xs">
+                  <div className="font-semibold text-card-foreground text-sm sm:text-base">
+                    ${expense.amount.toFixed(2)}
+                  </div>
+                  <Badge
+                    variant="outline"
+                    className="text-xs border-border/50 text-muted-foreground"
+                  >
                     {expense.category}
                   </Badge>
                 </div>
-                
+
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
                     <Button variant="ghost" size="sm" className="w-8 h-8 p-0">
@@ -126,7 +175,9 @@ export const RecentExpenses: React.FC<RecentExpensesProps> = ({ expenses }) => {
                     </Button>
                   </DropdownMenuTrigger>
                   <DropdownMenuContent align="end">
-                    <DropdownMenuItem onClick={() => handleEditExpense(expense)}>
+                    <DropdownMenuItem
+                      onClick={() => handleEditExpense(expense)}
+                    >
                       <Pencil className="w-4 h-4 mr-2" />
                       Edit
                     </DropdownMenuItem>
@@ -141,14 +192,15 @@ export const RecentExpenses: React.FC<RecentExpensesProps> = ({ expenses }) => {
                         <AlertDialogHeader>
                           <AlertDialogTitle>Delete Expense</AlertDialogTitle>
                           <AlertDialogDescription>
-                            Are you sure you want to delete this expense? This action cannot be undone.
+                            Are you sure you want to delete this expense? This
+                            action cannot be undone.
                           </AlertDialogDescription>
                         </AlertDialogHeader>
                         <AlertDialogFooter>
                           <AlertDialogCancel>Cancel</AlertDialogCancel>
-                          <AlertDialogAction 
+                          <AlertDialogAction
                             onClick={() => handleDeleteExpense(expense)}
-                            className="bg-red-600 hover:bg-red-700"
+                            className="bg-destructive hover:bg-destructive/90 text-destructive-foreground"
                           >
                             Delete
                           </AlertDialogAction>
@@ -162,7 +214,11 @@ export const RecentExpenses: React.FC<RecentExpensesProps> = ({ expenses }) => {
           ))}
         </div>
         <div className="mt-4 sm:hidden">
-          <Button variant="outline" size="sm" className="w-full text-blue-600 border-blue-200 hover:bg-blue-50">
+          <Button
+            variant="outline"
+            size="sm"
+            className="w-full text-blue-500 border-blue-500/30 hover:bg-blue-500/10 hover:border-blue-500/50 dark:text-blue-400 dark:border-blue-400/30 dark:hover:bg-blue-400/10"
+          >
             View All
           </Button>
         </div>
