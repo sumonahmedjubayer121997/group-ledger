@@ -49,11 +49,15 @@ import { Group } from "@/stores/expenseStore";
 interface GroupBudgetManagementProps {
   group: Group;
   children: React.ReactNode;
+  editBudget?: Budget | null;
+  onBudgetEdited?: () => void;
 }
 
 export const GroupBudgetManagement: React.FC<GroupBudgetManagementProps> = ({
   group,
   children,
+  editBudget,
+  onBudgetEdited,
 }) => {
   const [isOpen, setIsOpen] = useState(false);
   const [newBudget, setNewBudget] = useState({
@@ -84,6 +88,14 @@ export const GroupBudgetManagement: React.FC<GroupBudgetManagementProps> = ({
     (expense) => expense.groupId === group.id
   );
   const budgetUsages = getBudgetUsage(groupExpenses, undefined, group.id);
+
+  // Effect to handle external edit budget request
+  React.useEffect(() => {
+    if (editBudget) {
+      setIsOpen(true);
+      handleEditBudget(editBudget);
+    }
+  }, [editBudget]);
 
   const handleAddBudget = () => {
     if (!newBudget.name || newBudget.limit <= 0) {
@@ -159,6 +171,7 @@ export const GroupBudgetManagement: React.FC<GroupBudgetManagementProps> = ({
       period: "monthly",
       alertThreshold: 80,
     });
+    onBudgetEdited?.();
   };
 
   const handleDeleteBudget = (budgetId: string) => {

@@ -77,6 +77,7 @@ export const GroupDetailView: React.FC<GroupDetailViewProps> = ({
   const [showInvite, setShowInvite] = useState(false);
   const [showRecurring, setShowRecurring] = useState(false);
   const [showBudgetManagement, setShowBudgetManagement] = useState(false);
+  const [editingBudget, setEditingBudget] = useState<any>(null);
   const [groupMembers, setGroupMembers] = useState<MemberWithPhoto[]>([]);
   const [group, setGroup] = useState<Group>(initialGroup);
 
@@ -399,7 +400,14 @@ export const GroupDetailView: React.FC<GroupDetailViewProps> = ({
                       </Button>
                     </GroupInviteDialog>
 
-                    <GroupBudgetManagement group={group}>
+                    <GroupBudgetManagement 
+                      group={group}
+                      editBudget={editingBudget}
+                      onBudgetEdited={() => {
+                        setEditingBudget(null);
+                        setShowBudgetManagement(false);
+                      }}
+                    >
                       <Button
                         variant="outline"
                         className="border-gray-200 dark:border-slate-700 hover:bg-gray-50 dark:hover:bg-slate-800 dark:text-slate-200 px-6"
@@ -1043,7 +1051,8 @@ export const GroupDetailView: React.FC<GroupDetailViewProps> = ({
                 <GroupBudgetList
                   group={group}
                   onEditBudget={(budget) => {
-                    // TODO: Add edit functionality - could open GroupBudgetManagement with pre-filled data
+                    console.log("Setting budget for editing:", budget);
+                    setEditingBudget(budget);
                     setShowBudgetManagement(true);
                   }}
                 />
@@ -1059,7 +1068,14 @@ export const GroupDetailView: React.FC<GroupDetailViewProps> = ({
                     <p className="text-gray-600 dark:text-slate-300 mb-6">
                       Set spending limits and track your group's financial goals
                     </p>
-                    <GroupBudgetManagement group={group}>
+                    <GroupBudgetManagement 
+                      group={group}
+                      editBudget={editingBudget}
+                      onBudgetEdited={() => {
+                        setEditingBudget(null);
+                        setShowBudgetManagement(false);
+                      }}
+                    >
                       <Button
                         className="bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white px-8 py-3"
                         size={isMobile ? "sm" : "default"}
