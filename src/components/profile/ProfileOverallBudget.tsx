@@ -38,9 +38,9 @@ export const ProfileOverallBudget: React.FC = () => {
   const { toast } = useToast();
   const { user } = useAuth();
 
-  const userBudgets = getIndividualBudgets();
+  const userBudgets = getIndividualBudgets(user?.uid);
   const userExpenses = expenses.filter(expense => !expense.groupId); // Personal expenses only
-  const budgetUsages = getBudgetUsage(userExpenses);
+  const budgetUsages = getBudgetUsage(userExpenses, user?.uid);
 
   const handleAddBudget = () => {
     if (!newBudget.name || newBudget.limit <= 0) {
@@ -52,11 +52,16 @@ export const ProfileOverallBudget: React.FC = () => {
       return;
     }
 
+    console.log("Creating personal budget:", newBudget);
     addBudget({
       ...newBudget,
       type: 'individual',
       isActive: true,
-    }, user?.uid || '');
+    }, user?.uid || '').then(() => {
+      console.log("Personal budget created successfully");
+    }).catch(error => {
+      console.error("Error creating personal budget:", error);
+    });
 
     toast({
       title: "Success",

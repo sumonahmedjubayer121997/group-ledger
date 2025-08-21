@@ -93,12 +93,14 @@ export const useBudgetStore = create<BudgetState>()((set, get) => ({
     }
 
     set({ isLoading: true });
+    console.log("🚀 Starting budget sync for user:", userId, "with groups:", userGroups.length);
 
     // Subscribe to both personal and group budgets
     const unsubscribe = subscribeToUserAllBudgets(
       userId,
       userGroups,
       (budgets) => {
+        console.log("📊 Received budgets:", budgets.length);
         set({ budgets, isLoading: false });
       }
     );

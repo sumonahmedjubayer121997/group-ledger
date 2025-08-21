@@ -43,6 +43,7 @@ import { GroupBudgetAlerts } from "./GroupBudgetAlerts";
 import { GroupBudgetList } from "./GroupBudgetList";
 import { fetchGroupMembersWithPhotos } from "@/components/firebaseComponents/FetchGroupMembersWithPhotos";
 import { useBudgetValidation } from "@/hooks/useBudgetValidation";
+import { useBudgetStore } from "@/stores/budgetStore";
 
 interface GroupDetailViewProps {
   group: Group;
@@ -111,6 +112,16 @@ export const GroupDetailView: React.FC<GroupDetailViewProps> = ({
     useExpenseStore();
   const isMobile = useIsMobile();
   const { user } = useAuth();
+
+  // Initialize budget store for this group
+  const { initializeFirebaseSync } = useBudgetStore();
+  
+  useEffect(() => {
+    if (user?.uid && group.id) {
+      console.log("Initializing budget sync for group:", group.id);
+      initializeFirebaseSync(user.uid, [group]);
+    }
+  }, [user?.uid, group.id, initializeFirebaseSync]);
 
   // Enable budget validation for real-time alerts
   useBudgetValidation(group.id);

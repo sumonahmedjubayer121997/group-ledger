@@ -13,12 +13,13 @@ export const useBudgetFirebaseSync = () => {
       console.log("Initializing Budget Firebase sync for user:", user.uid);
       // Get user's groups for budget sync
       const userGroups = groups.filter((group) =>
-        group.members.some((member) =>
+        group.members && group.members.some((member) =>
           typeof member === "string"
             ? member === user.uid
             : member.id === user.uid
         )
       );
+      console.log("Found user groups for budget sync:", userGroups.length);
       initializeFirebaseSync(user.uid, userGroups);
     } else {
       console.log("User not authenticated, cleaning up Budget Firebase sync");
