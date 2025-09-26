@@ -8,6 +8,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Textarea } from '@/components/ui/textarea';
 import { useExpenseStore } from '@/stores/expenseStore';
 import { Member } from '@/stores/expenseStore';
+import { useAuth } from '@/contexts/AuthContext';
 import { v4 as uuidv4 } from 'uuid';
 
 interface SettlementDialogProps {
@@ -16,6 +17,7 @@ interface SettlementDialogProps {
   fromMember: Member;
   toMember: Member;
   amount: number;
+  groupId: string;
 }
 
 const paymentMethods = [
@@ -31,14 +33,21 @@ export const SettlementDialog: React.FC<SettlementDialogProps> = ({
   onClose,
   fromMember,
   toMember,
-  amount
+  amount,
+  groupId
 }) => {
   const { addSettlement } = useExpenseStore();
+  const { user } = useAuth();
   const [paymentMethod, setPaymentMethod] = useState('cash');
   const [notes, setNotes] = useState('');
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    
+    if (!user) {
+      console.error('No user found');
+      return;
+    }
     
     const settlement = {
       fromMemberId: fromMember.id,
@@ -50,10 +59,14 @@ export const SettlementDialog: React.FC<SettlementDialogProps> = ({
       date: new Date()
     };
 
-    addSettlement(settlement);
-    onClose();
-    setPaymentMethod('cash');
-    setNotes('');
+    try {
+      await addSettlement(settlement, groupId, user.uid);
+      onClose();
+      setPaymentMethod('cash');
+      setNotes('');
+    } catch (error) {
+      console.error('Failed to record settlement:', error);
+    }
   };
 
   return (

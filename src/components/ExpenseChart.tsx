@@ -263,6 +263,78 @@ const ExportModal = ({
   const [exportType, setExportType] = useState<"pdf" | "csv">("pdf");
   const colors = TEXT_COLORS[theme];
 
+  // Export functions
+  const exportToPDF = async (expensesToExport: Expense[]) => {
+    const doc = new jsPDF();
+
+    // Header
+    doc.setFontSize(20);
+    doc.text("Expense Analytics Report", 20, 20);
+
+    // Date and filters
+    doc.setFontSize(12);
+    doc.text(`Generated on: ${new Date().toLocaleDateString()}`, 20, 30);
+    doc.text(
+      `Time Range: Current Period`,
+      20,
+      40
+    );
+    doc.text(`Total Expenses: ${expensesToExport.length}`, 20, 50);
+    doc.text(
+      `Total Amount: $${expensesToExport
+        .reduce((sum, exp) => sum + exp.amount, 0)
+        .toFixed(2)}`,
+      20,
+      60
+    );
+
+    // Summary stats
+    const summaryY = 80;
+    doc.setFontSize(14);
+    doc.text("Summary Statistics", 20, summaryY);
+
+    const totalAmount = expensesToExport.reduce(
+      (sum, exp) => sum + exp.amount,
+      0
+    );
+    const avgAmount =
+      expensesToExport.length > 0 ? totalAmount / expensesToExport.length : 0;
+    const maxAmount =
+      expensesToExport.length > 0
+        ? Math.max(...expensesToExport.map((exp) => exp.amount))
+        : 0;
+
+    doc.setFontSize(10);
+    doc.text(`Average Expense: $${avgAmount.toFixed(2)}`, 20, summaryY + 10);
+    doc.text(`Highest Expense: $${maxAmount.toFixed(2)}`, 20, summaryY + 20);
+
+    // Save the document
+    doc.save("expense-analytics.pdf");
+  };
+
+  const exportToCSV = async (expensesToExport: Expense[]) => {
+    const csvData = [
+      ["Date", "Description", "Category", "Amount", "Paid By"],
+      ...expensesToExport.map((expense) =>
+        [
+          expense.date,
+          `"${expense.description}"`,
+          expense.category,
+          expense.amount,
+          expense.paidBy.name,
+        ].join(",")
+      ),
+    ].join("\n");
+
+    const blob = new Blob([csvData], { type: "text/csv" });
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = "expenses.csv";
+    a.click();
+    window.URL.revokeObjectURL(url);
+  };
+
   const handleExport = async () => {
     setIsExporting(true);
 
@@ -469,8 +541,8 @@ export const ExpenseChart: React.FC<ExpenseChartProps> = ({
     doc.setFontSize(14);
     doc.text("Monthly Spending Trend", 20, currentY);
 
-    const monthlyTableData = Object.entries(monthlyData).map(
-      ([month, amount]) => [month, `$${amount.toFixed(2)}`]
+    const monthlyTableData = monthlyData.map(
+      ({ month, amount }) => [month, `$${amount.toFixed(2)}`]
     );
 
     (doc as any).autoTable({
@@ -528,7 +600,7 @@ export const ExpenseChart: React.FC<ExpenseChartProps> = ({
           expense.category,
           expense.amount,
           expense.paidBy.name,
-          expense.paymentMethod,
+          
         ].join(",")
       ),
     ].join("\n");
@@ -660,7 +732,6 @@ export const ExpenseChart: React.FC<ExpenseChartProps> = ({
                   fill="#8884d8"
                   dataKey="value"
                   onClick={(data) => setSelectedCategory(data.name)}
-                  labelStyle={{ fill: colors.pieLabel, fontSize: 12 }}
                 >
                   {Object.entries(categoryData).map((_, index) => (
                     <Cell

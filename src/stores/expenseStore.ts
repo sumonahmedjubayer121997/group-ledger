@@ -12,6 +12,8 @@ import {
   getUserGroups,
   addMemberToGroup as addMemberToGroupFirebase,
   removeMemberFromGroup as removeMemberFromGroupFirebase,
+  createSettlement as createSettlementFirebase,
+  subscribeToGroupSettlements,
 } from '@/services/firebaseService';
 import { notificationFirebaseService } from '@/services/notificationFirebaseService';
 import { useOfflineStore } from '@/stores/offlineStore';
@@ -127,7 +129,7 @@ interface ExpenseStore {
   addMemberToGroup: (groupId: string, member: Omit<Member, 'joinedAt' | 'role'>, userId: string) => Promise<void>;
   removeMemberFromGroup: (groupId: string, memberId: string) => Promise<void>;
   updateMemberRole: (groupId: string, memberId: string, role: Member['role']) => void;
-  addSettlement: (settlement: Omit<Settlement, 'id' | 'status'>) => void;
+  addSettlement: (settlement: Omit<Settlement, 'id' | 'status'>, groupId: string, userId: string) => Promise<void>;
   addActivity: (activity: Omit<GroupActivity, 'id' | 'timestamp'>) => void;
   addRecurringExpense: (recurring: Omit<RecurringExpense, 'id'>) => void;
   processRecurringExpenses: () => void;
@@ -624,26 +626,31 @@ export const useExpenseStore = create<ExpenseStore>()(
           }));
         },
 
-        addSettlement: (settlement) => {
-          const newSettlement: Settlement = {
-            ...settlement,
-            id: crypto.randomUUID(),
-            status: 'confirmed',
-          };
-          set((state) => ({
-            settlements: [...state.settlements, newSettlement],
-          }));
-          
-          const fromMember = get().groups.flatMap(g => g.members).find(m => m.id === settlement.fromMemberId);
-          const toMember = get().groups.flatMap(g => g.members).find(m => m.id === settlement.toMemberId);
-          
-          if (fromMember && toMember) {
+        addSettlement: async (settlement, groupId, userId) => {
+          try {
+            set({ loading: true, error: null });
+            console.log('Adding settlement:', settlement);
+            const settlementWithStatus = { ...settlement, status: 'confirmed' as const };
+            const createdSettlement = await createSettlementFirebase(settlementWithStatus, groupId, userId);
+            console.log('Settlement added successfully to Firebase');
+            
+            // Add to local state
+            set((state) => ({
+              settlements: [...state.settlements, createdSettlement],
+              loading: false
+            }));
+            
+            // Add activity
             get().addActivity({
               type: 'settlement_made',
-              userId: fromMember.id,
-              userName: fromMember.name,
-              description: `${fromMember.name} paid ${toMember.name} $${settlement.amount.toFixed(2)}`,
+              userId,
+              userName: settlement.fromMemberId,
+              description: `Settlement of $${settlement.amount.toFixed(2)} recorded`,
             });
+          } catch (error) {
+            console.error('Error adding settlement:', error);
+            set({ error: 'Failed to add settlement', loading: false });
+            throw error;
           }
         },
 

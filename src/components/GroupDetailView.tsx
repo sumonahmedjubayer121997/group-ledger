@@ -44,6 +44,8 @@ import { GroupBudgetList } from "./GroupBudgetList";
 import { fetchGroupMembersWithPhotos } from "@/components/firebaseComponents/FetchGroupMembersWithPhotos";
 import { useBudgetValidation } from "@/hooks/useBudgetValidation";
 import { useBudgetStore } from "@/stores/budgetStore";
+import { BalanceCard } from './BalanceCard';
+import { SettlementSummary } from './SettlementSummary';
 
 interface GroupDetailViewProps {
   group: Group;
@@ -1020,6 +1022,17 @@ export const GroupDetailView: React.FC<GroupDetailViewProps> = ({
                         </div>
                       </CardContent>
                     </Card>
+                  </motion.div>
+
+                  {/* Balance and Settlement Section */}
+                  <motion.div
+                    initial={{ opacity: 0, y: 20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ delay: 0.4 }}
+                    className="grid grid-cols-1 lg:grid-cols-2 gap-6"
+                  >
+                    <BalanceCard balances={balances} groupId={group.id} />
+                    <SettlementSummary groupId={group.id} />
                   </motion.div>
                 </div>
               </div>

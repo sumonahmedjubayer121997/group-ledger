@@ -1219,3 +1219,69 @@ export const subscribeToUserAllBudgets = (
     unsubscribers.forEach((unsubscriber) => unsubscriber());
   };
 };
+
+// Settlement Firebase Functions
+export const createSettlement = async (settlement: Omit<Settlement, 'id'>, groupId: string, userId: string): Promise<Settlement> => {
+  try {
+    console.log('Creating settlement in Firebase:', settlement);
+    
+    const settlementDoc = {
+      ...settlement,
+      createdAt: serverTimestamp(),
+      createdBy: userId,
+      groupId,
+      status: 'confirmed'
+    };
+
+    const docRef = await addDoc(collection(db, 'settlements'), settlementDoc);
+    
+    const createdSettlement = {
+      ...settlement,
+      id: docRef.id,
+      status: 'confirmed' as const
+    };
+
+    console.log('✅ Settlement created successfully:', createdSettlement.id);
+    return createdSettlement;
+  } catch (error) {
+    console.error('❌ Error creating settlement:', error);
+    throw error;
+  }
+};
+
+export const getGroupSettlements = async (groupId: string): Promise<Settlement[]> => {
+  try {
+    const q = query(
+      collection(db, 'settlements'),
+      where('groupId', '==', groupId),
+      orderBy('date', 'desc')
+    );
+    
+    const snapshot = await getDocs(q);
+    return snapshot.docs.map(doc => ({
+      id: doc.id,
+      ...doc.data()
+    } as Settlement));
+  } catch (error) {
+    console.error('Error fetching group settlements:', error);
+    return [];
+  }
+};
+
+export const subscribeToGroupSettlements = (groupId: string, callback: (settlements: Settlement[]) => void): (() => void) => {
+  const q = query(
+    collection(db, 'settlements'),
+    where('groupId', '==', groupId),
+    orderBy('date', 'desc')
+  );
+  
+  return onSnapshot(q, (snapshot) => {
+    const settlements = snapshot.docs.map(doc => ({
+      id: doc.id,
+      ...doc.data()
+    } as Settlement));
+    callback(settlements);
+  }, (error) => {
+    console.error('Error in settlements subscription:', error);
+  });
+};

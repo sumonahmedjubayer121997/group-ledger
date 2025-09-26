@@ -7,9 +7,10 @@ import { SettlementDialog } from "./SettlementDialog";
 
 interface BalanceCardProps {
   balances: Balance[];
+  groupId?: string;
 }
 
-export const BalanceCard: React.FC<BalanceCardProps> = ({ balances }) => {
+export const BalanceCard: React.FC<BalanceCardProps> = ({ balances, groupId = '' }) => {
   const [selectedBalance, setSelectedBalance] = useState<Balance | null>(null);
   const [isSettlementOpen, setIsSettlementOpen] = useState(false);
 
@@ -103,6 +104,7 @@ export const BalanceCard: React.FC<BalanceCardProps> = ({ balances }) => {
           fromMember={selectedBalance.from}
           toMember={selectedBalance.to}
           amount={selectedBalance.amount}
+          groupId={groupId}
         />
       )}
     </>
