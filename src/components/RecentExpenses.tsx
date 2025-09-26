@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -29,11 +29,13 @@ import {
   Pencil,
   Trash2,
   Plus,
+  Group,
 } from "lucide-react";
 import { ExpenseForm } from "./ExpenseForm";
 import { EditExpenseForm } from "./EditExpenseForm";
 import { useToast } from "@/hooks/use-toast";
 import { formatDistanceToNow } from "date-fns";
+import { getGroupName } from "./firebaseComponents/FetchGroupNameUsingId";
 
 interface RecentExpensesProps {
   expenses: Expense[];
@@ -44,9 +46,48 @@ export const RecentExpenses: React.FC<RecentExpensesProps> = ({ expenses }) => {
   const { toast } = useToast();
   const [showExpenseForm, setShowExpenseForm] = useState(false);
   const [editingExpense, setEditingExpense] = useState<Expense | null>(null);
-  const recentExpenses = expenses
-    .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
-    .slice(0, 5);
+  const [groupNames, setGroupNames] = useState<(string | null)[]>([]);
+  const [loadingGroupNames, setLoadingGroupNames] = useState(true);
+
+  // Memoize recent expenses to prevent unnecessary re-renders
+  const recentExpenses = useMemo(() => {
+    return expenses
+      .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
+      .slice(0, 5);
+  }, [expenses]);
+
+  // Fetch group names when recentExpenses changes
+  useEffect(() => {
+    const fetchGroupNames = async () => {
+      if (recentExpenses.length === 0) {
+        setGroupNames([]);
+        setLoadingGroupNames(false);
+        return;
+      }
+
+      setLoadingGroupNames(true);
+      const names: (string | null)[] = [];
+
+      // Use a cache to avoid duplicate calls for the same groupId
+      const cache: Record<string, string | null> = {};
+
+      for (const expense of recentExpenses) {
+        if (cache[expense.groupId] !== undefined) {
+          names.push(cache[expense.groupId]);
+          continue;
+        }
+
+        const name = await getGroupName(expense.groupId);
+        cache[expense.groupId] = name;
+        names.push(name);
+      }
+
+      setGroupNames(names);
+      setLoadingGroupNames(false);
+    };
+
+    fetchGroupNames();
+  }, [recentExpenses]);
 
   const handleDeleteExpense = async (expense: Expense) => {
     try {
@@ -124,7 +165,7 @@ export const RecentExpenses: React.FC<RecentExpensesProps> = ({ expenses }) => {
       </CardHeader>
       <CardContent className="px-4 py-0 pb-4 sm:px-6 sm:pb-6">
         <div className="space-y-3 sm:space-y-4">
-          {recentExpenses.map((expense) => (
+          {recentExpenses.map((expense, index) => (
             <div
               key={expense.id}
               className="flex items-center justify-between p-3 sm:p-4 bg-muted/30 rounded-lg hover:bg-muted/50 transition-colors border border-border/50"
@@ -151,6 +192,18 @@ export const RecentExpenses: React.FC<RecentExpensesProps> = ({ expenses }) => {
                           addSuffix: true,
                         })}
                       </span>
+                    </div>
+                    <div className="flex items-center space-x-1">
+                      <Group className="w-3 h-3 flex-shrink-0" />
+                      {loadingGroupNames ? (
+                        <span className="text-xs text-muted-foreground">
+                          Loading...
+                        </span>
+                      ) : (
+                        <span className="truncate">
+                          {groupNames[index] || "Unknown Group"}
+                        </span>
+                      )}
                     </div>
                   </div>
                 </div>

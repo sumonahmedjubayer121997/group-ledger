@@ -24,9 +24,23 @@ import { GroupDetailMobileNav } from "@/components/GroupDetailMobileNav";
 import { fetchGroupMembersWithPhotos } from "@/components/firebaseComponents/FetchGroupMembersWithPhotos";
 import { useNavigate } from "react-router-dom";
 import { useBudgetFirebaseSync } from "@/hooks/useBudgetFirebaseSync";
+import { getGroupName } from "@/components/firebaseComponents/FetchGroupNameUsingId";
+
+// Define types for better type safety
+type TabItem = {
+  value: string;
+  id: string;
+  label: string;
+  icon: React.ComponentType<{ className?: string }>;
+};
+
+type GroupWithMembers = any & { members?: any[] };
 
 const Dashboard = () => {
+  // Authentication state
   const { user, userProfile } = useAuth();
+
+  // Expense store state
   const {
     groups,
     expenses,
@@ -34,39 +48,36 @@ const Dashboard = () => {
     getBalances,
     initializeFirebaseSync,
   } = useExpenseStore();
+
+  // Local component state
   const [showGroupForm, setShowGroupForm] = useState(false);
   const [showExpenseForm, setShowExpenseForm] = useState(false);
   const [activeTab, setActiveTab] = useState("overview");
   const isMobile = useIsMobile();
-  const [enrichedGroups, setEnrichedGroups] = useState([]);
+  const [enrichedGroups, setEnrichedGroups] = useState<GroupWithMembers[]>([]);
   const navigate = useNavigate();
 
-  // Initialize Firebase sync for expenses and budgets
+  // Initialize Firebase sync
   useBudgetFirebaseSync();
 
   // Initialize Firebase sync when user is authenticated
   useEffect(() => {
-    console.log(
-      "Dashboard useEffect - user:",
-      user?.uid,
-      "groups length:",
-      groups.length
-    );
     if (user?.uid) {
-      console.log("Initializing Firebase sync for user:", user.uid);
       initializeFirebaseSync(user.uid);
     }
   }, [user?.uid, initializeFirebaseSync]);
 
+  // Load group members with photos
   useEffect(() => {
     const loadGroupsWithMembers = async () => {
       if (!user?.uid || groups.length === 0) return;
 
       try {
-        // Only enrich groups that haven't been enriched yet
+        // Filter groups that need enrichment
         const unenrichedGroups = groups.filter((group) => !group.members);
         if (unenrichedGroups.length === 0 && enrichedGroups.length > 0) return;
 
+        // Enrich groups with member data
         const enriched = await Promise.all(
           unenrichedGroups.map(async (group) => {
             const members = await fetchGroupMembersWithPhotos(group.id);
@@ -76,9 +87,8 @@ const Dashboard = () => {
 
         // Merge with existing enriched groups
         const allEnriched = groups.map((group) => {
-          const enrichedGroup = enriched.find((e) => e.id === group.id);
           return (
-            enrichedGroup ||
+            enriched.find((e) => e.id === group.id) ||
             enrichedGroups.find((eg) => eg.id === group.id) ||
             group
           );
@@ -94,17 +104,20 @@ const Dashboard = () => {
     loadGroupsWithMembers();
   }, [groups, user?.uid, enrichedGroups]);
 
+  // Handle group click with memoization
   const handleGroupClick = useCallback(
-    (group: any) => {
+    (group: GroupWithMembers) => {
       setSelectedGroup(group);
       navigate(`/groups/${group.id}`);
     },
     [setSelectedGroup, navigate]
   );
 
+  // Memoize balances calculation
   const balances = useMemo(() => getBalances(), [getBalances]);
 
-  const tabItems = [
+  // Tab configuration
+  const tabItems: TabItem[] = [
     { value: "overview", id: "overview", label: "Overview", icon: BarChart3 },
     { value: "groups", id: "groups", label: "Groups", icon: Users },
     { value: "expenses", id: "expenses", label: "Expenses", icon: Receipt },
@@ -116,6 +129,7 @@ const Dashboard = () => {
     },
   ];
 
+  // Content animation variants
   const contentVariants = {
     initial: { opacity: 0, y: 20 },
     animate: { opacity: 1, y: 0 },
@@ -157,6 +171,7 @@ const Dashboard = () => {
         onValueChange={setActiveTab}
         className="space-y-4 sm:space-y-6"
       >
+        {/* Desktop Tabs */}
         {!isMobile && (
           <div className="relative w-full">
             <TabsList className="inline-flex h-12 items-center justify-center rounded-xl bg-muted/50 p-1 text-muted-foreground w-full backdrop-blur-sm border border-border/50">
@@ -198,8 +213,9 @@ const Dashboard = () => {
           </div>
         )}
 
+        {/* Tab Content */}
         <AnimatePresence mode="wait">
-          {/* Overview */}
+          {/* Overview Tab */}
           <TabsContent value="overview" className="space-y-4 sm:space-y-6">
             <motion.div
               key="overview"
@@ -246,7 +262,7 @@ const Dashboard = () => {
             </motion.div>
           </TabsContent>
 
-          {/* Groups */}
+          {/* Groups Tab */}
           <TabsContent value="groups" className="space-y-4 sm:space-y-6">
             <motion.div
               key="groups"
@@ -276,7 +292,7 @@ const Dashboard = () => {
             </motion.div>
           </TabsContent>
 
-          {/* Expenses */}
+          {/* Expenses Tab */}
           <TabsContent value="expenses" className="space-y-4 sm:space-y-6">
             <motion.div
               key="expenses"
@@ -303,7 +319,7 @@ const Dashboard = () => {
             </motion.div>
           </TabsContent>
 
-          {/* Analytics */}
+          {/* Analytics Tab */}
           <TabsContent value="analytics" className="space-y-4 sm:space-y-6">
             <motion.div
               key="analytics"

@@ -1,4 +1,3 @@
-
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -11,8 +10,6 @@ import Index from "./pages/Index";
 import NotFound from "./pages/NotFound";
 import { ThemeProvider } from "@/components/theme-provider";
 
-
-
 const queryClient = new QueryClient();
 
 const AppContent = () => {
@@ -22,10 +19,10 @@ const AppContent = () => {
   // Initialize Firebase sync when user is authenticated properly
   useEffect(() => {
     if (user) {
-      console.log('Initializing Firebase sync for user:', user.uid);
+      console.log("Initializing Firebase sync for user:", user.uid);
       initializeFirebaseSync(user.uid);
     } else {
-      console.log('User logged out, cleaning up Firebase sync');
+      console.log("User logged out, cleaning up Firebase sync");
       cleanup();
     }
 
@@ -35,19 +32,10 @@ const AppContent = () => {
     };
   }, [user, initializeFirebaseSync, cleanup]);
 
-  console.log('App loading state:', loading);
-  console.log('User state:', user ? 'authenticated' : 'not authenticated');
+  console.log("App loading state:", loading);
+  console.log("User state:", user ? "authenticated" : "not authenticated");
 
-  if (loading) {
-    return (
-      <div className="min-h-screen bg-background flex items-center justify-center">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto"></div>
-          <p className="mt-4 text-muted-foreground">Loading...</p>
-        </div>
-      </div>
-    );
-  }
+  // Loader removed as requested
 
   // Always show the Index component, which will handle showing landing page vs main app
   return (
