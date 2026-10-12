@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { SUPPORTED_CURRENCIES, toCurrencyCode } from '@/lib/money';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -7,7 +8,8 @@ import { Textarea } from '@/components/ui/textarea';
 import { Switch } from '@/components/ui/switch';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useExpenseStore, Group } from '@/stores/expenseStore';
-import { Settings, Upload, Save } from 'lucide-react';
+import { Settings, Upload, Save, Copy, RefreshCw } from 'lucide-react';
+import { regenerateInviteLink, setLinkJoining } from '@/services/firebaseService';
 import { toast } from "sonner";
 import { GroupPictureUpload } from '@/components/GroupPictureUpload';
 
@@ -15,34 +17,22 @@ interface GroupSettingsProps {
   group: Group;
 }
 
-const validCurrencies = [
-   { value: '£', label: '£ GBP' },
-   {value: '৳', label: '৳ BDT'},
-  { value: '$', label: '$ USD' },
-  { value: '€', label: '€ EUR' },
-  { value: 'CAD $', label: '$ CAD' },
-  { value: 'AUS $', label: '$ AUD' },
-  { value: '¥', label: '¥ JPY' },
-].filter(curr => curr.value && typeof curr.value === 'string' && curr.value.trim() !== '');
+// Saved as ISO codes ("GBP"); older groups stored a symbol ("£"), which toCurrencyCode() understands.
+const validCurrencies = SUPPORTED_CURRENCIES.map(({ code, label }) => ({ value: code, label }));
 
-const validGroupTypes = [
-  { value: 'private', label: 'Private (Invite Only)' },
-  { value: 'public', label: 'Public (Join with link)' },
-].filter(type => type.value && typeof type.value === 'string' && type.value.trim() !== '');
 
 export const GroupSettings: React.FC<GroupSettingsProps> = ({ group }) => {
   const [name, setName] = useState(group.name);
   const [description, setDescription] = useState(group.description);
   const [location, setLocation] = useState(group.location || '');
   const [tags, setTags] = useState(group.tags?.join(', ') || '');
-  const [currency, setCurrency] = useState(group.settings?.currency || 'USD');
+  const [currency, setCurrency] = useState(toCurrencyCode(group.settings?.currency));
   const [simplifyDebts, setSimplifyDebts] = useState(group.settings?.simplifyDebts ?? true);
   const [notifications, setNotifications] = useState(group.settings?.notifications ?? true);
   const [recurringBills, setRecurringBills] = useState(group.settings?.recurringBills ?? false);
-  const [groupType, setGroupType] = useState<'private' | 'public'>(group.groupType || 'private');
   const [photo, setPhoto] = useState(group.photo || '');
   const [coverImage, setCoverImage] = useState(group.coverImage || '');
-  const [inviteCode, setInviteCode] = useState(group.inviteCode || '');
+  const [linkBusy, setLinkBusy] = useState(false);
 
   const { updateGroup } = useExpenseStore();
 
@@ -52,14 +42,12 @@ export const GroupSettings: React.FC<GroupSettingsProps> = ({ group }) => {
     setDescription(group.description);
     setLocation(group.location || '');
     setTags(group.tags?.join(', ') || '');
-    setCurrency(group.settings?.currency || 'USD');
+    setCurrency(toCurrencyCode(group.settings?.currency));
     setSimplifyDebts(group.settings?.simplifyDebts ?? true);
     setNotifications(group.settings?.notifications ?? true);
     setRecurringBills(group.settings?.recurringBills ?? false);
-    setGroupType(group.groupType || 'private');
     setPhoto(group.photo || '');
     setCoverImage(group.coverImage || '');
-    setInviteCode(group.inviteCode || '');
   }, [group]);
 
   const handlePhotoChange = (newPhoto: string) => {
@@ -69,6 +57,34 @@ export const GroupSettings: React.FC<GroupSettingsProps> = ({ group }) => {
   const handleCoverImageChange = (newCoverImage: string) => {
   setCoverImage(newCoverImage);
 };
+  const linkEnabled = group.groupType === 'public';
+  // Codes shorter than a UUID come from older versions and never had a working link.
+  const inviteLink = group.inviteCode?.length >= 16 ? `${window.location.origin}/join/${group.inviteCode}` : '';
+
+  const toggleLink = async (enabled: boolean) => {
+    setLinkBusy(true);
+    try {
+      await setLinkJoining(group, enabled);
+      toast.success(enabled ? 'Invite link turned on' : 'Invite link turned off. Old links no longer work.');
+    } catch {
+      toast.error("Couldn't change the invite link.");
+    } finally {
+      setLinkBusy(false);
+    }
+  };
+
+  const regenerateLink = async () => {
+    setLinkBusy(true);
+    try {
+      await regenerateInviteLink(group);
+      toast.success('New invite link created. The old one no longer works.');
+    } catch {
+      toast.error("Couldn't create a new link.");
+    } finally {
+      setLinkBusy(false);
+    }
+  };
+
   const handleSave = async () => {
   try {
     // Log all values you are about to save
@@ -77,7 +93,6 @@ export const GroupSettings: React.FC<GroupSettingsProps> = ({ group }) => {
       description,
       location,
       tags,
-      groupType,
       settings: {
         currency,
         simplifyDebts,
@@ -86,7 +101,6 @@ export const GroupSettings: React.FC<GroupSettingsProps> = ({ group }) => {
       },
       photo,
       coverImage,
-      inviteCode,
     });
 
    await updateGroup(group.id, {
@@ -94,7 +108,6 @@ export const GroupSettings: React.FC<GroupSettingsProps> = ({ group }) => {
   description,
   location: location || undefined,
   tags: tags ? tags.split(',').map(tag => tag.trim()).filter(Boolean) : [],
-  groupType: groupType as 'private' | 'public',
   settings: {
     currency,
     simplifyDebts,
@@ -103,7 +116,6 @@ export const GroupSettings: React.FC<GroupSettingsProps> = ({ group }) => {
   },
   photo,
   coverImage,
-  inviteCode,
 });
 
     console.log("Group updated successfully!");
@@ -166,21 +178,6 @@ export const GroupSettings: React.FC<GroupSettingsProps> = ({ group }) => {
                 placeholder="e.g., Trip, Flatmates, Office"
               />
             </div>
-            <div>
-              <Label htmlFor="group-type">Group Type</Label>
-              <Select value={groupType} onValueChange={(value) => setGroupType(value as 'private' | 'public')}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Select group type" />
-                </SelectTrigger>
-                <SelectContent>
-                  {validGroupTypes.map(type => (
-                    <SelectItem key={type.value} value={type.value}>
-                      {type.label}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
           </div>
 
           {/* Financial Settings */}
@@ -189,7 +186,7 @@ export const GroupSettings: React.FC<GroupSettingsProps> = ({ group }) => {
             <div>
               <Label htmlFor="currency">Default Currency</Label>
               <Select value={currency} onValueChange={setCurrency}>
-                <SelectTrigger>
+                <SelectTrigger id="currency">
                   <SelectValue placeholder="Select currency" />
                 </SelectTrigger>
                 <SelectContent>
@@ -204,7 +201,7 @@ export const GroupSettings: React.FC<GroupSettingsProps> = ({ group }) => {
             <div className="flex items-center justify-between">
               <div>
                 <Label htmlFor="simplify-debts">Simplify Debts</Label>
-                <p className="text-sm text-gray-600">
+                <p className="text-sm text-muted-foreground">
                   Automatically reduce circular debts to minimize transactions
                 </p>
               </div>
@@ -222,7 +219,7 @@ export const GroupSettings: React.FC<GroupSettingsProps> = ({ group }) => {
             <div className="flex items-center justify-between">
               <div>
                 <Label htmlFor="notifications">Notifications</Label>
-                <p className="text-sm text-gray-600">
+                <p className="text-sm text-muted-foreground">
                   Receive notifications for group activities
                 </p>
               </div>
@@ -230,19 +227,6 @@ export const GroupSettings: React.FC<GroupSettingsProps> = ({ group }) => {
                 id="notifications"
                 checked={notifications}
                 onCheckedChange={setNotifications}
-              />
-            </div>
-            <div className="flex items-center justify-between">
-              <div>
-                <Label htmlFor="recurring-bills">Recurring Bills</Label>
-                <p className="text-sm text-gray-600">
-                  Enable automatic recurring expenses
-                </p>
-              </div>
-              <Switch
-                id="recurring-bills"
-                checked={recurringBills}
-                onCheckedChange={setRecurringBills}
               />
             </div>
           </div>
@@ -258,11 +242,11 @@ export const GroupSettings: React.FC<GroupSettingsProps> = ({ group }) => {
     <div>
       <Label>Group Photo</Label>
       <div className="mt-2 flex items-center space-x-3">
-        <div className="w-16 h-16 bg-gray-200 rounded-lg flex items-center justify-center">
+        <div className="w-16 h-16 bg-muted rounded-lg flex items-center justify-center">
           {photo ? (
             <img src={photo} alt="Group" className="w-full h-full object-cover rounded-lg" />
           ) : (
-            <Upload className="w-6 h-6 text-gray-400" />
+            <Upload className="w-6 h-6 text-muted-foreground" />
           )}
         </div>
         {/* Enable upload and connect to photo handler */}
@@ -277,11 +261,11 @@ export const GroupSettings: React.FC<GroupSettingsProps> = ({ group }) => {
     <div>
       <Label>Cover Image</Label>
       <div className="mt-2 flex items-center space-x-3">
-        <div className="w-32 h-16 bg-gray-200 rounded-lg flex items-center justify-center">
+        <div className="w-32 h-16 bg-muted rounded-lg flex items-center justify-center">
           {coverImage ? (
             <img src={coverImage} alt="Cover" className="w-full h-full object-cover rounded-lg" />
           ) : (
-            <Upload className="w-6 h-6 text-gray-400" />
+            <Upload className="w-6 h-6 text-muted-foreground" />
           )}
         </div>
         {/* Use a separate handler for cover image */}
@@ -297,21 +281,43 @@ export const GroupSettings: React.FC<GroupSettingsProps> = ({ group }) => {
             </div>
           </div>
 
-          {/* Group Code */}
+          {/* Invite link */}
           <div className="space-y-4">
-            <h3 className="text-lg font-medium">Group Code</h3>
-            <div className="bg-gray-50 p-4 rounded-lg">
-              <Label>Invite Code</Label>
-              <div className="flex items-center space-x-2 mt-1">
-                <Input value={inviteCode || 'LOADING'} readOnly className="font-mono" />
-                <Button variant="outline" size="sm" disabled>
-                  Regenerate
+            <h3 className="text-lg font-medium">Invite link</h3>
+            <div className="flex items-center justify-between">
+              <div>
+                <Label htmlFor="link-joining">Anyone with the link can join</Label>
+                <p className="text-sm text-muted-foreground">
+                  When off, the group is invite-only and members add people by email.
+                </p>
+              </div>
+              <Switch id="link-joining" checked={linkEnabled} onCheckedChange={toggleLink} disabled={linkBusy} />
+            </div>
+            {linkEnabled && (
+              <div className="flex items-center space-x-2">
+                <Input
+                  value={inviteLink}
+                  placeholder="No link yet. Create one."
+                  readOnly
+                  className="text-sm"
+                  aria-label="Invite link"
+                  onFocus={(e) => e.target.select()}
+                />
+                <Button
+                  variant="outline"
+                  size="sm"
+                  aria-label="Copy invite link"
+                  disabled={!inviteLink}
+                  onClick={() => navigator.clipboard.writeText(inviteLink).then(() => toast.success('Link copied'))}
+                >
+                  <Copy className="w-4 h-4" />
+                </Button>
+                <Button variant="outline" size="sm" onClick={regenerateLink} disabled={linkBusy}>
+                  <RefreshCw className="w-4 h-4 mr-2" />
+                  New link
                 </Button>
               </div>
-              <p className="text-xs text-gray-600 mt-1">
-                Share this code with others to let them join your group
-              </p>
-            </div>
+            )}
           </div>
 
           {/* Save Button */}

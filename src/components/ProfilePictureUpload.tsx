@@ -146,8 +146,8 @@ export const ProfilePictureUpload: React.FC<ProfilePictureUploadProps> = ({
   return (
     <Dialog open={isOpen} onOpenChange={setIsOpen}>
       <DialogTrigger asChild>
-        <Button size="sm" variant="outline" className="rounded-full">
-          <Camera className="h-4 w-4" />
+        <Button size="sm" variant="outline" className="rounded-full" aria-label="Change profile photo">
+          <Camera className="h-4 w-4" aria-hidden="true" />
         </Button>
       </DialogTrigger>
       <DialogContent className="sm:max-w-[500px] max-h-[80vh] overflow-y-auto">
@@ -230,9 +230,9 @@ export const ProfilePictureUpload: React.FC<ProfilePictureUploadProps> = ({
                         key={imageId}
                         onClick={() => handleDefaultSelect(imageId)}
                         className={`rounded-full border-2 transition-all ${
-                          selectedImage === `https://images.unsplash.com/${imageId}?w=150&h=150&fit=crop&crop=face`
+ selectedImage === `https://images.unsplash.com/${imageId}?w=150&h=150&fit=crop&crop=face`
                             ? 'border-primary' 
-                            : 'border-transparent hover:border-gray-300'
+                            : 'border-transparent hover:border-border'
                         }`}
                       >
                         <Avatar className="h-16 w-16">
@@ -251,9 +251,9 @@ export const ProfilePictureUpload: React.FC<ProfilePictureUploadProps> = ({
                         key={imageId}
                         onClick={() => handleDefaultSelect(imageId)}
                         className={`rounded-full border-2 transition-all ${
-                          selectedImage === `https://images.unsplash.com/${imageId}?w=150&h=150&fit=crop&crop=face`
+ selectedImage === `https://images.unsplash.com/${imageId}?w=150&h=150&fit=crop&crop=face`
                             ? 'border-primary' 
-                            : 'border-transparent hover:border-gray-300'
+                            : 'border-transparent hover:border-border'
                         }`}
                       >
                         <Avatar className="h-16 w-16">
@@ -275,10 +275,10 @@ export const ProfilePictureUpload: React.FC<ProfilePictureUploadProps> = ({
                       key={index}
                       onClick={() => handleAestheticSelect(url)}
                       className={`rounded-full border-2 transition-all ${
-                        selectedImage === url
-                          ? 'border-primary' 
-                          : 'border-transparent hover:border-gray-300'
-                      }`}
+ selectedImage === url
+ ? 'border-primary' 
+ : 'border-transparent hover:border-border'
+ }`}
                     >
                       <Avatar className="h-16 w-16">
                         <AvatarImage src={url} />

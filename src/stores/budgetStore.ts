@@ -28,6 +28,8 @@ export interface Budget {
   period: "monthly" | "weekly" | "yearly";
   alertThreshold: number; // percentage (e.g., 80 for 80%)
   isActive: boolean;
+  /** Personal budgets: the currency they count (ISO code). Group budgets use the group's currency. */
+  currency?: string;
   createdAt: Date;
 }
 

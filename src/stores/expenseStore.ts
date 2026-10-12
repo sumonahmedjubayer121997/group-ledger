@@ -12,8 +12,11 @@ import {
   getUserGroups,
   addMemberToGroup as addMemberToGroupFirebase,
   removeMemberFromGroup as removeMemberFromGroupFirebase,
+  updateMemberRole as updateMemberRoleFirebase,
   createSettlement as createSettlementFirebase,
   subscribeToGroupSettlements,
+  logGroupActivity,
+  type GroupActivityType,
 } from '@/services/firebaseService';
 import { notificationFirebaseService } from '@/services/notificationFirebaseService';
 import { useOfflineStore } from '@/stores/offlineStore';
@@ -85,7 +88,11 @@ export interface Expense {
   category: string;
   date: Date;
   splitType: 'equal' | 'exact' | 'percentage';
+  /** exact: amount per person. percentage: amount per person when splitVersion >= 2, else percent per person. */
   splitData?: { [memberId: string]: number };
+  /** Percent per person, kept for display (splitVersion 2+). */
+  splitPercentages?: { [memberId: string]: number };
+  splitVersion?: number;
 }
 
 export interface Balance {
@@ -110,10 +117,14 @@ interface ExpenseStore {
   expenses: Expense[];
   groups: Group[];
   settlements: Settlement[];
+  /** Settlements per group, live from Firestore. The source of truth for balances. */
+  groupSettlements: Record<string, Settlement[]>;
   activities: GroupActivity[];
   recurringExpenses: RecurringExpense[];
   selectedGroup: Group | null;
   loading: boolean;
+  /** False until the first list of groups arrives after sign-in (pages show skeletons until then). */
+  groupsLoaded: boolean;
   error: string | null;
   isInitialized: boolean;
   currentUserId: string | null;
@@ -128,7 +139,7 @@ interface ExpenseStore {
   updateGroup: (id: string, updates: Partial<Group>) => Promise<void>;
   addMemberToGroup: (groupId: string, member: Omit<Member, 'joinedAt' | 'role'>, userId: string) => Promise<void>;
   removeMemberFromGroup: (groupId: string, memberId: string) => Promise<void>;
-  updateMemberRole: (groupId: string, memberId: string, role: Member['role']) => void;
+  updateMemberRole: (groupId: string, memberId: string, role: Member['role']) => Promise<void>;
   addSettlement: (settlement: Omit<Settlement, 'id' | 'status'>, groupId: string, userId: string) => Promise<void>;
   addActivity: (activity: Omit<GroupActivity, 'id' | 'timestamp'>) => void;
   addRecurringExpense: (recurring: Omit<RecurringExpense, 'id'>) => void;
@@ -141,13 +152,10 @@ interface ExpenseStore {
   
   // Keep existing methods unchanged
   getTotalExpenses: () => number;
-  getBalances: () => Balance[];
-  calculateBalances: () => Record<string, number>;
   getGroupExpenses: (groupId: string) => Expense[];
   getGroupActivities: (groupId: string) => GroupActivity[];
   getGroupAnalytics: (groupId: string) => any;
   getSettlementHistory: () => Settlement[];
-  simplifyDebts: () => void;
   archiveGroup: (groupId: string) => Promise<void>;
   unarchiveGroup: (groupId: string) => Promise<void>;
 }
@@ -156,16 +164,29 @@ export const useExpenseStore = create<ExpenseStore>()(
   persist(
     (set, get) => {
       let groupsUnsubscriber: (() => void) | null = null;
-      let expenseUnsubscribers: Map<string, () => void> = new Map();
+      const expenseUnsubscribers: Map<string, () => void> = new Map();
+      const settlementUnsubscribers: Map<string, () => void> = new Map();
+
+      /** Saves an entry to the group's activity log (shown in the Activity Feed). Never blocks the action. */
+      const record = (groupId: string, type: GroupActivityType, description: string) => {
+        const actorId = get().currentUserId ?? '';
+        const actorName =
+          get().groups.find(g => g.id === groupId)?.members.find(m => m.id === actorId)?.name ?? 'Someone';
+        void logGroupActivity(groupId, { type, actorId, actorName, description }).catch(error =>
+          console.error('Error logging activity:', error)
+        );
+      };
       
       return {
         expenses: [],
         groups: [],
         settlements: [],
+        groupSettlements: {},
         activities: [],
         recurringExpenses: [],
         selectedGroup: null,
         loading: false,
+        groupsLoaded: false,
         error: null,
         isInitialized: false,
         currentUserId: null,
@@ -197,6 +218,8 @@ export const useExpenseStore = create<ExpenseStore>()(
             }
             expenseUnsubscribers.forEach(unsubscribe => unsubscribe());
             expenseUnsubscribers.clear();
+            settlementUnsubscribers.forEach(unsubscribe => unsubscribe());
+            settlementUnsubscribers.clear();
             
             set({ 
               loading: true, 
@@ -213,17 +236,23 @@ export const useExpenseStore = create<ExpenseStore>()(
               console.log('📋 Groups details:', initialGroups.map(g => ({ id: g.id, name: g.name, members: g.members.length })));
               
               // Set initial groups
-              set({ groups: initialGroups });
+              set({ groups: initialGroups, groupsLoaded: true });
               
               // Then set up real-time subscription
               console.log('🔔 Setting up real-time subscription for user:', userId);
               groupsUnsubscriber = subscribeToUserGroups(userId, (groups) => {
                 console.log('📡 Groups updated from Firebase subscription:', groups.length, 'groups');
                 console.log('🎯 Updated groups data:', groups.map(g => ({ id: g.id, name: g.name, members: g.members.length })));
-                set({ groups, loading: false });
+                set({ groups, loading: false, groupsLoaded: true });
                 
                 // Clean up old expense subscriptions for groups that no longer exist
                 const currentGroupIds = new Set(groups.map(g => g.id));
+                settlementUnsubscribers.forEach((unsubscribe, groupId) => {
+                  if (!currentGroupIds.has(groupId)) {
+                    unsubscribe();
+                    settlementUnsubscribers.delete(groupId);
+                  }
+                });
                 expenseUnsubscribers.forEach((unsubscribe, groupId) => {
                   if (!currentGroupIds.has(groupId)) {
                     console.log('Cleaning up expense subscription for removed group:', groupId);
@@ -248,13 +277,21 @@ export const useExpenseStore = create<ExpenseStore>()(
                     });
                     expenseUnsubscribers.set(group.id, expensesUnsubscriber);
                   }
+                  if (!settlementUnsubscribers.has(group.id)) {
+                    const settlementsUnsubscriber = subscribeToGroupSettlements(group.id, (settlements) => {
+                      set(state => ({
+                        groupSettlements: { ...state.groupSettlements, [group.id]: settlements },
+                      }));
+                    });
+                    settlementUnsubscribers.set(group.id, settlementsUnsubscriber);
+                  }
                 });
               });
               
               set({ loading: false });
             } catch (error) {
               console.error('Error initializing Firebase sync:', error);
-              set({ error: 'Failed to initialize Firebase sync', loading: false });
+              set({ error: 'Failed to initialize Firebase sync', loading: false, groupsLoaded: true });
             }
           } else {
             console.log('Firebase sync already initialized for user:', userId);
@@ -269,7 +306,9 @@ export const useExpenseStore = create<ExpenseStore>()(
           }
           expenseUnsubscribers.forEach(unsubscribe => unsubscribe());
           expenseUnsubscribers.clear();
-          set({ isInitialized: false, currentUserId: null });
+          settlementUnsubscribers.forEach(unsubscribe => unsubscribe());
+          settlementUnsubscribers.clear();
+          set({ isInitialized: false, currentUserId: null, groupSettlements: {}, groupsLoaded: false });
         },
         
         addExpense: async (expense, userId) => {
@@ -305,7 +344,8 @@ export const useExpenseStore = create<ExpenseStore>()(
             const group = groups.find(g => g.id === expense.groupId);
             const currentUser = groups.flatMap(g => g.members).find(m => m.id === userId);
             
-            if (group && currentUser) {
+            // The group's "Notifications" setting turns these off.
+            if (group && currentUser && group.settings?.notifications !== false) {
               // Notify all group members except the person who added the expense
               const membersToNotify = group.members.filter(m => m.id !== userId);
               
@@ -410,6 +450,13 @@ export const useExpenseStore = create<ExpenseStore>()(
             set({ loading: true, error: null });
             await updateGroupFirebase(id, updates);
             set({ loading: false });
+            record(
+              id,
+              'group_updated',
+              'isArchived' in updates
+                ? updates.isArchived ? 'archived the group' : 'restored the group'
+                : 'updated the group details'
+            );
             // Firebase listener will update the state
           } catch (error) {
             console.error('Error updating group:', error);
@@ -424,15 +471,11 @@ export const useExpenseStore = create<ExpenseStore>()(
             set({ loading: false });
             // Firebase listener will update the state
             
-            get().addActivity({
-              type: 'member_added',
-              userId: member.id,
-              userName: member.name,
-              description: `${member.name} joined the group`,
-            });
+            record(groupId, 'member_added', `added ${member.name || member.email}`);
           } catch (error) {
             console.error('Error adding member to group:', error);
             set({ error: 'Failed to add member', loading: false });
+            throw error;
           }
         },
 
@@ -447,16 +490,12 @@ export const useExpenseStore = create<ExpenseStore>()(
             // Firebase listener will update the state
             
             if (member) {
-              get().addActivity({
-                type: 'member_removed',
-                userId: memberId,
-                userName: member.name,
-                description: `${member.name} was removed from the group`,
-              });
+              record(groupId, 'member_removed', `removed ${member.name}`);
             }
           } catch (error) {
             console.error('Error removing member from group:', error);
             set({ error: 'Failed to remove member', loading: false });
+            throw error;
           }
         },
 
@@ -489,9 +528,9 @@ export const useExpenseStore = create<ExpenseStore>()(
               const groups = get().groups;
               const group = groups.find(g => g.id === expense.groupId);
               
-              if (group) {
+              if (group && group.settings?.notifications !== false) {
                 // Notify all group members except the one who updated the expense 
-                const membersToNotify = group.members.filter(m => m.id !== expense.paidBy.id);
+                const membersToNotify = group.members.filter(m => m.id !== get().currentUserId);
                 
                 for (const member of membersToNotify) {
                   await notificationFirebaseService.notifyExpenseAdded(
@@ -507,12 +546,7 @@ export const useExpenseStore = create<ExpenseStore>()(
               set({ loading: false });
               // Firebase listener will update the state
               
-              get().addActivity({
-                type: 'expense_updated',
-                userId: expense.paidBy.id,
-                userName: expense.paidBy.name,
-                description: `Updated expense "${expense.description}"`,
-              });
+              record(expense.groupId, 'expense_updated', `edited "${updatedExpense.description ?? expense.description}"`);
             }
           } catch (error) {
             console.error('Error updating expense:', error);
@@ -548,9 +582,9 @@ export const useExpenseStore = create<ExpenseStore>()(
               const groups = get().groups;
               const group = groups.find(g => g.id === expense.groupId);
               
-              if (group) {
+              if (group && group.settings?.notifications !== false) {
                 // Notify all group members except the one who deleted the expense
-                const membersToNotify = group.members.filter(m => m.id !== expense.paidBy.id);
+                const membersToNotify = group.members.filter(m => m.id !== get().currentUserId);
                 
                 for (const member of membersToNotify) {
                   await notificationFirebaseService.notifyExpenseAdded(
@@ -563,12 +597,7 @@ export const useExpenseStore = create<ExpenseStore>()(
                 }
               }
               
-              get().addActivity({
-                type: 'expense_deleted',
-                userId: expense.paidBy.id,
-                userName: expense.paidBy.name,
-                description: `Deleted expense "${expense.description}"`,
-              });
+              record(groupId, 'expense_deleted', `deleted "${expense.description}"`);
             }
           } catch (error) {
             console.error('Error deleting expense:', error);
@@ -580,38 +609,11 @@ export const useExpenseStore = create<ExpenseStore>()(
           set({ selectedGroup: group });
         },
         
-        calculateBalances: () => {
-          const { expenses, settlements } = get();
-          const balanceMap = new Map<string, number>();
-          
-          // Calculate balances from expenses
-          expenses.forEach((expense) => {
-            const { paidBy, splitAmong, amount, splitType, splitData } = expense;
-            const splitAmount = splitType === 'equal' ? amount / splitAmong.length : 0;
-            
-            splitAmong.forEach((member) => {
-              if (member.id !== paidBy.id) {
-                const owedAmount = splitType === 'equal' ? splitAmount : (splitData?.[member.id] || 0);
-                balanceMap.set(member.id, (balanceMap.get(member.id) || 0) + owedAmount);
-                balanceMap.set(paidBy.id, (balanceMap.get(paidBy.id) || 0) - owedAmount);
-              }
-            });
-          });
-
-          // Subtract settlements from balances
-          settlements.forEach((settlement) => {
-            if (settlement.status === 'confirmed') {
-              const currentBalance = balanceMap.get(settlement.fromMemberId) || 0;
-              balanceMap.set(settlement.fromMemberId, currentBalance - settlement.amount);
-              const toBalance = balanceMap.get(settlement.toMemberId) || 0;
-              balanceMap.set(settlement.toMemberId, toBalance + settlement.amount);
-            }
-          });
-          
-          return Object.fromEntries(balanceMap);
-        },
-
-        updateMemberRole: (groupId, memberId, role) => {
+        updateMemberRole: async (groupId, memberId, role) => {
+          await updateMemberRoleFirebase(groupId, memberId, role ?? 'member');
+          const member = get().groups.find(g => g.id === groupId)?.members.find(m => m.id === memberId);
+          if (member) record(groupId, 'group_updated', `made ${member.name} ${role === 'admin' ? 'an admin' : role === 'viewer' ? 'a viewer' : 'a member'}`);
+          // The groups listener brings the saved change; update locally too so the UI responds at once.
           set((state) => ({
             groups: state.groups.map((group) =>
               group.id === groupId
@@ -692,69 +694,6 @@ export const useExpenseStore = create<ExpenseStore>()(
           return expenses.reduce((total, expense) => total + expense.amount, 0);
         },
         
-        getBalances: () => {
-          const { expenses, settlements } = get();
-          const balanceMap = new Map<string, Map<string, number>>();
-          
-          // Calculate balances from expenses
-          expenses.forEach((expense) => {
-            const { paidBy, splitAmong, amount, splitType, splitData } = expense;
-            const splitAmount = splitType === 'equal' ? amount / splitAmong.length : 0;
-            
-            splitAmong.forEach((member) => {
-              if (member.id !== paidBy.id) {
-                const owedAmount = splitType === 'equal' ? splitAmount : (splitData?.[member.id] || 0);
-                
-                if (!balanceMap.has(member.id)) {
-                  balanceMap.set(member.id, new Map());
-                }
-                
-                const memberBalances = balanceMap.get(member.id)!;
-                const currentBalance = memberBalances.get(paidBy.id) || 0;
-                memberBalances.set(paidBy.id, currentBalance + owedAmount);
-              }
-            });
-          });
-
-          // Subtract settlements from balances
-          settlements.forEach((settlement) => {
-            if (settlement.status === 'confirmed') {
-              const debtorBalances = balanceMap.get(settlement.fromMemberId);
-              if (debtorBalances) {
-                const currentBalance = debtorBalances.get(settlement.toMemberId) || 0;
-                const newBalance = currentBalance - settlement.amount;
-                if (newBalance <= 0.01) {
-                  debtorBalances.delete(settlement.toMemberId);
-                } else {
-                  debtorBalances.set(settlement.toMemberId, newBalance);
-                }
-              }
-            }
-          });
-          
-          const balances: Balance[] = [];
-          const { groups } = get();
-          const allMembers = groups.flatMap(group => group.members);
-          
-          balanceMap.forEach((owedAmounts, debtorId) => {
-            const debtor = allMembers.find(m => m.id === debtorId);
-            if (!debtor) return;
-            
-            owedAmounts.forEach((amount, creditorId) => {
-              const creditor = allMembers.find(m => m.id === creditorId);
-              if (!creditor || amount <= 0.01) return;
-              
-              balances.push({
-                from: debtor,
-                to: creditor,
-                amount,
-              });
-            });
-          });
-          
-          return balances;
-        },
-        
         getGroupExpenses: (groupId) => {
           const { expenses } = get();
           return expenses.filter((expense) => expense.groupId === groupId);
@@ -795,10 +734,6 @@ export const useExpenseStore = create<ExpenseStore>()(
         getSettlementHistory: () => {
           const { settlements } = get();
           return settlements.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
-        },
-
-        simplifyDebts: () => {
-          console.log('Debt simplification would be implemented here');
         },
 
         archiveGroup: async (groupId) => {

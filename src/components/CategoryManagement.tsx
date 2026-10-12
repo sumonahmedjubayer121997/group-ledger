@@ -120,7 +120,7 @@ export const CategoryManagement: React.FC<CategoryManagementProps> = ({ isOpen, 
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto bg-white">
+      <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto bg-card">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Tag className="h-5 w-5" />
@@ -152,10 +152,13 @@ export const CategoryManagement: React.FC<CategoryManagementProps> = ({ isOpen, 
                   {colorOptions.map((color) => (
                     <button
                       key={color}
+                      type="button"
                       onClick={() => setNewCategoryColor(color)}
+                      aria-label={`Colour ${color}`}
+                      aria-pressed={newCategoryColor === color}
                       className={`w-8 h-8 rounded-full border-2 ${
-                        newCategoryColor === color ? 'border-gray-800' : 'border-gray-300'
-                      }`}
+ newCategoryColor === color ? 'border-foreground ring-2 ring-ring ring-offset-2' : 'border-border'
+ }`}
                       style={{ backgroundColor: color }}
                     />
                   ))}
@@ -208,8 +211,8 @@ export const CategoryManagement: React.FC<CategoryManagementProps> = ({ isOpen, 
                                   key={color}
                                   onClick={() => setEditColor(color)}
                                   className={`w-6 h-6 rounded-full border ${
-                                    editColor === color ? 'border-gray-800' : 'border-gray-300'
-                                  }`}
+ editColor === color ? 'border-border' : 'border-border'
+ }`}
                                   style={{ backgroundColor: color }}
                                 />
                               ))}
@@ -246,10 +249,10 @@ export const CategoryManagement: React.FC<CategoryManagementProps> = ({ isOpen, 
                             <AlertDialog>
                               <AlertDialogTrigger asChild>
                                 <Button size="sm" variant="ghost">
-                                  <Trash2 className="h-4 w-4 text-red-500" />
+                                  <Trash2 className="h-4 w-4 text-destructive" />
                                 </Button>
                               </AlertDialogTrigger>
-                              <AlertDialogContent className="bg-white">
+                              <AlertDialogContent className="bg-card">
                                 <AlertDialogHeader>
                                   <AlertDialogTitle>Delete Category</AlertDialogTitle>
                                   <AlertDialogDescription>
@@ -260,7 +263,7 @@ export const CategoryManagement: React.FC<CategoryManagementProps> = ({ isOpen, 
                                   <AlertDialogCancel>Cancel</AlertDialogCancel>
                                   <AlertDialogAction
                                     onClick={() => handleDeleteCategory(category.id)}
-                                    className="bg-red-600 hover:bg-red-700"
+                                    className="bg-destructive hover:bg-destructive"
                                   >
                                     Delete
                                   </AlertDialogAction>

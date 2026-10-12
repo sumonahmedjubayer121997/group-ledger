@@ -1,343 +1,310 @@
-
 import React, { useState } from 'react';
+import {
+  EmailAuthProvider,
+  GoogleAuthProvider,
+  reauthenticateWithCredential,
+  reauthenticateWithPopup,
+  type User,
+} from 'firebase/auth';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Switch } from '@/components/ui/switch';
+import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Badge } from '@/components/ui/badge';
+import {
+  AlertDialog,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 import { useToast } from '@/hooks/use-toast';
-import { useAuth } from '@/contexts/AuthContext';
-import { User } from 'firebase/auth';
-import { UserProfile } from '@/contexts/AuthContext';
-import { 
-  Shield, 
-  Smartphone, 
-  Download, 
-  Trash2, 
-  LogOut,
-  AlertTriangle,
-  Eye,
-  Lock
-} from 'lucide-react';
+import { useAuth, type UserProfile } from '@/contexts/AuthContext';
+import { useExpenseStore } from '@/stores/expenseStore';
+import { useBudgetStore } from '@/stores/budgetStore';
+import { deleteMyAccount } from '@/services/firebaseService';
+import { popupResolver } from '@/lib/firebaseApp';
+import { Download, Trash2, LogOut, AlertTriangle, Eye, Smartphone } from 'lucide-react';
 
 interface ProfilePrivacySecurityProps {
   user: User;
   userProfile: UserProfile;
 }
 
+const errorCode = (error: unknown) => (error as { code?: string })?.code ?? '';
+
 export const ProfilePrivacySecurity: React.FC<ProfilePrivacySecurityProps> = ({ user, userProfile }) => {
   const { logout } = useAuth();
   const { toast } = useToast();
-  const [isLoading, setIsLoading] = useState(false);
-  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [deleteOpen, setDeleteOpen] = useState(false);
+  const [confirmText, setConfirmText] = useState('');
+  const [password, setPassword] = useState('');
+  const [deleteError, setDeleteError] = useState('');
 
-  const handleExportData = async () => {
-    setIsLoading(true);
+  const usesPassword = user.providerData.some((p) => p.providerId === 'password');
+  const usesGoogle = user.providerData.some((p) => p.providerId === 'google.com');
+
+  /** Everything SplitWize holds that's visible to you: profile, groups, expenses, payments, budgets. */
+  const handleExportData = () => {
     try {
-      // Create a comprehensive data export
-      const userData = {
+      const { groups, expenses, groupSettlements } = useExpenseStore.getState();
+      const { budgets } = useBudgetStore.getState();
+      const data = {
+        exportedAt: new Date().toISOString(),
         profile: {
-          displayName: userProfile.displayName,
+          name: userProfile.name,
           email: userProfile.email,
-          createdAt: userProfile.createdAt,
-          lastLoginAt: userProfile.lastLoginAt,
-          preferences: userProfile.preferences
+          photoURL: userProfile.photoURL ?? null,
+          joinedAt: userProfile.joinedAt,
+          preferences: userProfile.preferences,
         },
         account: {
           uid: user.uid,
           emailVerified: user.emailVerified,
-          providerData: user.providerData
+          signInMethods: user.providerData.map((p) => p.providerId),
         },
-        exportedAt: new Date().toISOString()
+        groups: groups.map((g) => ({
+          id: g.id,
+          name: g.name,
+          description: g.description,
+          currency: g.settings?.currency,
+          archived: !!g.isArchived,
+          yourRole: g.members.find((m) => m.id === user.uid)?.role ?? null,
+          members: g.members.map((m) => ({ id: m.id, name: m.name, email: m.email, role: m.role })),
+          expenses: expenses
+            .filter((e) => e.groupId === g.id)
+            .map((e) => ({
+              id: e.id,
+              date: e.date,
+              description: e.description,
+              category: e.category,
+              amount: e.amount,
+              paidBy: { id: e.paidBy?.id, name: e.paidBy?.name },
+              splitType: e.splitType,
+              splitAmong: (e.splitAmong ?? []).map((m) => ({ id: m.id, name: m.name })),
+              splitData: e.splitData ?? null,
+            })),
+          payments: (groupSettlements[g.id] ?? []).map((s) => ({
+            id: s.id,
+            date: s.date,
+            from: s.fromMemberId,
+            to: s.toMemberId,
+            amount: s.amount,
+            method: s.paymentMethod,
+            notes: s.notes ?? null,
+          })),
+        })),
+        budgets,
       };
 
-      const dataStr = JSON.stringify(userData, null, 2);
-      const dataBlob = new Blob([dataStr], { type: 'application/json' });
-      const url = URL.createObjectURL(dataBlob);
+      const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
       const link = document.createElement('a');
       link.href = url;
-      link.download = `${userProfile.displayName}_data_export.json`;
+      link.download = `splitwize-data-${new Date().toISOString().slice(0, 10)}.json`;
       document.body.appendChild(link);
       link.click();
-      document.body.removeChild(link);
+      link.remove();
       URL.revokeObjectURL(url);
-
       toast({
-        title: "Success",
-        description: "Your data has been exported successfully"
+        title: 'Your data is downloading',
+        description: `${data.groups.length} groups and ${expenses.length} expenses.`,
       });
     } catch (error) {
-      toast({
-        title: "Error",
-        description: "Failed to export data",
-        variant: "destructive"
-      });
-    } finally {
-      setIsLoading(false);
+      console.error('Export failed:', error);
+      toast({ title: 'Export failed', description: 'Please try again.', variant: 'destructive' });
     }
   };
 
-  const handleSignOutAllDevices = async () => {
-    setIsLoading(true);
+  const handleSignOut = async () => {
+    setBusy(true);
     try {
       await logout();
-      toast({
-        title: "Success",
-        description: "Signed out from all devices"
-      });
-    } catch (error) {
-      toast({
-        title: "Error",
-        description: "Failed to sign out from all devices",
-        variant: "destructive"
-      });
-    } finally {
-      setIsLoading(false);
+    } catch {
+      toast({ title: "Couldn't sign out", description: 'Please try again.', variant: 'destructive' });
+      setBusy(false);
     }
+  };
+
+  const closeDelete = () => {
+    if (busy) return;
+    setDeleteOpen(false);
+    setConfirmText('');
+    setPassword('');
+    setDeleteError('');
   };
 
   const handleDeleteAccount = async () => {
-    if (!showDeleteConfirm) {
-      setShowDeleteConfirm(true);
-      return;
-    }
-
-    setIsLoading(true);
+    setBusy(true);
+    setDeleteError('');
     try {
-      // In a real app, this would delete the user account
-      // For now, we'll just show a message
-      toast({
-        title: "Account Deletion",
-        description: "Account deletion is not implemented in this demo",
-        variant: "destructive"
-      });
+      // Firebase only deletes accounts that signed in recently, so confirm who this is first.
+      if (usesPassword && user.email) {
+        await reauthenticateWithCredential(user, EmailAuthProvider.credential(user.email, password));
+      } else {
+        await reauthenticateWithPopup(user, new GoogleAuthProvider(), popupResolver);
+      }
+      await deleteMyAccount(user);
+      toast({ title: 'Account deleted', description: 'Your SplitWize account has been deleted.' });
     } catch (error) {
-      toast({
-        title: "Error",
-        description: "Failed to delete account",
-        variant: "destructive"
-      });
-    } finally {
-      setIsLoading(false);
-      setShowDeleteConfirm(false);
+      const code = errorCode(error);
+      if (code === 'auth/popup-closed-by-user' || code === 'auth/cancelled-popup-request') {
+        setDeleteError('');
+      } else if (code === 'auth/wrong-password' || code === 'auth/invalid-credential') {
+        setDeleteError("That password isn't right.");
+      } else if (code === 'auth/user-mismatch') {
+        setDeleteError(`Choose the Google account you signed in with (${user.email}).`);
+      } else if (code === 'auth/too-many-requests') {
+        setDeleteError('Too many attempts. Wait a few minutes and try again.');
+      } else {
+        console.error('Account deletion failed:', error);
+        setDeleteError('Something went wrong, and your account was not deleted. Please try again.');
+      }
+      setBusy(false);
     }
   };
 
+  const canDelete = confirmText.trim().toUpperCase() === 'DELETE' && (!usesPassword || password.length > 0);
+
   return (
     <div className="space-y-6">
-      {/* Two-Factor Authentication */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Shield className="h-5 w-5" />
-            Two-Factor Authentication
-          </CardTitle>
-          <CardDescription>
-            Add an extra layer of security to your account
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="flex items-center justify-between">
-            <div className="space-y-1">
-              <Label htmlFor="2fa">Enable 2FA</Label>
-              <p className="text-sm text-muted-foreground">
-                Secure your account with two-factor authentication
-              </p>
-            </div>
-            <div className="flex items-center gap-2">
-              <Badge variant="outline" className="text-orange-600">
-                Not Enabled
-              </Badge>
-              <Switch
-                id="2fa"
-                checked={false}
-                disabled={isLoading}
-              />
-            </div>
-          </div>
-          
-          <div className="p-3 bg-muted rounded-lg">
-            <p className="text-sm text-muted-foreground">
-              🔒 Two-factor authentication adds an extra layer of security by requiring a second form of verification when signing in.
-            </p>
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* Active Sessions */}
+      {/* Signing in */}
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <Smartphone className="h-5 w-5" />
-            Active Sessions
+            Signing in
           </CardTitle>
           <CardDescription>
-            View and manage your active login sessions
+            You sign in with {[usesPassword && 'email and password', usesGoogle && 'Google'].filter(Boolean).join(' or ') || 'your account'}.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
-          <div className="space-y-3">
-            <div className="flex items-center justify-between p-3 border rounded-lg">
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 bg-primary/10 rounded-full flex items-center justify-center">
-                  <Smartphone className="h-5 w-5 text-primary" />
-                </div>
-                <div>
-                  <p className="font-medium">Current Session</p>
-                  <p className="text-sm text-muted-foreground">
-                    {new Date().toLocaleDateString()} • Web Browser
-                  </p>
-                </div>
-              </div>
-              <Badge variant="outline" className="text-green-600">
-                Active
-              </Badge>
-            </div>
+          <div className="rounded-lg border p-3">
+            <p className="font-medium">This browser</p>
+            <p className="text-sm text-muted-foreground">Signed in as {user.email}</p>
           </div>
-          
-          <Button 
-            variant="outline" 
-            onClick={handleSignOutAllDevices}
-            disabled={isLoading}
-            className="w-full"
-          >
+          {usesPassword && (
+            <p className="text-sm text-muted-foreground">
+              To sign out on your other devices, change your password in Settings. Other devices are signed out within an
+              hour.
+            </p>
+          )}
+          <Button variant="outline" onClick={handleSignOut} disabled={busy} className="w-full">
             <LogOut className="h-4 w-4 mr-2" />
-            Sign Out All Devices
+            Sign out of this browser
           </Button>
         </CardContent>
       </Card>
 
-      {/* Privacy Settings */}
+      {/* Who can see what */}
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <Eye className="h-5 w-5" />
-            Privacy Settings
+            Who can see your information
           </CardTitle>
-          <CardDescription>
-            Control your privacy and data visibility
-          </CardDescription>
         </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="flex items-center justify-between">
-            <div className="space-y-1">
-              <Label htmlFor="profile-visibility">Profile Visibility</Label>
-              <p className="text-sm text-muted-foreground">
-                Allow others to see your profile in group settings
-              </p>
-            </div>
-            <Switch
-              id="profile-visibility"
-              checked={true}
-              disabled={isLoading}
-            />
-          </div>
-          
-          <div className="flex items-center justify-between">
-            <div className="space-y-1">
-              <Label htmlFor="activity-visibility">Activity Visibility</Label>
-              <p className="text-sm text-muted-foreground">
-                Show your activity status to group members
-              </p>
-            </div>
-            <Switch
-              id="activity-visibility"
-              checked={true}
-              disabled={isLoading}
-            />
-          </div>
+        <CardContent className="space-y-2 text-sm text-muted-foreground">
+          <p>
+            People in your groups can see your name, email and photo, and the expenses and payments in the groups you share.
+          </p>
+          <p>Your list of groups, personal budgets and notifications are visible only to you.</p>
         </CardContent>
       </Card>
 
-      {/* Data Export */}
+      {/* Data export */}
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <Download className="h-5 w-5" />
-            Data Export
+            Download your data
           </CardTitle>
           <CardDescription>
-            Download your personal data (GDPR compliant)
+            A JSON file with your profile, groups, members, expenses, payments and personal budgets.
           </CardDescription>
         </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="p-3 bg-muted rounded-lg">
-            <p className="text-sm text-muted-foreground">
-              📋 Export includes your profile information, expense history, group memberships, and preferences.
-            </p>
-          </div>
-          
-          <Button 
-            variant="outline" 
-            onClick={handleExportData}
-            disabled={isLoading}
-            className="w-full"
-          >
+        <CardContent>
+          <Button variant="outline" onClick={handleExportData} disabled={busy} className="w-full">
             <Download className="h-4 w-4 mr-2" />
-            Export My Data
+            Download my data
           </Button>
         </CardContent>
       </Card>
 
-      {/* Danger Zone */}
-      <Card className="border-red-200">
+      {/* Danger zone */}
+      <Card className="border-destructive/40 ">
         <CardHeader>
-          <CardTitle className="flex items-center gap-2 text-red-600">
+          <CardTitle className="flex items-center gap-2 text-destructive">
             <AlertTriangle className="h-5 w-5" />
-            Danger Zone
+            Delete account
           </CardTitle>
-          <CardDescription>
-            Irreversible actions that affect your account
-          </CardDescription>
+          <CardDescription>Permanently delete your SplitWize account. This can't be undone.</CardDescription>
         </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="space-y-4">
-            <div className="p-4 bg-red-50 border border-red-200 rounded-lg">
-              <div className="flex items-center gap-2 mb-2">
-                <Trash2 className="h-4 w-4 text-red-600" />
-                <h4 className="font-medium text-red-600">Delete Account</h4>
-              </div>
-              <p className="text-sm text-red-600 mb-3">
-                Once you delete your account, there is no going back. This will permanently delete your profile, expense history, and remove you from all groups.
-              </p>
-              {!showDeleteConfirm ? (
-                <Button 
-                  variant="destructive" 
-                  onClick={handleDeleteAccount}
-                  disabled={isLoading}
-                >
-                  <Trash2 className="h-4 w-4 mr-2" />
-                  Delete Account
-                </Button>
-              ) : (
-                <div className="space-y-2">
-                  <p className="text-sm font-medium text-red-600">
-                    Are you sure? This action cannot be undone.
-                  </p>
-                  <div className="flex gap-2">
-                    <Button 
-                      variant="destructive" 
-                      onClick={handleDeleteAccount}
-                      disabled={isLoading}
-                      size="sm"
-                    >
-                      Yes, Delete Account
-                    </Button>
-                    <Button 
-                      variant="outline" 
-                      onClick={() => setShowDeleteConfirm(false)}
-                      disabled={isLoading}
-                      size="sm"
-                    >
-                      Cancel
-                    </Button>
-                  </div>
-                </div>
-              )}
-            </div>
-          </div>
+        <CardContent>
+          <Button variant="destructive" onClick={() => setDeleteOpen(true)} disabled={busy}>
+            <Trash2 className="h-4 w-4 mr-2" />
+            Delete my account…
+          </Button>
         </CardContent>
       </Card>
+
+      <AlertDialog open={deleteOpen} onOpenChange={(open) => (open ? setDeleteOpen(true) : closeDelete())}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete your account?</AlertDialogTitle>
+            <AlertDialogDescription asChild>
+              <div className="space-y-2 text-sm text-muted-foreground">
+                <p>This permanently deletes:</p>
+                <ul className="list-disc space-y-1 pl-5">
+                  <li>your sign-in, profile, personal budgets and notifications</li>
+                  <li>any group where nobody else has an account, with all its expenses</li>
+                </ul>
+                <p>
+                  In groups you share, past expenses and payments stay so everyone else's balances remain correct. You'll
+                  appear there as "{userProfile.name} (left)". If you were the only admin, another member becomes admin.
+                </p>
+                <p>Download your data first if you want a copy.</p>
+              </div>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+
+          <div className="space-y-3">
+            <div className="space-y-1">
+              <Label htmlFor="delete-confirm">Type DELETE to confirm</Label>
+              <Input id="delete-confirm" value={confirmText} onChange={(e) => setConfirmText(e.target.value)} autoComplete="off" />
+            </div>
+            {usesPassword ? (
+              <div className="space-y-1">
+                <Label htmlFor="delete-password">Your password</Label>
+                <Input
+                  id="delete-password"
+                  type="password"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  autoComplete="current-password"
+                />
+              </div>
+            ) : (
+              <p className="text-xs text-muted-foreground">You'll be asked to sign in with Google once more to confirm.</p>
+            )}
+            {deleteError && (
+              <p role="alert" className="text-sm text-destructive">
+                {deleteError}
+              </p>
+            )}
+          </div>
+
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={busy}>Cancel</AlertDialogCancel>
+            <Button variant="destructive" onClick={handleDeleteAccount} disabled={busy || !canDelete}>
+              {busy ? 'Deleting…' : 'Delete account'}
+            </Button>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 };

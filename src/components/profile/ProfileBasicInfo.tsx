@@ -7,7 +7,10 @@ import { CalendarDays, Users, Clock, TrendingUp } from 'lucide-react';
 import { User } from 'firebase/auth';
 import { UserProfile } from '@/contexts/AuthContext';
 import { useExpenseStore } from '@/stores/expenseStore';
+import { useCurrencyOf } from '@/stores/useLedger';
+import { formatAmount, formatTotals, toCents } from '@/lib/money';
 
+import { formatCalendarDate } from "@/lib/dates";
 interface ProfileBasicInfoProps {
   user: User;
   userProfile: UserProfile;
@@ -18,15 +21,15 @@ export const ProfileBasicInfo: React.FC<ProfileBasicInfoProps> = ({ user, userPr
 
   const userExpenses = expenses.filter(expense => expense.paidBy.id === user.uid);
   const totalExpensesAdded = userExpenses.length;
-  const totalAmountPaid = userExpenses.reduce((sum, expense) => sum + expense.amount, 0);
+  const currencyOf = useCurrencyOf();
+  // Totals stay per currency: £ and $ are never added together.
+  const totalPaidByCurrency = new Map<string, number>();
+  for (const expense of userExpenses) {
+    const code = currencyOf(expense.groupId);
+    totalPaidByCurrency.set(code, (totalPaidByCurrency.get(code) ?? 0) + toCents(expense.amount));
+  }
 
-  const formatDate = (date: Date) => {
-    return new Intl.DateTimeFormat('en-GB', {
-      day: 'numeric',
-      month: 'long',
-      year: 'numeric'
-    }).format(date);
-  };
+  const formatDate = (date: Date) => formatCalendarDate(date);
 
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat('en-GB', {
@@ -79,8 +82,8 @@ export const ProfileBasicInfo: React.FC<ProfileBasicInfoProps> = ({ user, userPr
               <p className="text-lg sm:text-2xl font-bold text-primary">{totalExpensesAdded}</p>
               <p className="text-xs sm:text-sm text-muted-foreground">Expenses Added</p>
             </div>
-            <div className="text-center p-2 sm:p-3 bg-green-500/10 rounded-lg">
-              <p className="text-lg sm:text-2xl font-bold text-green-600">{formatCurrency(totalAmountPaid)}</p>
+            <div className="text-center p-2 sm:p-3 bg-settled/10 rounded-lg">
+              <p className="text-lg sm:text-2xl font-bold tabular-nums text-settled">{formatTotals(totalPaidByCurrency)}</p>
               <p className="text-xs sm:text-sm text-muted-foreground">Total Paid</p>
             </div>
           </div>
@@ -116,7 +119,7 @@ export const ProfileBasicInfo: React.FC<ProfileBasicInfoProps> = ({ user, userPr
                   </p>
                 </div>
                 <div className="text-right ml-2">
-                  <p className="font-semibold text-sm sm:text-base">{formatCurrency(expense.amount)}</p>
+                  <p className="font-semibold tabular-nums text-sm sm:text-base">{formatAmount(expense.amount, currencyOf(expense.groupId))}</p>
                   <p className="text-xs sm:text-sm text-muted-foreground">{expense.category}</p>
                 </div>
               </div>

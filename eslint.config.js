@@ -24,6 +24,10 @@ export default tseslint.config(
         { allowConstantExport: true },
       ],
       "@typescript-eslint/no-unused-vars": "off",
+      // ~77 existing `any`s; tightened together with strict TypeScript (roadmap phase 4).
+      "@typescript-eslint/no-explicit-any": "warn",
+      // shadcn/ui declares `interface X extends Y {}` for documentation.
+      "@typescript-eslint/no-empty-object-type": ["error", { allowInterfaces: "with-single-extends" }],
     },
   }
 );

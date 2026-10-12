@@ -12,8 +12,8 @@ import { useCommentStore, ExpenseComment } from '@/stores/commentStore';
 import { useAuth } from '@/contexts/AuthContext';
 import { Expense } from '@/stores/expenseStore';
 import { useToast } from '@/hooks/use-toast';
-import { formatDistanceToNow } from 'date-fns';
 
+import { formatDateTime } from "@/lib/dates";
 interface ExpenseCommentsProps {
   expense: Expense;
   isOpen: boolean;
@@ -106,7 +106,7 @@ export const ExpenseComments: React.FC<ExpenseCommentsProps> = ({ expense, isOpe
     const isOwner = user?.uid === comment.userId;
 
     return (
-      <div key={comment.id} className={`${isReply ? 'ml-8 border-l-2 border-gray-200 pl-4' : ''}`}>
+      <div key={comment.id} className={`${isReply ? 'ml-8 border-l-2 border-border pl-4' : ''}`}>
         <Card className="mb-3">
           <CardContent className="p-4">
             <div className="flex items-start justify-between">
@@ -127,7 +127,7 @@ export const ExpenseComments: React.FC<ExpenseCommentsProps> = ({ expense, isOpe
                       </Badge>
                     )}
                     <span className="text-xs text-muted-foreground">
-                      {formatDistanceToNow(new Date(comment.createdAt), { addSuffix: true })}
+                      {formatDateTime(comment.createdAt)}
                     </span>
                   </div>
                   
@@ -153,7 +153,7 @@ export const ExpenseComments: React.FC<ExpenseCommentsProps> = ({ expense, isOpe
                       </div>
                     </div>
                   ) : (
-                    <p className="text-sm text-gray-700 mb-2">{comment.content}</p>
+                    <p className="text-sm text-foreground mb-2">{comment.content}</p>
                   )}
                   
                   {editingComment !== comment.id && (
@@ -161,7 +161,7 @@ export const ExpenseComments: React.FC<ExpenseCommentsProps> = ({ expense, isOpe
                       variant="ghost"
                       size="sm"
                       onClick={() => setReplyingTo(comment.id)}
-                      className="text-xs text-blue-600 h-6 px-2"
+                      className="text-xs text-muted-foreground h-6 px-2"
                     >
                       <Reply className="h-3 w-3 mr-1" />
                       Reply
@@ -177,7 +177,7 @@ export const ExpenseComments: React.FC<ExpenseCommentsProps> = ({ expense, isOpe
                       <MoreVertical className="h-3 w-3" />
                     </Button>
                   </DropdownMenuTrigger>
-                  <DropdownMenuContent align="end" className="bg-white z-50">
+                  <DropdownMenuContent align="end" className="bg-card z-50">
                     <DropdownMenuItem onClick={() => handleEditComment(comment.id, comment.content)}>
                       <Edit className="h-3 w-3 mr-2" />
                       Edit
@@ -189,7 +189,7 @@ export const ExpenseComments: React.FC<ExpenseCommentsProps> = ({ expense, isOpe
                           Delete
                         </DropdownMenuItem>
                       </AlertDialogTrigger>
-                      <AlertDialogContent className="bg-white">
+                      <AlertDialogContent className="bg-card">
                         <AlertDialogHeader>
                           <AlertDialogTitle>Delete Comment</AlertDialogTitle>
                           <AlertDialogDescription>
@@ -200,7 +200,7 @@ export const ExpenseComments: React.FC<ExpenseCommentsProps> = ({ expense, isOpe
                           <AlertDialogCancel>Cancel</AlertDialogCancel>
                           <AlertDialogAction
                             onClick={() => handleDeleteComment(comment.id)}
-                            className="bg-red-600 hover:bg-red-700"
+                            className="bg-destructive hover:bg-destructive"
                           >
                             Delete
                           </AlertDialogAction>
@@ -246,7 +246,7 @@ export const ExpenseComments: React.FC<ExpenseCommentsProps> = ({ expense, isOpe
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="max-w-2xl max-h-[80vh] overflow-hidden bg-white">
+      <DialogContent className="max-w-2xl max-h-[80vh] overflow-hidden bg-card">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <MessageCircle className="h-5 w-5" />

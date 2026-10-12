@@ -1,9 +1,13 @@
 import html2canvas from 'html2canvas';
+import { formatAmount } from '@/lib/money';
 import { jsPDF } from 'jspdf';
 import Chart from 'chart.js/auto';
 
 
-const formatCurrency = (amount: number) => `$${amount.toFixed(2)}`;
+
+/** Escapes user-entered text before it goes into the report's HTML (names, descriptions, categories). */
+const esc = (value: unknown) =>
+  String(value ?? "").replace(/[&<>"']/g, (ch) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[ch] as string);
 
 function getSafeFileName(name: string) {
   return name.replace(/[^a-z0-9]/gi, '_').toLowerCase();
@@ -24,6 +28,9 @@ export default async function exportGroupAnalyticsToPDF({
   categorySpendingData: any[];
   monthlyData: any[];
 }) {
+  // Amounts in the group's own currency.
+  const formatCurrency = (amount: number) => formatAmount(amount, group.settings?.currency ?? "USD");
+
   try {
     // 1. Create a hidden container for the report
     const container = document.createElement('div');
@@ -39,15 +46,15 @@ export default async function exportGroupAnalyticsToPDF({
 
     // 2. Fill the container with HTML content
     container.innerHTML = `
-      <h1 style="text-align:center;color:#2563eb;margin-bottom:0">${group.name}</h1>
+      <h1 style="text-align:center;color:#2563eb;margin-bottom:0">${esc(group.name)}</h1>
 
       <h2 style="text-align:center;color:#64748b;margin-top:4px">Analytics Report</h2>
       <hr style="margin:24px 0;border-color:#e5e7eb" />
       <div style="background:#f0f8ff;border:1px solid #3b82f6;border-radius:8px;padding:16px;margin-bottom:24px">
         <h3 style="margin:0;color:#2563eb">Group Information</h3>
-        <div>Type: <b>${group.groupType || 'Standard'}</b></div>
+        <div>Type: <b>${esc(group.groupType || 'Standard')}</b></div>
         <div>Members: <b>${group.members.length}</b></div>
-        <div>Description: <b>${group.description || 'No description'}</b></div>
+        <div>Description: <b>${esc(group.description || 'No description')}</b></div>
       </div>
       <div style="background:#f8fafc;border:1px solid #64748b;border-radius:8px;padding:16px;margin-bottom:24px">
         <h3 style="margin:0;color:#334155">Summary Metrics</h3>
@@ -77,9 +84,9 @@ export default async function exportGroupAnalyticsToPDF({
   <tbody>
     ${group.members.map((m, i) => `
       <tr style="background: ${i % 2 ? '#fffbeb' : '#ffffff'};">
-        <td style="padding: 10px; border-bottom: 1px solid #fef9c3;">${m.name}</td>
-        <td style="padding: 10px; border-bottom: 1px solid #fef9c3;">${m.email || 'N/A'}</td>
-        <td style="padding: 10px; border-bottom: 1px solid #fef9c3;">${m.role || 'Member'}</td>
+        <td style="padding: 10px; border-bottom: 1px solid #fef9c3;">${esc(m.name)}</td>
+        <td style="padding: 10px; border-bottom: 1px solid #fef9c3;">${esc(m.email || 'N/A')}</td>
+        <td style="padding: 10px; border-bottom: 1px solid #fef9c3;">${esc(m.role || 'Member')}</td>
         <td style="padding: 10px; border-bottom: 1px solid #fef9c3;">${formatCurrency(memberSpendingData.find(md => md.name === m.name)?.amount || 0)}</td>
       </tr>
     `).join('')}
@@ -103,7 +110,7 @@ export default async function exportGroupAnalyticsToPDF({
         <tbody>
             ${memberSpendingData.map((m, i) => `
             <tr style="background: ${i % 2 ? '#f1f5f9' : '#ffffff'};">
-                <td style="padding: 10px; white-space: nowrap; border-bottom: 1px solid #e2e8f0;">${m.name}</td>
+                <td style="padding: 10px; white-space: nowrap; border-bottom: 1px solid #e2e8f0;">${esc(m.name)}</td>
                 <td style="padding: 10px; white-space: nowrap; border-bottom: 1px solid #e2e8f0;">${formatCurrency(m.amount)}</td>
                 <td style="padding: 10px; white-space: nowrap; border-bottom: 1px solid #e2e8f0;">${m.percentage.toFixed(1)}%</td>
             </tr>
@@ -132,7 +139,7 @@ export default async function exportGroupAnalyticsToPDF({
   <tbody>
     ${categorySpendingData.map((c, i) => `
       <tr style="background: ${i % 2 ? '#f0fdf4' : '#ffffff'};">
-        <td style="padding: 10px; border-bottom: 1px solid #d1fae5;">${c.name}</td>
+        <td style="padding: 10px; border-bottom: 1px solid #d1fae5;">${esc(c.name)}</td>
         <td style="padding: 10px; border-bottom: 1px solid #d1fae5;">${formatCurrency(c.amount)}</td>
         <td style="padding: 10px; border-bottom: 1px solid #d1fae5;">${c.percentage.toFixed(1)}%</td>
       </tr>
@@ -162,7 +169,7 @@ export default async function exportGroupAnalyticsToPDF({
         <td style="padding: 10px; border-bottom: 1px solid #e2e8f0;">${m.month}</td>
         <td style="padding: 10px; border-bottom: 1px solid #e2e8f0;">${formatCurrency(m.amount)}</td>
         <td style="padding: 10px; border-bottom: 1px solid #e2e8f0;">${m.count}</td>
-        <td style="padding: 10px; border-bottom: 1px solid #e2e8f0;">${m.count > 0 ? formatCurrency(m.amount / m.count) : '$0.00'}</td>
+        <td style="padding: 10px; border-bottom: 1px solid #e2e8f0;">${m.count > 0 ? formatCurrency(m.amount / m.count) : formatCurrency(0)}</td>
       </tr>
     `).join('')}
   </tbody>
@@ -195,12 +202,12 @@ export default async function exportGroupAnalyticsToPDF({
       .map(
         (e, i) => `
       <tr style="background: ${i % 2 ? '#fdf2f8' : '#ffffff'};">
-        <td style="padding: 8px; border-bottom: 1px solid #fce7f3;">${e.description}</td>
-        <td style="padding: 8px; border-bottom: 1px solid #fce7f3;">${e.category}</td>
+        <td style="padding: 8px; border-bottom: 1px solid #fce7f3;">${esc(e.description)}</td>
+        <td style="padding: 8px; border-bottom: 1px solid #fce7f3;">${esc(e.category)}</td>
         <td style="padding: 8px; border-bottom: 1px solid #fce7f3;">${formatCurrency(e.amount)}</td>
         <td style="padding: 8px; border-bottom: 1px solid #fce7f3;">${new Date(e.date).toLocaleDateString()}</td>
-        <td style="padding: 8px; border-bottom: 1px solid #fce7f3;">${e.paidBy?.name ?? ''}</td>
-        <td style="padding: 8px; border-bottom: 1px solid #fce7f3;">${e.splitType ?? 'Equal'}</td>
+        <td style="padding: 8px; border-bottom: 1px solid #fce7f3;">${esc(e.paidBy?.name ?? '')}</td>
+        <td style="padding: 8px; border-bottom: 1px solid #fce7f3;">${esc(e.splitType ?? 'Equal')}</td>
       </tr>
     `
       )
@@ -215,10 +222,10 @@ export default async function exportGroupAnalyticsToPDF({
 
 <ul style="list-style-type: disc; padding-left: 20px; font-family: Arial, sans-serif; font-size: 14px; color: #1e293b; margin-bottom: 32px;">
   <li style="margin-bottom: 8px;">
-    Highest spender: <b>${memberSpendingData[0]?.name}</b> – <b>${formatCurrency(memberSpendingData[0]?.amount || 0)}</b>
+    Highest spender: <b>${esc(memberSpendingData[0]?.name)}</b> – <b>${formatCurrency(memberSpendingData[0]?.amount || 0)}</b>
   </li>
   <li style="margin-bottom: 8px;">
-    Most expensive category: <b>${categorySpendingData[0]?.name}</b> – <b>${formatCurrency(categorySpendingData[0]?.amount || 0)}</b>
+    Most expensive category: <b>${esc(categorySpendingData[0]?.name)}</b> – <b>${formatCurrency(categorySpendingData[0]?.amount || 0)}</b>
   </li>
   <li style="margin-bottom: 8px;">
     Peak month: <b>${monthlyData.reduce((max, m) => m.amount > max.amount ? m : max, monthlyData[0])?.month}</b> – <b>${formatCurrency(monthlyData.reduce((max, m) => m.amount > max.amount ? m : max, monthlyData[0])?.amount || 0)}</b>
@@ -274,7 +281,7 @@ if (canvasEl) {
           y: {
             beginAtZero: true,
             ticks: {
-              callback: value => `$${value}`
+              callback: value => formatCurrency(Number(value))
             },
             title: {
               display: true,
@@ -321,7 +328,7 @@ if (canvasEl) {
 //       y: {
 //         beginAtZero: true,
 //         ticks: {
-//           callback: value => `$${value}`
+//           callback: value => formatCurrency(Number(value))
 //         },
 //         title: {
 //           display: true,

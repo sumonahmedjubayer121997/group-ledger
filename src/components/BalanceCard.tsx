@@ -1,110 +1,95 @@
 import React, { useState } from "react";
+import { Check } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Balance } from "@/stores/expenseStore";
-import { ArrowRight, DollarSign } from "lucide-react";
 import { SettlementDialog } from "./SettlementDialog";
+import { useAuth } from "@/contexts/AuthContext";
+import { formatMoney } from "@/lib/money";
+import type { DebtView } from "@/stores/useLedger";
 
 interface BalanceCardProps {
-  balances: Balance[];
-  groupId?: string;
+  debts: DebtView[];
+  /** On the dashboard, debts come from several groups. */
+  showGroupName?: boolean;
+  /** Extra line under the list, e.g. settlements that couldn't be counted. */
+  note?: string;
+  /** Without the card frame, e.g. inside a dialog. */
+  bare?: boolean;
+  title?: string;
 }
 
-export const BalanceCard: React.FC<BalanceCardProps> = ({ balances, groupId = '' }) => {
-  const [selectedBalance, setSelectedBalance] = useState<Balance | null>(null);
-  const [isSettlementOpen, setIsSettlementOpen] = useState(false);
+const nameOf = (person: DebtView["fromPerson"]) => `${person.name}${person.isFormer ? " (left)" : ""}`;
 
-  const handleSettleUp = (balance: Balance) => {
-    setSelectedBalance(balance);
-    setIsSettlementOpen(true);
-  };
+/** Who owes whom, one line per debt, each with a "Settle up" button. */
+export const BalanceCard: React.FC<BalanceCardProps> = ({ debts, showGroupName = false, note, bare = false, title = "Balances" }) => {
+  const [selected, setSelected] = useState<DebtView | null>(null);
+  const { user } = useAuth();
+  // Seen from your side: green when you're owed, amber when you owe, plain otherwise.
+  const tone = (debt: DebtView) => (debt.to === user?.uid ? "text-settled" : debt.from === user?.uid ? "text-owes" : "text-foreground");
 
-  const handleCloseSettlement = () => {
-    setIsSettlementOpen(false);
-    setSelectedBalance(null);
-  };
-
-  if (balances.length === 0) {
-    return (
-      <Card className="bg-card/80 backdrop-blur-sm border-border shadow-lg">
-        <CardHeader>
-          <CardTitle className="flex items-center space-x-2 text-card-foreground">
-            <DollarSign className="w-5 h-5 text-green-500" />
-            <span>Balances</span>
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="text-center py-8">
-            <div className="text-4xl mb-2">🎉</div>
-            <p className="text-muted-foreground">All settled up!</p>
-            <p className="text-sm text-muted-foreground/70">
-              No pending balances
-            </p>
-          </div>
-        </CardContent>
-      </Card>
+  const list =
+    debts.length === 0 ? (
+      <div className="flex items-center gap-3 py-4 text-sm text-muted-foreground">
+        <span className="flex h-8 w-8 items-center justify-center rounded-full bg-settled/10 text-settled" aria-hidden="true">
+          <Check className="h-4 w-4" />
+        </span>
+        Everyone's settled up.
+      </div>
+    ) : (
+      <ul className="divide-y">
+        {debts.map((debt) => (
+          <li key={`${debt.groupId}-${debt.from}-${debt.to}`} className="flex items-center justify-between gap-3 py-3 first:pt-0 last:pb-0">
+            <div className="min-w-0">
+              <p className="text-sm">
+                <span className="font-medium">{nameOf(debt.fromPerson)}</span>
+                <span className="text-muted-foreground"> owes </span>
+                <span className="font-medium">{nameOf(debt.toPerson)}</span>
+              </p>
+              {showGroupName && <p className="truncate text-xs text-muted-foreground">{debt.groupName}</p>}
+            </div>
+            <div className="flex shrink-0 items-center gap-3">
+              <span className={`money font-medium ${tone(debt)}`}>{formatMoney(debt.cents, debt.currency)}</span>
+              {!debt.fromPerson.isFormer && !debt.toPerson.isFormer && (
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => setSelected(debt)}
+                  aria-label={`Settle up: ${debt.fromPerson.name} pays ${debt.toPerson.name} ${formatMoney(debt.cents, debt.currency)}`}
+                >
+                  Settle up
+                </Button>
+              )}
+            </div>
+          </li>
+        ))}
+      </ul>
     );
-  }
 
   return (
     <>
-      <Card className="bg-card/80 backdrop-blur-sm border-border shadow-lg">
-        <CardHeader>
-          <CardTitle className="flex items-center space-x-2 text-card-foreground">
-            <DollarSign className="w-5 h-5 text-green-500" />
-            <span>Balances</span>
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="space-y-3">
-            {balances.map((balance, index) => (
-              <div
-                key={index}
-                className="flex items-center justify-between p-3 bg-muted/30 rounded-lg hover:bg-muted/50 transition-colors border border-border/50"
-              >
-                <div className="flex items-center space-x-3">
-                  <div className="w-8 h-8 bg-primary/10 rounded-full flex items-center justify-center border border-primary/20">
-                    <span className="text-primary font-medium text-sm">
-                      {balance.from.name.charAt(0)}
-                    </span>
-                  </div>
-                  <div className="flex items-center space-x-2 text-sm">
-                    <span className="font-medium text-card-foreground">
-                      {balance.from.name}
-                    </span>
-                    <ArrowRight className="w-4 h-4 text-muted-foreground" />
-                    <span className="font-medium text-card-foreground">
-                      {balance.to.name}
-                    </span>
-                  </div>
-                </div>
-                <div className="text-right">
-                  <div className="font-semibold text-destructive">
-                    ${balance.amount.toFixed(2)}
-                  </div>
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    className="mt-1 text-xs border-green-500/30 text-green-500 hover:bg-green-500/10 hover:border-green-500/50 dark:border-green-400/30 dark:text-green-400 dark:hover:bg-green-400/10"
-                    onClick={() => handleSettleUp(balance)}
-                  >
-                    Settle up
-                  </Button>
-                </div>
-              </div>
-            ))}
-          </div>
-        </CardContent>
-      </Card>
+      {bare ? (
+        list
+      ) : (
+        <Card>
+          <CardHeader className="pb-4">
+            <CardTitle className="text-xl">{title}</CardTitle>
+          </CardHeader>
+          <CardContent>
+            {list}
+            {note && <p className="mt-4 text-xs text-muted-foreground">{note}</p>}
+          </CardContent>
+        </Card>
+      )}
 
-      {selectedBalance && (
+      {selected && (
         <SettlementDialog
-          isOpen={isSettlementOpen}
-          onClose={handleCloseSettlement}
-          fromMember={selectedBalance.from}
-          toMember={selectedBalance.to}
-          amount={selectedBalance.amount}
-          groupId={groupId}
+          isOpen={!!selected}
+          onClose={() => setSelected(null)}
+          fromMember={{ id: selected.from, userId: selected.from, name: selected.fromPerson.name, email: selected.fromPerson.email ?? "" }}
+          toMember={{ id: selected.to, userId: selected.to, name: selected.toPerson.name, email: selected.toPerson.email ?? "" }}
+          amount={selected.cents / 100}
+          currency={selected.currency}
+          groupId={selected.groupId}
         />
       )}
     </>

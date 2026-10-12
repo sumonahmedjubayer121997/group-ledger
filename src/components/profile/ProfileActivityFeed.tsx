@@ -5,6 +5,8 @@ import { Badge } from '@/components/ui/badge';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { UserProfile } from '@/contexts/AuthContext';
 import { useExpenseStore } from '@/stores/expenseStore';
+import { useCurrencyOf, useUserBalances } from '@/stores/useLedger';
+import { formatAmount } from '@/lib/money';
 import { useAuth } from '@/contexts/AuthContext';
 import { 
   Activity, 
@@ -18,13 +20,16 @@ import {
   Award
 } from 'lucide-react';
 
+import { formatDateTime } from "@/lib/dates";
 interface ProfileActivityFeedProps {
   userProfile: UserProfile;
 }
 
 export const ProfileActivityFeed: React.FC<ProfileActivityFeedProps> = ({ userProfile }) => {
   const { user } = useAuth();
+  const { youOwe } = useUserBalances(user?.uid);
   const { expenses, groups } = useExpenseStore();
+  const currencyOf = useCurrencyOf();
 
   const userExpenses = expenses.filter(expense => expense.paidBy.id === user?.uid);
   const userGroups = groups.filter(group => 
@@ -38,14 +43,7 @@ export const ProfileActivityFeed: React.FC<ProfileActivityFeedProps> = ({ userPr
     }).format(amount);
   };
 
-  const formatDate = (date: Date) => {
-    return new Intl.DateTimeFormat('en-GB', {
-      day: 'numeric',
-      month: 'short',
-      hour: '2-digit',
-      minute: '2-digit'
-    }).format(date);
-  };
+  const formatDate = (date: Date) => formatDateTime(date);
 
   const getInitials = (name: string) => {
     return name.split(' ').map(n => n[0]).join('').toUpperCase();
@@ -56,11 +54,11 @@ export const ProfileActivityFeed: React.FC<ProfileActivityFeedProps> = ({ userPr
     ...userExpenses.slice(0, 10).map(expense => ({
       id: expense.id,
       type: 'expense',
-      title: `You paid ${formatCurrency(expense.amount)} for ${expense.description}`,
+      title: `You paid ${formatAmount(expense.amount, currencyOf(expense.groupId))} for ${expense.description}`,
       description: `in ${groups.find(g => g.id === expense.groupId)?.name || 'Unknown Group'}`,
       timestamp: expense.date,
       icon: CreditCard,
-      color: 'text-green-600'
+      color: 'text-settled'
     })),
     ...userGroups.slice(0, 5).map(group => ({
       id: group.id,
@@ -69,44 +67,28 @@ export const ProfileActivityFeed: React.FC<ProfileActivityFeedProps> = ({ userPr
       description: `${group.members.length} members`,
       timestamp: group.createdAt,
       icon: Users,
-      color: 'text-blue-600'
+      color: 'text-muted-foreground'
     }))
   ].sort((a, b) => b.timestamp.getTime() - a.timestamp.getTime()).slice(0, 15);
 
-  // Calculate achievements
+  // Badges, only where the app actually knows the answer.
   const achievements = [
     {
-      id: 'on-time-payer',
-      name: 'On-Time Payer',
-      description: 'Settled all debts within 7 days',
-      icon: CheckCircle,
-      earned: userExpenses.length > 5,
-      color: 'text-green-600'
-    },
-    {
       id: 'group-creator',
-      name: 'Group Creator',
-      description: 'Created your first group',
+      name: 'Group creator',
+      description: 'Started a group',
       icon: Users,
-      earned: userGroups.some(g => g.members.find(m => m.id === user?.uid)?.role === 'admin'),
-      color: 'text-blue-600'
+      earned: userGroups.some(g => g.createdBy === user?.uid),
+      color: 'text-muted-foreground'
     },
     {
-      id: 'big-spender',
-      name: 'Big Spender',
-      description: 'Paid over £500 in expenses',
-      icon: Trophy,
-      earned: userExpenses.reduce((sum, e) => sum + e.amount, 0) > 500,
-      color: 'text-yellow-600'
+      id: 'all-square',
+      name: 'All square',
+      description: "You don't owe anyone right now",
+      icon: CheckCircle,
+      earned: youOwe.size === 0,
+      color: 'text-settled'
     },
-    {
-      id: 'debt-free',
-      name: 'Debt-Free',
-      description: 'No outstanding debts',
-      icon: Target,
-      earned: true, // This would need real balance calculation
-      color: 'text-purple-600'
-    }
   ];
 
   return (
@@ -130,27 +112,27 @@ export const ProfileActivityFeed: React.FC<ProfileActivityFeedProps> = ({ userPr
                 <div 
                   key={achievement.id}
                   className={`p-4 rounded-lg border-2 ${
-                    achievement.earned 
-                      ? 'border-primary bg-primary/5' 
-                      : 'border-muted bg-muted/20'
-                  }`}
+ achievement.earned 
+ ? 'border-primary bg-primary/5' 
+ : 'border-muted bg-muted/20'
+ }`}
                 >
                   <div className="flex items-center gap-3">
                     <div className={`p-2 rounded-full ${
-                      achievement.earned 
-                        ? 'bg-primary text-primary-foreground' 
-                        : 'bg-muted text-muted-foreground'
-                    }`}>
+ achievement.earned 
+ ? 'bg-primary text-primary-foreground' 
+ : 'bg-muted text-muted-foreground'
+ }`}>
                       <Icon className="h-5 w-5" />
                     </div>
                     <div className="flex-1">
-                      <h4 className="font-medium">{achievement.name}</h4>
+                      <h3 className="font-medium">{achievement.name}</h3>
                       <p className="text-sm text-muted-foreground">
                         {achievement.description}
                       </p>
                     </div>
                     {achievement.earned && (
-                      <Badge variant="outline" className="text-green-600">
+                      <Badge variant="outline" className="text-settled">
                         Earned
                       </Badge>
                     )}
@@ -209,48 +191,6 @@ export const ProfileActivityFeed: React.FC<ProfileActivityFeedProps> = ({ userPr
         </CardContent>
       </Card>
 
-      {/* Smart Suggestions */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Target className="h-5 w-5" />
-            Smart Suggestions
-          </CardTitle>
-          <CardDescription>
-            Personalized recommendations based on your activity
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="space-y-3">
-            <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg">
-              <p className="text-sm font-medium text-blue-900">
-                💡 You usually split expenses equally with group members
-              </p>
-              <p className="text-sm text-blue-700 mt-1">
-                Consider setting this as your default split method in preferences
-              </p>
-            </div>
-            
-            <div className="p-3 bg-green-50 border border-green-200 rounded-lg">
-              <p className="text-sm font-medium text-green-900">
-                🎯 You're great at settling up quickly!
-              </p>
-              <p className="text-sm text-green-700 mt-1">
-                Your average settlement time is 3 days - keep it up!
-              </p>
-            </div>
-            
-            <div className="p-3 bg-orange-50 border border-orange-200 rounded-lg">
-              <p className="text-sm font-medium text-orange-900">
-                📊 Most of your expenses are in the "Food" category
-              </p>
-              <p className="text-sm text-orange-700 mt-1">
-                Consider creating a "Dining Out" group for easier tracking
-              </p>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
     </div>
   );
 };

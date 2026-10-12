@@ -1,5 +1,6 @@
 
 import React, { useState, useEffect } from 'react';
+import { checkSplit, formatAmount, splitFieldsToSave, toCents, toCurrencyCode } from '@/lib/money';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -16,11 +17,13 @@ import { useToast } from '@/hooks/use-toast';
 interface ExpenseFormProps {
   isOpen: boolean;
   onClose: () => void;
+  /** Pre-selects a group (e.g. when adding from a group page), with you as the payer. */
+  defaultGroupId?: string;
 }
 
 import { useCategoryStore } from '@/stores/categoryStore';
 
-export const ExpenseForm: React.FC<ExpenseFormProps> = ({ isOpen, onClose }) => {
+export const ExpenseForm: React.FC<ExpenseFormProps> = ({ isOpen, onClose, defaultGroupId }) => {
   const { groups, addExpense, loading } = useExpenseStore();
   const { getAllAvailableCategories, initializeDefaultCategories } = useCategoryStore();
   const { user } = useAuth();
@@ -45,6 +48,15 @@ export const ExpenseForm: React.FC<ExpenseFormProps> = ({ isOpen, onClose }) => 
     splitType: 'equal' as 'equal' | 'exact' | 'percentage',
   });
   
+  useEffect(() => {
+    if (!isOpen || !defaultGroupId) return;
+    const group = groups.find(g => g.id === defaultGroupId);
+    if (!group) return;
+    setFormData(prev =>
+      prev.groupId ? prev : { ...prev, groupId: group.id, paidBy: group.members.some(m => m.id === user?.uid) ? user!.uid : '' }
+    );
+  }, [isOpen, defaultGroupId, groups, user]);
+
   const [splitData, setSplitData] = useState<{ [memberId: string]: number }>({});
   const [includeSelf, setIncludeSelf] = useState(true);
 
@@ -60,15 +72,17 @@ export const ExpenseForm: React.FC<ExpenseFormProps> = ({ isOpen, onClose }) => 
       const memberCount = splitAmong.length;
       const amount = parseFloat(formData.amount) || 0;
       
-      if (formData.splitType === 'percentage') {
-        const equalPercentage = memberCount > 0 ? Math.floor(100 / memberCount) : 0;
-        splitAmong.forEach(member => {
-          initialSplitData[member.id] = equalPercentage;
+      // Start from an even split that already adds up exactly (100% / the full bill).
+      if (formData.splitType === 'percentage' && memberCount > 0) {
+        const base = Math.floor(100 / memberCount);
+        splitAmong.forEach((member, i) => {
+          initialSplitData[member.id] = base + (i < 100 - base * memberCount ? 1 : 0);
         });
-      } else if (formData.splitType === 'exact') {
-        const equalAmount = memberCount > 0 ? Number((amount / memberCount).toFixed(2)) : 0;
-        splitAmong.forEach(member => {
-          initialSplitData[member.id] = equalAmount;
+      } else if (formData.splitType === 'exact' && memberCount > 0) {
+        const totalCents = toCents(amount);
+        const base = Math.floor(totalCents / memberCount);
+        splitAmong.forEach((member, i) => {
+          initialSplitData[member.id] = (base + (i < totalCents - base * memberCount ? 1 : 0)) / 100;
         });
       }
       
@@ -103,18 +117,33 @@ export const ExpenseForm: React.FC<ExpenseFormProps> = ({ isOpen, onClose }) => 
       });
       return;
     }
+
+    if (!formData.category) {
+      toast({ title: "Choose a category", description: "Every expense needs a category.", variant: "destructive" });
+      return;
+    }
+
+    const amount = toCents(formData.amount) / 100;
+    const participantIds = splitAmong.map(m => m.id);
+    const check = checkSplit(formData.splitType, amount, splitData, participantIds);
+    if (!check.ok) {
+      toast({ title: "The split doesn't add up", description: check.message, variant: "destructive" });
+      return;
+    }
+    const split = splitFieldsToSave(formData.splitType, amount, splitData, participantIds, selectedPayer.id);
+
     
     try {
       await addExpense({
         description: formData.description,
-        amount: parseFloat(formData.amount),
+        amount,
         paidBy: selectedPayer,
         splitAmong: splitAmong,
         groupId: formData.groupId,
         category: formData.category,
         date: new Date(formData.date),
         splitType: formData.splitType,
-        splitData: formData.splitType !== 'equal' ? splitData : undefined,
+        ...split,
       }, user.uid);
       
       toast({
@@ -149,7 +178,7 @@ export const ExpenseForm: React.FC<ExpenseFormProps> = ({ isOpen, onClose }) => 
       <DialogContent className="w-[95vw] max-w-2xl mx-auto max-h-[90vh] overflow-y-auto">
         <DialogHeader className="px-1 sm:px-0">
           <DialogTitle className="flex items-center space-x-2 text-lg sm:text-xl">
-            <DollarSign className="w-5 h-5 text-blue-500" />
+            <DollarSign className="w-5 h-5 text-muted-foreground" />
             <span>Add New Expense</span>
           </DialogTitle>
         </DialogHeader>
@@ -168,7 +197,7 @@ export const ExpenseForm: React.FC<ExpenseFormProps> = ({ isOpen, onClose }) => 
               />
             </div>
             <div>
-              <Label htmlFor="amount" className="text-sm font-medium">Amount ($)</Label>
+              <Label htmlFor="amount" className="text-sm font-medium">Amount{selectedGroup ? ` (${toCurrencyCode(selectedGroup.settings?.currency)})` : ''}</Label>
               <Input
                 id="amount"
                 type="number"
@@ -185,12 +214,14 @@ export const ExpenseForm: React.FC<ExpenseFormProps> = ({ isOpen, onClose }) => 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
               <Label htmlFor="group" className="text-sm font-medium">Group</Label>
-              <Select value={formData.groupId} onValueChange={(value) => setFormData({ ...formData, groupId: value, paidBy: '' })}>
-                <SelectTrigger className="mt-1">
+              <Select value={formData.groupId} onValueChange={(value) => value && setFormData(prev => ({ ...prev, groupId: value, paidBy: prev.groupId === value ? prev.paidBy : '' }))}>
+                <SelectTrigger id="group" className="mt-1">
                   <SelectValue placeholder="Select a group" />
                 </SelectTrigger>
                 <SelectContent>
-                  {groups.map((group) => (
+                  {groups
+                    .filter((group) => !group.isArchived && group.members.find((m) => m.id === user?.uid)?.role !== 'viewer')
+                    .map((group) => (
                     <SelectItem key={group.id} value={group.id}>
                       <div className="flex items-center space-x-2">
                         <Users className="w-4 h-4" />
@@ -203,8 +234,8 @@ export const ExpenseForm: React.FC<ExpenseFormProps> = ({ isOpen, onClose }) => 
             </div>
             <div>
               <Label htmlFor="paidBy" className="text-sm font-medium">Paid by</Label>
-              <Select value={formData.paidBy} onValueChange={(value) => setFormData({ ...formData, paidBy: value })}>
-                <SelectTrigger className="mt-1">
+              <Select value={formData.paidBy} onValueChange={(value) => value && setFormData(prev => ({ ...prev, paidBy: value }))}>
+                <SelectTrigger id="paidBy" className="mt-1">
                   <SelectValue placeholder="Who paid?" />
                 </SelectTrigger>
                 <SelectContent>
@@ -221,8 +252,8 @@ export const ExpenseForm: React.FC<ExpenseFormProps> = ({ isOpen, onClose }) => 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
               <Label htmlFor="category" className="text-sm font-medium">Category</Label>
-              <Select value={formData.category} onValueChange={(value) => setFormData({ ...formData, category: value })}>
-                <SelectTrigger className="mt-1">
+              <Select value={formData.category} onValueChange={(value) => value && setFormData(prev => ({ ...prev, category: value }))}>
+                <SelectTrigger id="category" className="mt-1">
                   <SelectValue placeholder="Select category" />
                 </SelectTrigger>
                 <SelectContent>
@@ -302,13 +333,13 @@ export const ExpenseForm: React.FC<ExpenseFormProps> = ({ isOpen, onClose }) => 
                 <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center space-y-2 sm:space-y-0">
                   <h4 className="font-medium text-sm sm:text-base">Split Details</h4>
                   {formData.splitType === 'percentage' && (
-                    <span className={`text-sm ${getRemainingAmount() === 0 ? 'text-green-600' : 'text-orange-600'}`}>
+                    <span className={`text-sm ${getRemainingAmount() === 0 ? 'text-settled' : 'text-owes'}`}>
                       Remaining: {getRemainingAmount()}%
                     </span>
                   )}
                   {formData.splitType === 'exact' && (
-                    <span className={`text-sm ${Math.abs(getRemainingAmount()) < 0.01 ? 'text-green-600' : 'text-orange-600'}`}>
-                      Remaining: ${getRemainingAmount().toFixed(2)}
+                    <span className={`text-sm ${Math.abs(getRemainingAmount()) < 0.01 ? 'text-settled' : 'text-owes'}`}>
+                      Remaining: {formatAmount(getRemainingAmount(), selectedGroup?.settings?.currency)}
                     </span>
                   )}
                 </div>
@@ -321,13 +352,14 @@ export const ExpenseForm: React.FC<ExpenseFormProps> = ({ isOpen, onClose }) => 
                         <span className="text-sm text-muted-foreground">
                           {formData.splitType === 'percentage' 
                             ? `${splitData[member.id] || 0}%` 
-                            : `$${(splitData[member.id] || 0).toFixed(2)}`
+                            : formatAmount(splitData[member.id] || 0, selectedGroup?.settings?.currency)
                           }
                         </span>
                       </div>
                       
                       {formData.splitType === 'percentage' ? (
                         <Slider
+                          aria-label={`${member.name}'s percentage`}
                           value={[splitData[member.id] || 0]}
                           onValueChange={([value]) => updateSplitAmount(member.id, value)}
                           max={100}
@@ -337,6 +369,7 @@ export const ExpenseForm: React.FC<ExpenseFormProps> = ({ isOpen, onClose }) => 
                       ) : (
                         <div className="flex flex-col sm:flex-row items-stretch sm:items-center space-y-2 sm:space-y-0 sm:space-x-2">
                           <Slider
+                            aria-label={`${member.name}'s share`}
                             value={[splitData[member.id] || 0]}
                             onValueChange={([value]) => updateSplitAmount(member.id, value)}
                             max={parseFloat(formData.amount) || 100}
@@ -348,6 +381,7 @@ export const ExpenseForm: React.FC<ExpenseFormProps> = ({ isOpen, onClose }) => 
                             step="0.01"
                             value={splitData[member.id] || 0}
                             onChange={(e) => updateSplitAmount(member.id, parseFloat(e.target.value) || 0)}
+                            aria-label={`${member.name}'s share`}
                             className="w-full sm:w-20 text-xs"
                           />
                         </div>
@@ -366,7 +400,7 @@ export const ExpenseForm: React.FC<ExpenseFormProps> = ({ isOpen, onClose }) => 
             <Button 
               type="submit" 
               disabled={loading}
-              className="w-full sm:w-auto bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700"
+              className="w-full sm:w-auto "
             >
               {loading ? 'Adding...' : 'Add Expense'}
             </Button>

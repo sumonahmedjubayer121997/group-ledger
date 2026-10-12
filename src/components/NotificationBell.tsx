@@ -1,263 +1,194 @@
-import { useState, useEffect } from 'react';
-import { Bell, X, Settings, Trash2 } from 'lucide-react';
+import { useEffect, useMemo, useState } from 'react';
+import { Bell, HandCoins, MessageCircle, Receipt, Settings, Trash2, Users, X } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Switch } from '@/components/ui/switch';
+import { Label } from '@/components/ui/label';
 import { useNotificationStore } from '@/stores/notificationStore';
-import { useExpenseStore } from '@/stores/expenseStore';
-import { formatDistanceToNow } from 'date-fns';
-import { toast } from '@/hooks/use-toast';
 import { useAuth } from '@/contexts/AuthContext';
+import { formatDateTime } from '@/lib/dates';
+import type { NotificationPreferences } from '@/types/notifications';
+
+type Kind = keyof NotificationPreferences;
+
+/** Which preference switch covers each notification type. */
+const kindOf = (type: string): Kind => {
+  if (type.startsWith('expense')) return 'expenseNotifications';
+  if (['settlement_made', 'you_owe', 'owes_you', 'payment_reminder', 'overdue_payment', 'recurring_bill'].includes(type))
+    return 'paymentReminders';
+  if (['chat', 'poll', 'task', 'group_updated', 'member_joined', 'member_left', 'role_changed', 'invite_generated', 'settings_updated'].includes(type))
+    return 'groupActivity';
+  return 'systemAlerts';
+};
+
+const icons: Record<Kind, typeof Bell> = {
+  expenseNotifications: Receipt,
+  paymentReminders: HandCoins,
+  groupActivity: Users,
+  systemAlerts: Bell,
+};
+
+const switches: { key: Kind; label: string }[] = [
+  { key: 'expenseNotifications', label: 'New and changed expenses' },
+  { key: 'paymentReminders', label: 'Payments and reminders' },
+  { key: 'groupActivity', label: 'Chat, polls, tasks and members' },
+  { key: 'systemAlerts', label: 'Everything else' },
+];
 
 export const NotificationBell = () => {
   const [showSettings, setShowSettings] = useState(false);
   const [isOpen, setIsOpen] = useState(false);
   const navigate = useNavigate();
   const { user } = useAuth();
-  const { groups, setSelectedGroup } = useExpenseStore();
-
   const {
     notifications,
-    unreadCount,
     preferences,
     markAsRead,
     markAllAsRead,
     removeNotification,
     clearAllNotifications,
     updatePreferences,
-    getRecentNotifications,
     startListening,
     stopListening,
   } = useNotificationStore();
 
-  const recentNotifications = getRecentNotifications(10);
-
   useEffect(() => {
-    if (user?.uid) {
-      startListening(user.uid);
-    }
-    return () => {
-      stopListening();
-    };
+    if (user?.uid) startListening(user.uid);
+    return () => stopListening();
   }, [user?.uid, startListening, stopListening]);
 
-  const handleNotificationClick = (notification: any) => {
-    if (!notification.read) {
-      markAsRead(notification.id);
-    }
-    if (notification.actionUrl) {
-      const url = new URL(notification.actionUrl, window.location.origin);
-      const pathParts = url.pathname.split('/');
-      if (pathParts[1] === 'groups' && pathParts[2]) {
-        const groupId = pathParts[2];
-        const tabParam = url.searchParams.get('tab');
-        const group = groups.find(g => g.id === groupId);
-        if (group) {
-          setSelectedGroup(group);
-          if (tabParam === 'chat') {
-            sessionStorage.setItem('openTab', 'chat');
-          }
-        }
-      } else {
-        navigate(notification.actionUrl);
-      }
-      setIsOpen(false);
-    }
-  };
+  // Only the kinds switched on in the settings are shown and counted.
+  const visible = useMemo(
+    () =>
+      notifications
+        .filter((n) => preferences[kindOf(n.type)] !== false)
+        .sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()),
+    [notifications, preferences]
+  );
+  const unread = visible.filter((n) => !n.read).length;
 
-  const getNotificationIcon = (type: string) => {
-    switch (type) {
-      case 'expense_added':
-      case 'expense_edited':
-      case 'expense_deleted':
-        return '💵';
-      case 'you_owe':
-      case 'owes_you':
-      case 'payment_reminder':
-      case 'overdue_payment':
-        return '💰';
-      case 'recurring_bill':
-        return '⏰';
-      case 'member_joined':
-      case 'member_left':
-      case 'role_changed':
-        return '👥';
-      case 'invite_generated':
-      case 'settings_updated':
-        return '⚙️';
-      default:
-        return '🔔';
+  const open = (notification: (typeof visible)[number]) => {
+    if (!notification.read) markAsRead(notification.id);
+    if (!notification.actionUrl) return;
+    const url = new URL(notification.actionUrl, window.location.origin);
+    const [, section, groupId] = url.pathname.split('/');
+    if (section === 'groups' && groupId) {
+      navigate(url.searchParams.get('tab') === 'chat' ? `/groups/${groupId}?tab=chat` : `/groups/${groupId}`);
+    } else {
+      navigate(url.pathname + url.search);
     }
-  };
-
-  const formatTime = (timestamp: Date) => {
-    return formatDistanceToNow(new Date(timestamp), { addSuffix: true });
+    setIsOpen(false);
   };
 
   return (
     <Popover open={isOpen} onOpenChange={setIsOpen}>
       <PopoverTrigger asChild>
-        <Button
-          variant="ghost"
-          size="sm"
-          className="relative hover:bg-gray-100"
-          onClick={() => setIsOpen(!isOpen)}
-        >
-          <Bell className="h-5 w-5" />
-          {unreadCount > 0 && (
-            <Badge
-              variant="destructive"
-              className="absolute -top-1 -right-1 h-5 w-5 flex items-center justify-center text-xs p-0 min-w-[20px]"
+        <Button variant="ghost" size="icon" className="relative" aria-label={unread ? `Notifications, ${unread} unread` : 'Notifications'}>
+          <Bell aria-hidden="true" />
+          {unread > 0 && (
+            <span
+              className="absolute -right-0.5 -top-0.5 flex h-5 min-w-5 items-center justify-center rounded-full bg-foreground px-1 text-[11px] font-medium text-background"
+              aria-hidden="true"
             >
-              {unreadCount > 99 ? '99+' : unreadCount}
-            </Badge>
+              {unread > 99 ? '99+' : unread}
+            </span>
           )}
         </Button>
       </PopoverTrigger>
 
-      <PopoverContent className="w-80 p-0 bg-white" align="end">
-        <div className="flex items-center justify-between p-4 border-b border-gray-100">
-          <h3 className="font-semibold text-gray-900">Notifications</h3>
-          <div className="flex items-center space-x-2">
+      <PopoverContent className="w-[22rem] max-w-[calc(100vw-2rem)] p-0" align="end" aria-label="Notifications">
+        <div className="flex items-center justify-between border-b px-4 py-3">
+          <h2 className="font-display text-xl">Notifications</h2>
+          <div className="flex items-center gap-1">
             <Button
               variant="ghost"
-              size="sm"
+              size="icon"
+              className="h-8 w-8"
               onClick={() => setShowSettings(!showSettings)}
-              className="hover:bg-gray-100"
+              aria-label="Notification settings"
+              aria-pressed={showSettings}
             >
-              <Settings className="h-4 w-4" />
+              <Settings aria-hidden="true" />
             </Button>
-            {notifications.length > 0 && (
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => {
-                  clearAllNotifications();
-                  toast({ title: "All notifications cleared" });
-                }}
-                className="hover:bg-gray-100"
-              >
-                <Trash2 className="h-4 w-4" />
+            {visible.length > 0 && !showSettings && (
+              <Button variant="ghost" size="icon" className="h-8 w-8" onClick={clearAllNotifications} aria-label="Clear all notifications">
+                <Trash2 aria-hidden="true" />
               </Button>
             )}
           </div>
         </div>
 
         {showSettings ? (
-          <Card className="m-4 border-0 shadow-none bg-white">
-            <CardHeader className="pb-3">
-              <CardTitle className="text-sm text-gray-900">Notification Preferences</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="flex items-center justify-between">
-                <span className="text-sm text-gray-800">Expense Updates</span>
+          <div className="space-y-4 p-4">
+            <p className="text-sm text-muted-foreground">Show notifications about:</p>
+            {switches.map(({ key, label }) => (
+              <div key={key} className="flex items-center justify-between gap-3">
+                <Label htmlFor={`notify-${key}`} className="font-normal">
+                  {label}
+                </Label>
                 <Switch
-                  checked={preferences.expenseNotifications}
-                  onCheckedChange={(checked) =>
-                    updatePreferences({ expenseNotifications: checked })
-                  }
+                  id={`notify-${key}`}
+                  checked={preferences[key] !== false}
+                  onCheckedChange={(checked) => updatePreferences({ [key]: checked })}
                 />
               </div>
-              <div className="flex items-center justify-between">
-                <span className="text-sm text-gray-800">Payment Reminders</span>
-                <Switch
-                  checked={preferences.paymentReminders}
-                  onCheckedChange={(checked) =>
-                    updatePreferences({ paymentReminders: checked })
-                  }
-                />
-              </div>
-              <div className="flex items-center justify-between">
-                <span className="text-sm text-gray-800">Group Activity</span>
-                <Switch
-                  checked={preferences.groupActivity}
-                  onCheckedChange={(checked) =>
-                    updatePreferences({ groupActivity: checked })
-                  }
-                />
-              </div>
-              <div className="flex items-center justify-between">
-                <span className="text-sm text-gray-800">System Alerts</span>
-                <Switch
-                  checked={preferences.systemAlerts}
-                  onCheckedChange={(checked) =>
-                    updatePreferences({ systemAlerts: checked })
-                  }
-                />
-              </div>
-              <Button
-                variant="outline"
-                size="sm"
-                className="w-full"
-                onClick={() => setShowSettings(false)}
-              >
-                Done
-              </Button>
-            </CardContent>
-          </Card>
+            ))}
+            <Button variant="outline" size="sm" className="w-full" onClick={() => setShowSettings(false)}>
+              Done
+            </Button>
+          </div>
         ) : (
           <>
-            {unreadCount > 0 && (
-              <div className="p-3 border-b border-gray-100">
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  className="w-full justify-start text-sm text-gray-700 hover:bg-gray-100"
-                  onClick={() => {
-                    markAllAsRead(user?.uid);
-                    toast({ title: "All notifications marked as read" });
-                  }}
-                >
-                  Mark all as read ({unreadCount})
+            {unread > 0 && (
+              <div className="border-b px-2 py-1.5">
+                <Button variant="ghost" size="sm" className="w-full justify-start" onClick={() => markAllAsRead(user?.uid)}>
+                  Mark all as read ({unread})
                 </Button>
               </div>
             )}
-
-            <ScrollArea className="h-80 bg-white text-black">
-              {recentNotifications.length === 0 ? (
-                <div className="p-8 text-center text-gray-400">
-                  <Bell className="h-8 w-8 mx-auto mb-2 opacity-20" />
-                  <p className="text-sm">No notifications yet</p>
+            <ScrollArea className="h-80">
+              {visible.length === 0 ? (
+                <div className="flex flex-col items-center p-8 text-center text-muted-foreground">
+                  <Bell className="mb-2 h-6 w-6" aria-hidden="true" />
+                  <p className="text-sm">No notifications</p>
                 </div>
               ) : (
-                <div className="divide-y divide-gray-100">
-                  {recentNotifications.map((notification) => (
-                    <div
-                      key={notification.id}
-                      className={`group relative flex items-start gap-3 px-4 py-3 cursor-pointer transition-colors
-                        ${!notification.read ? 'bg-gray-50' : 'bg-white'}
-                        hover:bg-gray-100`}
-                      onClick={() => handleNotificationClick(notification)}
-                    >
-                      <span className="text-xl mt-1 opacity-70">{getNotificationIcon(notification.type)}</span>
-                      <div className="flex-1 min-w-0">
-                        <p className="text-sm font-medium text-gray-900 truncate">{notification.title}</p>
-                        <p className="text-xs text-gray-500 mt-0.5 truncate">{notification.message}</p>
-                        <p className="text-xs text-gray-400 mt-0.5">{formatTime(notification.timestamp)}</p>
-                      </div>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="h-6 w-6 p-0 opacity-0 group-hover:opacity-100 transition-opacity hover:bg-gray-200 hover:text-red-400"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          removeNotification(notification.id);
-                        }}
-                        tabIndex={-1}
-                        aria-label="Remove notification"
-                      >
-                        <X className="h-3 w-3" />
-                      </Button>
-                      {!notification.read && (
-                        <span className="absolute top-3 right-3 h-2 w-2 bg-black rounded-full" />
-                      )}
-                    </div>
-                  ))}
-                </div>
+                <ul className="divide-y">
+                  {visible.slice(0, 30).map((n) => {
+                    const Icon = (n.type as string) === 'chat' ? MessageCircle : icons[kindOf(n.type)];
+                    return (
+                      <li key={n.id} className={`group relative flex items-start ${n.read ? '' : 'bg-secondary/60'}`}>
+                        <button
+                          type="button"
+                          onClick={() => open(n)}
+                          className="flex min-w-0 flex-1 items-start gap-3 px-4 py-3 text-left transition-colors hover:bg-secondary focus-visible:bg-secondary focus-visible:outline-none"
+                        >
+                          <Icon className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground" aria-hidden="true" />
+                          <span className="min-w-0 flex-1">
+                            <span className="block truncate text-sm font-medium">
+                              {!n.read && <span className="sr-only">Unread: </span>}
+                              {n.title}
+                            </span>
+                            <span className="mt-0.5 block truncate text-xs text-muted-foreground">{n.message}</span>
+                            <span className="mt-0.5 block text-xs text-muted-foreground">{formatDateTime(n.timestamp)}</span>
+                          </span>
+                          {!n.read && <span className="mt-1.5 h-2 w-2 shrink-0 rounded-full bg-foreground" aria-hidden="true" />}
+                        </button>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="mr-1 mt-2 h-7 w-7 shrink-0 opacity-0 focus-visible:opacity-100 group-hover:opacity-100"
+                          onClick={() => removeNotification(n.id)}
+                          aria-label={`Remove notification: ${n.title}`}
+                        >
+                          <X aria-hidden="true" />
+                        </Button>
+                      </li>
+                    );
+                  })}
+                </ul>
               )}
             </ScrollArea>
           </>

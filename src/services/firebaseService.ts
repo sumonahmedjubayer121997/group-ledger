@@ -15,14 +15,12 @@ import {
   arrayRemove,
   setDoc,
   deleteField,
+  FieldPath,
 } from "firebase/firestore";
-import { User, getAuth } from "firebase/auth";
-import { db } from "@/lib/firebase";
+import { User, deleteUser } from "firebase/auth";
+import { auth, db } from "@/lib/firebase";
 import { Group, Expense, Member, Settlement } from "@/stores/expenseStore";
 import { Budget } from "@/stores/budgetStore";
-import { findSimilarEmails } from "@/components/firebaseComponents/FindSimilarEmails";
-import { logAllUserEmails } from "@/components/firebaseComponents/LogAllUserEmail";
-import { findSimilarEmailUIDs } from "@/components/firebaseComponents/FindSimilarUIDs";
 // User Profile Interface
 export interface UserProfile {
   uid: string;
@@ -37,6 +35,8 @@ export interface UserProfile {
     theme: string;
     language: string;
     notifications?: boolean;
+    /** Set when the person picks a theme, so their choice follows them to other devices. */
+    themeUpdatedAt?: number;
   };
   stats: {
     groupsJoined: number;
@@ -187,102 +187,236 @@ export const updateUserProfile = async (
   }
 };
 
+export const normalizeEmail = (email: string) => email.trim().toLowerCase();
+
+/**
+ * Path to a member's entry in a group's `users` map. Some older placeholder IDs contain dots, which a
+ * dotted string path ("users.a.b") would treat as nesting, so always address entries with FieldPath.
+ */
+const memberField = (memberId: string, ...rest: string[]) => new FieldPath("users", memberId, ...rest);
+
+/**
+ * Exact-email lookup through `emailIndex/{email}`. The security rules only allow reading a single
+ * entry, so nobody can list every user. People appear here once they sign in with a verified email.
+ */
 export const getUserByEmail = async (
   email: string
 ): Promise<UserProfile | null> => {
   try {
-    const usersRef = collection(db, "users");
-    const q = query(usersRef, where("email", "==", email));
-    const querySnapshot = await getDocs(q);
-
-    if (!querySnapshot.empty) {
-      const userDoc = querySnapshot.docs[0];
-      const data = userDoc.data();
-      return {
-        uid: userDoc.id,
-        ...data,
-        joinedAt: data.joinedAt?.toDate() || new Date(),
-        lastActivity: data.lastActivity?.toDate() || new Date(),
-        stats: {
-          groupsJoined: data.stats?.groupsJoined || 0,
-          totalPaid: data.stats?.totalPaid || 0,
-          totalOwed: data.stats?.totalOwed || 0,
-        },
-        displayName: data.name,
-        emailVerified: data.verified,
-        role: "user" as const,
-        createdAt: data.joinedAt?.toDate() || new Date(),
-        lastLoginAt: data.lastActivity?.toDate() || new Date(),
-      } as UserProfile;
-    }
-
-    return null;
+    const entry = await getDoc(doc(db, "emailIndex", normalizeEmail(email)));
+    if (!entry.exists()) return null;
+    return await getUserProfile(entry.data().uid);
   } catch (error) {
     console.error("Error fetching user by email:", error);
     return null;
   }
 };
 
-export const mergeTemporaryUserWithRealUser = async (realUser: User) => {
-  const userId = realUser.uid;
-  const email = realUser.email;
-  if (!userId || !email) {
-    console.error("❌ mergeTemporaryUserWithRealUser: Missing userId or email");
-    return;
-  }
+/** Publishes the signed-in user's verified email so friends can add them to groups by email. */
+export const registerEmailIndex = async (user: User) => {
+  if (!user.email || !user.emailVerified) return;
+  await setDoc(doc(db, "emailIndex", normalizeEmail(user.email)), {
+    uid: user.uid,
+    updatedAt: serverTimestamp(),
+  });
+};
 
+type InviteDetails = { email: string; tempId: string; role: string; name: string };
+
+/**
+ * Records that someone without an account was added to a group. When they sign in with that
+ * (verified) email, `mergeTemporaryUserWithRealUser` swaps their placeholder for their real account.
+ */
+export const createInvite = async (
+  groupId: string,
+  invite: InviteDetails,
+  invitedBy: string
+) => {
+  const email = normalizeEmail(invite.email);
   if (!email) return;
-  console.log("Merging temp user for:", realUser.email, realUser.uid);
+  await setDoc(doc(db, "invites", `${groupId}_${email}`), {
+    groupId,
+    email,
+    tempId: invite.tempId,
+    role: invite.role || "member",
+    name: invite.name || email,
+    invitedBy,
+    createdAt: serverTimestamp(),
+  });
+};
 
-  // 🔎 STEP 1: Look for any temp user by email
-  const groupsSnapshot = await getDocs(collection(db, "groups"));
-
-  for (const groupDoc of groupsSnapshot.docs) {
-    const groupId = groupDoc.id;
-    const groupData = groupDoc.data();
-    const usersInGroup = groupData.users || {};
-
-    const tempEntry = Object.entries(usersInGroup).find(
-      ([tempId, data]: [string, any]) =>
-        data?.isTemporary && data?.email === email
-    );
-
-    if (tempEntry) {
-      const [tempId, tempUserData] = tempEntry;
-      const groupRef = doc(db, "groups", groupId);
-
-      // ✅ Merge user data
-      await updateDoc(groupRef, {
-        [`users.${userId}`]: {
-          ...(tempUserData as any),
-          isTemporary: false,
-          joinedAt: (tempUserData as any).joinedAt || serverTimestamp(),
-        },
-        [`users.${tempId}`]: deleteField(),
-      });
-
-      // 🔧 Cleanup: remove from 'users' collection if temp profile exists
-      const tempUserRef = doc(db, "users", tempId);
-      const tempUserSnap = await getDoc(tempUserRef);
-      if (tempUserSnap.exists()) {
-        await deleteDoc(tempUserRef);
+/**
+ * Groups created before invites existed have placeholder members with no invite record.
+ * Members create the missing records as they open the app, once per session.
+ */
+const invitesEnsured = new Set<string>();
+export const ensureInvitesForTemporaryMembers = async (
+  groups: { id: string; rawUsers?: Record<string, any> }[],
+  currentUserId: string
+) => {
+  for (const group of groups) {
+    const me = group.rawUsers?.[currentUserId];
+    if (!me || !["admin", "member"].includes(me.role)) continue;
+    for (const [tempId, data] of Object.entries(group.rawUsers || {})) {
+      if (!data?.isTemporary || !data.email) continue;
+      const key = `${group.id}_${normalizeEmail(data.email)}`;
+      if (invitesEnsured.has(key)) continue;
+      invitesEnsured.add(key);
+      try {
+        await createInvite(
+          group.id,
+          { email: data.email, tempId, role: data.role, name: data.name },
+          currentUserId
+        );
+      } catch (error) {
+        console.error("Error recording invite:", error);
       }
-
-      // 🔄 Subcollections update
-      await setDoc(doc(db, "groups", groupId, "members", userId), {
-        role: (tempUserData as any).role,
-        joinedAt: (tempUserData as any).joinedAt || serverTimestamp(),
-      });
-
-      await setDoc(doc(db, "users", userId, "groups", groupId), {
-        groupId,
-        role: (tempUserData as any).role,
-        joinedAt: (tempUserData as any).joinedAt || serverTimestamp(),
-      });
-
-      console.log(`✔️ Merged temp user ${tempId} → real user ${userId}`);
     }
   }
+};
+
+/**
+ * On sign-in, joins every group this person was invited to by email: their placeholder entry is
+ * replaced by their real account. Only verified emails can claim an invite.
+ */
+export const mergeTemporaryUserWithRealUser = async (realUser: User) => {
+  const userId = realUser.uid;
+  if (!userId || !realUser.email || !realUser.emailVerified) return;
+  const email = normalizeEmail(realUser.email);
+
+  const invites = await getDocs(
+    query(collection(db, "invites"), where("email", "==", email))
+  );
+
+  for (const inviteDoc of invites.docs) {
+    const { groupId, tempId, role, name } = inviteDoc.data();
+    try {
+      // Already a member (e.g. added twice): keep the existing entry and role, just drop the placeholder.
+      const existing = await getDoc(doc(db, "groups", groupId)).catch(() => null);
+      if (existing?.exists() && existing.data().users?.[userId]) {
+        await updateDoc(doc(db, "groups", groupId), memberField(tempId), deleteField());
+        await deleteDoc(doc(db, "groups", groupId, "members", tempId)).catch(() => undefined);
+        await deleteDoc(inviteDoc.ref);
+        continue;
+      }
+
+      await updateDoc(
+        doc(db, "groups", groupId),
+        memberField(userId),
+        {
+          name: realUser.displayName || name || email,
+          email,
+          role: role || "member",
+          joinedAt: serverTimestamp(),
+          isTemporary: false,
+        },
+        memberField(tempId),
+        deleteField()
+      );
+
+      // Now a member: finish joining and tidy up the placeholder's records.
+      await setDoc(doc(db, "groups", groupId, "members", userId), {
+        role: role || "member",
+        joinedAt: serverTimestamp(),
+      });
+      await setDoc(doc(db, "users", userId, "groups", groupId), {
+        groupId,
+        role: role || "member",
+        joinedAt: serverTimestamp(),
+      });
+      await deleteDoc(doc(db, "groups", groupId, "members", tempId)).catch(() => undefined);
+      await deleteDoc(doc(db, "users", tempId, "groups", groupId)).catch(() => undefined);
+      await deleteDoc(inviteDoc.ref);
+    } catch (error) {
+      // The placeholder may already have been merged (e.g. on another device); leave the invite for a retry.
+      console.error(`Error joining group ${groupId} from invite:`, error);
+    }
+  }
+};
+
+// ---------- invite links (/join/<code>) ----------
+// inviteCodes/{code} -> { groupId, groupName } exists only while a group allows joining by link
+// (groupType "public"). The security rules check the code against the group's own inviteCode.
+
+export type InviteCodeInfo = { groupId: string; groupName: string };
+
+const isUsableCode = (code?: string) => !!code && code.length >= 16;
+
+/** Makes sure a link-enabled group has a long random code and that the link resolves to it. */
+export const ensureInviteLink = async (group: Pick<Group, "id" | "name" | "inviteCode">) => {
+  let code = group.inviteCode;
+  if (!isUsableCode(code)) {
+    code = crypto.randomUUID();
+    await updateDoc(doc(db, "groups", group.id), { inviteCode: code, updatedAt: serverTimestamp() });
+  }
+  const ref = doc(db, "inviteCodes", code);
+  const current = await getDoc(ref);
+  if (!current.exists() || current.data().groupId !== group.id || current.data().groupName !== group.name) {
+    await setDoc(ref, { groupId: group.id, groupName: group.name, updatedAt: serverTimestamp() });
+  }
+  return code;
+};
+
+/** Turns joining by link on or off. Turning it off makes existing links stop working straight away. */
+export const setLinkJoining = async (group: Pick<Group, "id" | "name" | "inviteCode">, enabled: boolean) => {
+  await updateDoc(doc(db, "groups", group.id), {
+    groupType: enabled ? "public" : "private",
+    updatedAt: serverTimestamp(),
+  });
+  if (enabled) return ensureInviteLink(group);
+  if (group.inviteCode) await deleteDoc(doc(db, "inviteCodes", group.inviteCode)).catch(() => undefined);
+  return group.inviteCode;
+};
+
+/** Replaces the group's code; links shared before stop working. */
+export const regenerateInviteLink = async (group: Pick<Group, "id" | "name" | "inviteCode" | "groupType">) => {
+  const code = crypto.randomUUID();
+  await updateDoc(doc(db, "groups", group.id), { inviteCode: code, updatedAt: serverTimestamp() });
+  if (group.inviteCode) await deleteDoc(doc(db, "inviteCodes", group.inviteCode)).catch(() => undefined);
+  if (group.groupType === "public") {
+    await setDoc(doc(db, "inviteCodes", code), { groupId: group.id, groupName: group.name, updatedAt: serverTimestamp() });
+  }
+  return code;
+};
+
+/** Which group a link opens, or null if the link is wrong or joining by link was turned off. */
+export const lookupInviteCode = async (code: string): Promise<InviteCodeInfo | null> => {
+  if (!isUsableCode(code)) return null;
+  const snap = await getDoc(doc(db, "inviteCodes", code));
+  if (!snap.exists()) return null;
+  const { groupId, groupName } = snap.data();
+  return { groupId, groupName: groupName || "a group" };
+};
+
+/** Adds the signed-in person to a group as a member, using the group's invite link. */
+export const joinGroupWithInviteCode = async (user: User, invite: InviteCodeInfo, code: string) => {
+  const email = normalizeEmail(user.email || "");
+  const profile = await getUserProfile(user.uid).catch(() => null);
+  const name = (profile?.name || user.displayName || email.split("@")[0] || "Member").trim();
+
+  await updateDoc(doc(db, "groups", invite.groupId), memberField(user.uid), {
+    name,
+    email,
+    role: "member",
+    joinedAt: serverTimestamp(),
+    isTemporary: false,
+    inviteCode: code,
+  });
+  await setDoc(doc(db, "groups", invite.groupId, "members", user.uid), {
+    role: "member",
+    joinedAt: serverTimestamp(),
+  });
+  await setDoc(doc(db, "users", user.uid, "groups", invite.groupId), {
+    groupId: invite.groupId,
+    role: "member",
+    joinedAt: serverTimestamp(),
+  });
+  await logGroupActivity(invite.groupId, {
+    type: "member_added",
+    actorId: user.uid,
+    actorName: name,
+    description: "joined with the invite link",
+  }).catch((error) => console.error("Error logging activity:", error));
 };
 
 // Group Operations
@@ -301,7 +435,6 @@ export const createGroup = async (
         "User profile not found, attempting to create it from auth..."
       );
       // Try to get the user from Firebase Auth to create profile
-      const auth = getAuth();
       const currentUser = auth.currentUser;
       if (currentUser) {
         await createUserProfile(currentUser.uid, {
@@ -330,10 +463,6 @@ export const createGroup = async (
       role: "admin",
       joinedAt: serverTimestamp(),
     };
-    findSimilarEmails(groupData.members.map((m) => m.email).join(", "));
-
-    findSimilarEmailUIDs(groupData.members.map((m) => m.email).join(", "));
-
     console.log("🔍 groupData.members", groupData.members);
     console.log("📌 Type:", typeof groupData.members);
     console.log("📌 IsArray?", Array.isArray(groupData.members));
@@ -355,7 +484,7 @@ export const createGroup = async (
       users[memberId] = {
         name,
         email,
-        role: member.role,
+        role: member.role || "member",
         joinedAt: serverTimestamp(),
         isTemporary: !existingUser,
       };
@@ -409,6 +538,17 @@ export const createGroup = async (
     }
 
     await Promise.all(batch);
+
+    // People without an account yet join when they first sign in with this email.
+    for (const [uid, userData] of Object.entries(users)) {
+      if (userData.isTemporary && userData.email) {
+        await createInvite(
+          groupId,
+          { email: userData.email, tempId: uid, role: userData.role, name: userData.name },
+          userId
+        );
+      }
+    }
 
     await updateUserProfile(userId, {
       stats: {
@@ -525,7 +665,7 @@ export const getUserGroups = async (userId: string) => {
     const groupsRef = collection(db, "groups");
     const q = query(
       groupsRef,
-      where(`users.${userId}.role`, "in", ["admin", "member"])
+      where(`users.${userId}.role`, "in", ["admin", "member", "viewer"])
     );
 
     const querySnapshot = await getDocs(q);
@@ -538,8 +678,9 @@ export const getUserGroups = async (userId: string) => {
       console.log("Processing group:", doc.id, data);
 
       // Transform users object to members array
-      const membersArray = Object.entries(data.users || {}).map(
-        ([uid, userData]: [string, any]) => ({
+      const membersArray = Object.entries(data.users || {})
+        .filter(([, userData]) => userData)
+        .map(([uid, userData]: [string, any]) => ({
           userId: uid,
           id: uid,
           name: userData.name || "Unknown",
@@ -606,12 +747,18 @@ export const createExpense = async (
       createdAt: serverTimestamp(),
     };
 
-    // Only add splitData if it's not undefined and not empty
+    // Only add split details when there are some
     if (
       expenseData.splitData &&
       Object.keys(expenseData.splitData).length > 0
     ) {
       (cleanExpenseData as any).splitData = expenseData.splitData;
+    }
+    if (expenseData.splitPercentages) {
+      (cleanExpenseData as any).splitPercentages = expenseData.splitPercentages;
+    }
+    if (expenseData.splitVersion) {
+      (cleanExpenseData as any).splitVersion = expenseData.splitVersion;
     }
 
     console.log("Creating expense with clean data:", cleanExpenseData);
@@ -631,8 +778,12 @@ export const updateExpense = async (
 ) => {
   try {
     const expenseRef = doc(db, "groups", groupId, "expenses", expenseId);
+    // Firestore rejects undefined; an undefined split field means "remove it" (e.g. switched to equal).
+    const cleaned = Object.fromEntries(
+      Object.entries(updates).map(([key, value]) => [key, value === undefined ? deleteField() : value])
+    );
     await updateDoc(expenseRef, {
-      ...updates,
+      ...cleaned,
       updatedAt: serverTimestamp(),
     });
   } catch (error) {
@@ -683,7 +834,7 @@ export const subscribeToUserGroups = (
   const groupsRef = collection(db, "groups");
   const q = query(
     groupsRef,
-    where(`users.${userId}.role`, "in", ["admin", "member"])
+    where(`users.${userId}.role`, "in", ["admin", "member", "viewer"])
   );
 
   return onSnapshot(
@@ -707,8 +858,9 @@ export const subscribeToUserGroups = (
         console.log("👥 Group users structure:", data.users);
 
         // Transform users object to members array
-        const membersArray = Object.entries(data.users || {}).map(
-          ([uid, userData]: [string, any]) => ({
+        const membersArray = Object.entries(data.users || {})
+          .filter(([, userData]) => userData)
+          .map(([uid, userData]: [string, any]) => ({
             userId: uid,
             id: uid,
             name: userData.name || "Unknown",
@@ -742,6 +894,10 @@ export const subscribeToUserGroups = (
       console.log(
         "Firebase groups subscription updated with groups:",
         groups.length
+      );
+      void ensureInvitesForTemporaryMembers(
+        snapshot.docs.map((d) => ({ id: d.id, rawUsers: d.data().users })),
+        userId
       );
       callback(groups);
     },
@@ -793,76 +949,40 @@ export const addMemberToGroup = async (
   userId: string
 ) => {
   try {
-    let userIdToUse = "";
-    let isTemporary = false;
+    const email = normalizeEmail(member.email || "");
+    const role = member.role || "member";
 
-    // 🔍 Step 1: First try to find a similar or exact user
-    const similarUsers = await findSimilarEmailUIDs(member.email);
-    if (similarUsers.length > 0) {
-      userIdToUse = similarUsers[0].uid;
-      isTemporary = false;
-      console.log(`✔️ Similar or existing user found: ${userIdToUse}`);
+    // Exact match only. Someone without an account (or not yet verified) gets a placeholder
+    // entry plus an invite, and joins for real when they sign in with this email.
+    const existingUser = email ? await getUserByEmail(email) : null;
+    const memberId = existingUser?.uid ?? crypto.randomUUID();
+    const isTemporary = !existingUser;
+    const name = (existingUser?.name || member.name || email).trim();
+
+    await updateDoc(doc(db, "groups", groupId), memberField(memberId), {
+      name,
+      email: existingUser?.email || email,
+      role,
+      joinedAt: serverTimestamp(),
+      isTemporary,
+    });
+
+    await setDoc(doc(db, "groups", groupId, "members", memberId), {
+      role,
+      joinedAt: serverTimestamp(),
+    });
+
+    if (isTemporary) {
+      await createInvite(groupId, { email, tempId: memberId, role, name }, userId);
     } else {
-      // 🆕 Generate a UUID for temporary user
-      userIdToUse = crypto.randomUUID();
-      isTemporary = true;
-      console.log(`🆕 Temporary user created with ID: ${userIdToUse}`);
-    }
-
-    // 👤 Step 2: Create user profile if needed
-    let userProfile = await getUserProfile(userIdToUse);
-    if (!userProfile) {
-      await createUserProfile({
-        uid: userIdToUse,
-        email: member.email.trim().toLowerCase(),
-        name: member.name,
-        verified: false,
-        preferences: {
-          currency: "USD",
-          theme: "light",
-          language: "en",
-        },
-      });
-      userProfile = await getUserProfile(userIdToUse);
-    }
-
-    // 👥 Step 3: Add to group's `users` object
-    await updateDoc(doc(db, "groups", groupId), {
-      [`users.${userIdToUse}`]: {
-        name: userProfile.name,
-        email: userProfile.email,
-        role: member.role || "member",
+      await setDoc(doc(db, "users", memberId, "groups", groupId), {
+        groupId,
+        role,
         joinedAt: serverTimestamp(),
-        isTemporary,
-      },
-    });
-
-    // 📂 Step 4: Add to group's `members` subcollection
-    await setDoc(doc(db, "groups", groupId, "members", userIdToUse), {
-      role: member.role || "member",
-      joinedAt: serverTimestamp(),
-    });
-
-    // 🔗 Step 5: Add to user's `groups` subcollection
-    await setDoc(doc(db, "users", userIdToUse, "groups", groupId), {
-      groupId,
-      role: member.role || "member",
-      joinedAt: serverTimestamp(),
-    });
-
-    // 📈 Step 6: Only update stats if it's a real user
-    if (!isTemporary && userProfile) {
-      await updateUserProfile(userIdToUse, {
-        stats: {
-          ...userProfile.stats,
-          groupsJoined: (userProfile.stats?.groupsJoined || 0) + 1,
-        },
       });
     }
-
-    console.log(`✅ Member added to group ${groupId}:`, userProfile.email);
   } catch (error) {
-    console.error("❌ Error adding member to group:", error);
+    console.error("Error adding member to group:", error);
     throw error;
   }
 };
@@ -904,17 +1024,13 @@ export const deleteGroup = async (groupId: string) => {
 export const updateMemberRole = async (
   groupId: string,
   memberId: string,
-  newRole: "admin" | "member"
+  newRole: "admin" | "member" | "viewer"
 ) => {
   try {
-    const memberRef = doc(db, "groups", groupId, "members", memberId);
-    await updateDoc(memberRef, { role: newRole });
-
-    // Also update in the users object
-    const groupRef = doc(db, "groups", groupId);
-    await updateDoc(groupRef, {
-      [`users.${memberId}.role`]: newRole,
-    });
+    // The group's `users` map is what permissions are checked against; the members doc mirrors it
+    // (placeholders added before invites existed may not have one yet).
+    await updateDoc(doc(db, "groups", groupId), memberField(memberId, "role"), newRole);
+    await setDoc(doc(db, "groups", groupId, "members", memberId), { role: newRole }, { merge: true });
   } catch (error) {
     console.error("Error updating member role:", error);
     throw error;
@@ -926,29 +1042,20 @@ export const removeMemberFromGroup = async (
   memberId: string
 ) => {
   try {
-    // Remove from group's users object
     const groupRef = doc(db, "groups", groupId);
-    await updateDoc(groupRef, {
-      [`users.${memberId}`]: null,
-    });
+    const groupSnap = await getDoc(groupRef);
+    const removed = groupSnap.data()?.users?.[memberId];
 
-    // Remove from members subcollection
-    const memberRef = doc(db, "groups", groupId, "members", memberId);
-    await deleteDoc(memberRef);
+    // Delete the key (setting it to null left removed members looking like members).
+    await updateDoc(groupRef, memberField(memberId), deleteField());
 
-    // Remove from user's groups subcollection
-    const userGroupRef = doc(db, "users", memberId, "groups", groupId);
-    await deleteDoc(userGroupRef);
+    await deleteDoc(doc(db, "groups", groupId, "members", memberId));
+    await deleteDoc(doc(db, "users", memberId, "groups", groupId)).catch(() => undefined);
 
-    // Update user stats
-    const userProfile = await getUserProfile(memberId);
-    if (userProfile) {
-      await updateUserProfile(memberId, {
-        stats: {
-          ...userProfile.stats,
-          groupsJoined: Math.max(0, userProfile.stats.groupsJoined - 1),
-        },
-      });
+    if (removed?.isTemporary && removed.email) {
+      await deleteDoc(doc(db, "invites", `${groupId}_${normalizeEmail(removed.email)}`)).catch(
+        () => undefined
+      );
     }
   } catch (error) {
     console.error("Error removing member from group:", error);
@@ -1180,7 +1287,7 @@ export const subscribeToUserAllBudgets = (
   userGroups: Group[],
   callback: (budgets: Budget[]) => void
 ) => {
-  let allBudgets: Budget[] = [];
+  const allBudgets: Budget[] = [];
   let personalBudgets: Budget[] = [];
   let groupBudgets: Budget[] = [];
 
@@ -1249,39 +1356,193 @@ export const createSettlement = async (settlement: Omit<Settlement, 'id'>, group
   }
 };
 
+const toSettlement = (id: string, data: any): Settlement =>
+  ({
+    id,
+    ...data,
+    date: data.date?.toDate ? data.date.toDate() : new Date(data.date ?? Date.now()),
+  }) as Settlement;
+
+const newestFirst = (a: Settlement, b: Settlement) =>
+  new Date(b.date).getTime() - new Date(a.date).getTime();
+
+// Sorted here rather than with orderBy, so the query needs no composite index.
 export const getGroupSettlements = async (groupId: string): Promise<Settlement[]> => {
   try {
-    const q = query(
-      collection(db, 'settlements'),
-      where('groupId', '==', groupId),
-      orderBy('date', 'desc')
+    const snapshot = await getDocs(
+      query(collection(db, "settlements"), where("groupId", "==", groupId))
     );
-    
-    const snapshot = await getDocs(q);
-    return snapshot.docs.map(doc => ({
-      id: doc.id,
-      ...doc.data()
-    } as Settlement));
+    return snapshot.docs.map((d) => toSettlement(d.id, d.data())).sort(newestFirst);
   } catch (error) {
-    console.error('Error fetching group settlements:', error);
+    console.error("Error fetching group settlements:", error);
     return [];
   }
 };
 
-export const subscribeToGroupSettlements = (groupId: string, callback: (settlements: Settlement[]) => void): (() => void) => {
-  const q = query(
-    collection(db, 'settlements'),
-    where('groupId', '==', groupId),
-    orderBy('date', 'desc')
+export const subscribeToGroupSettlements = (
+  groupId: string,
+  callback: (settlements: Settlement[]) => void
+): (() => void) =>
+  onSnapshot(
+    query(collection(db, "settlements"), where("groupId", "==", groupId)),
+    (snapshot) => {
+      callback(snapshot.docs.map((d) => toSettlement(d.id, d.data())).sort(newestFirst));
+    },
+    (error) => {
+      console.error("Error in settlements subscription:", error);
+    }
   );
-  
-  return onSnapshot(q, (snapshot) => {
-    const settlements = snapshot.docs.map(doc => ({
-      id: doc.id,
-      ...doc.data()
-    } as Settlement));
-    callback(settlements);
-  }, (error) => {
-    console.error('Error in settlements subscription:', error);
+
+// ---------- Group activity log ----------
+// Expenses and settlements are their own history; this log records what would otherwise leave no
+// trace: edits, deletions and membership changes.
+
+export type GroupActivityType =
+  | "expense_updated"
+  | "expense_deleted"
+  | "member_added"
+  | "member_removed"
+  | "group_updated";
+
+export type GroupActivityRecord = {
+  id: string;
+  type: GroupActivityType;
+  actorId: string;
+  actorName: string;
+  description: string;
+  createdAt: Date;
+};
+
+export const logGroupActivity = async (
+  groupId: string,
+  activity: Omit<GroupActivityRecord, "id" | "createdAt">
+) => {
+  await addDoc(collection(db, "groups", groupId, "activities"), {
+    ...activity,
+    createdAt: serverTimestamp(),
   });
+};
+
+export const subscribeToGroupActivities = (
+  groupId: string,
+  callback: (activities: GroupActivityRecord[]) => void
+) =>
+  onSnapshot(
+    query(collection(db, "groups", groupId, "activities"), orderBy("createdAt", "desc")),
+    (snapshot) => {
+      callback(
+        snapshot.docs.map((d) => {
+          const data = d.data();
+          return {
+            id: d.id,
+            ...data,
+            createdAt: data.createdAt?.toDate?.() ?? new Date(),
+          } as GroupActivityRecord;
+        })
+      );
+    },
+    (error) => console.error("Error in activity subscription:", error)
+  );
+
+/**
+ * Deletes a group and everything in it: expenses, chat, budgets, settlements, invites. Admin only (the
+ * rules enforce it). Children go first, while the group still exists to prove membership.
+ */
+export const deleteGroupCompletely = async (groupId: string) => {
+  const groupRef = doc(db, "groups", groupId);
+  const snap = await getDoc(groupRef);
+  if (!snap.exists()) return;
+  const data = snap.data();
+  const memberIds = Object.keys(data.users ?? {});
+
+  const subcollections = ["expenses", "members", "messages", "pinnedNotes", "tasks", "polls", "budgets", "activities"];
+  for (const name of subcollections) {
+    const docs = await getDocs(collection(db, "groups", groupId, name));
+    await Promise.all(docs.docs.map((d) => deleteDoc(d.ref)));
+  }
+  const settlements = await getDocs(query(collection(db, "settlements"), where("groupId", "==", groupId)));
+  await Promise.all(settlements.docs.map((d) => deleteDoc(d.ref)));
+  const invites = await getDocs(query(collection(db, "invites"), where("groupId", "==", groupId)));
+  await Promise.all(invites.docs.map((d) => deleteDoc(d.ref)));
+  await Promise.all(
+    memberIds.map((uid) => deleteDoc(doc(db, "users", uid, "groups", groupId)).catch(() => undefined))
+  );
+  if (data.inviteCode) {
+    await deleteDoc(doc(db, "inviteCodes", data.inviteCode)).catch(() => undefined);
+  }
+  await deleteDoc(groupRef);
+};
+
+const joinedMillis = (entry: { joinedAt?: { toMillis?: () => number } }) =>
+  entry?.joinedAt?.toMillis?.() ?? Number.MAX_SAFE_INTEGER;
+
+/**
+ * Deletes the signed-in person's account. Call it right after they confirm who they are (Firebase
+ * only deletes recently signed-in accounts).
+ *
+ * - Groups where nobody else has an account are deleted.
+ * - In shared groups their entry becomes a "(left)" placeholder, so past expenses and everyone else's
+ *   balances stay correct. If they were the only admin, the longest-standing member becomes admin.
+ * - Their profile, group list, personal budgets, notifications and email lookup are deleted, then
+ *   their sign-in.
+ */
+export const deleteMyAccount = async (user: User) => {
+  const uid = user.uid;
+  const groups = await getDocs(
+    query(collection(db, "groups"), where(`users.${uid}.role`, "in", ["admin", "member", "viewer"]))
+  );
+
+  for (const group of groups.docs) {
+    const groupRef = group.ref;
+    const users = (group.data().users ?? {}) as Record<string, any>;
+    const me = users[uid];
+    const others = Object.entries(users).filter(([id, entry]) => id !== uid && entry && !entry.isTemporary);
+
+    if (others.length === 0) {
+      if (me.role === "admin") {
+        await deleteGroupCompletely(group.id);
+        continue;
+      }
+    } else if (me.role === "admin" && !others.some(([, entry]) => entry.role === "admin")) {
+      const [heirId] = others
+        .slice()
+        .sort(([, a], [, b]) => Number(a.role === "viewer") - Number(b.role === "viewer") || joinedMillis(a) - joinedMillis(b))[0];
+      await updateDoc(groupRef, memberField(heirId, "role"), "admin");
+      await setDoc(doc(db, "groups", group.id, "members", heirId), { role: "admin" }, { merge: true });
+    }
+
+    if (me.role !== "viewer") {
+      await logGroupActivity(group.id, {
+        type: "member_removed",
+        actorId: uid,
+        actorName: me.name || "A member",
+        description: "deleted their account and left the group",
+      }).catch(() => undefined);
+    }
+    const name = `${me.name || "Former member"} (left)`;
+    await updateDoc(groupRef, memberField(uid), {
+      name,
+      email: "",
+      role: me.role === "admin" ? "member" : me.role,
+      isTemporary: true,
+      joinedAt: me.joinedAt ?? serverTimestamp(),
+    });
+    if (me.role !== "viewer") {
+      await deleteDoc(doc(db, "groups", group.id, "members", uid)).catch(() => undefined);
+    }
+  }
+
+  const ownCollections = ["groups", "budgets"];
+  for (const name of ownCollections) {
+    const docs = await getDocs(collection(db, "users", uid, name));
+    await Promise.all(docs.docs.map((d) => deleteDoc(d.ref)));
+  }
+  const notifications = await getDocs(query(collection(db, "notifications"), where("to", "==", uid)));
+  await Promise.all(notifications.docs.map((d) => deleteDoc(d.ref)));
+  if (user.email) {
+    await deleteDoc(doc(db, "emailIndex", normalizeEmail(user.email))).catch(() => undefined);
+  }
+  await deleteDoc(doc(db, "users", uid)).catch(() => undefined);
+
+  await deleteUser(user);
 };

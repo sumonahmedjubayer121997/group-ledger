@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { checkSplit, formatAmount, splitFieldsToSave, toCents, toCurrencyCode } from '@/lib/money';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -39,7 +40,10 @@ export const EditExpenseForm: React.FC<EditExpenseFormProps> = ({ expense, isOpe
     splitType: expense.splitType || 'equal' as 'equal' | 'exact' | 'percentage',
   });
   
-  const [splitData, setSplitData] = useState<{ [memberId: string]: number }>(expense.splitData || {});
+  // Percent splits saved since splitVersion 2 keep the percentages separately from the amounts.
+  const initialSplit = () =>
+    (expense.splitType === 'percentage' && expense.splitPercentages ? expense.splitPercentages : expense.splitData) || {};
+  const [splitData, setSplitData] = useState<{ [memberId: string]: number }>(initialSplit);
 
   const selectedGroup = groups.find(g => g.id === expense.groupId);
   const selectedPayer = selectedGroup?.members.find(m => m.id === formData.paidBy);
@@ -55,7 +59,7 @@ export const EditExpenseForm: React.FC<EditExpenseFormProps> = ({ expense, isOpe
       date: new Date(expense.date).toISOString().split('T')[0],
       splitType: expense.splitType || 'equal',
     });
-    setSplitData(expense.splitData || {});
+    setSplitData(initialSplit());
   }, [expense]);
 
   const updateSplitAmount = (memberId: string, value: number) => {
@@ -85,16 +89,34 @@ export const EditExpenseForm: React.FC<EditExpenseFormProps> = ({ expense, isOpe
       });
       return;
     }
+
+    if (!formData.category) {
+      toast({ title: "Choose a category", description: "Every expense needs a category.", variant: "destructive" });
+      return;
+    }
+
+    const amount = toCents(formData.amount) / 100;
+    const participantIds = splitAmong.map(m => m.id);
+    const check = checkSplit(formData.splitType, amount, splitData, participantIds);
+    if (!check.ok) {
+      toast({ title: "The split doesn't add up", description: check.message, variant: "destructive" });
+      return;
+    }
+    const split = splitFieldsToSave(formData.splitType, amount, splitData, participantIds, selectedPayer.id);
+
     
     try {
       await updateExpense(expense.id, {
         description: formData.description,
-        amount: parseFloat(formData.amount),
+        amount,
         paidBy: selectedPayer,
         category: formData.category,
         date: new Date(formData.date),
         splitType: formData.splitType,
-        splitData: formData.splitType !== 'equal' ? splitData : undefined,
+        // undefined removes a field, so switching back to "equal" clears old split details
+        splitData: split.splitData,
+        splitPercentages: split.splitPercentages,
+        splitVersion: split.splitVersion,
       });
       
       toast({
@@ -117,7 +139,7 @@ export const EditExpenseForm: React.FC<EditExpenseFormProps> = ({ expense, isOpe
       <DialogContent className="w-[95vw] max-w-2xl mx-auto max-h-[90vh] overflow-y-auto">
         <DialogHeader className="px-1 sm:px-0">
           <DialogTitle className="flex items-center space-x-2 text-lg sm:text-xl">
-            <Pencil className="w-5 h-5 text-blue-500" />
+            <Pencil className="w-5 h-5 text-muted-foreground" />
             <span>Edit Expense</span>
           </DialogTitle>
         </DialogHeader>
@@ -136,7 +158,7 @@ export const EditExpenseForm: React.FC<EditExpenseFormProps> = ({ expense, isOpe
               />
             </div>
             <div>
-              <Label htmlFor="amount" className="text-sm font-medium">Amount ($)</Label>
+              <Label htmlFor="amount" className="text-sm font-medium">Amount ({toCurrencyCode(selectedGroup?.settings?.currency)})</Label>
               <Input
                 id="amount"
                 type="number"
@@ -154,7 +176,7 @@ export const EditExpenseForm: React.FC<EditExpenseFormProps> = ({ expense, isOpe
             <div>
               <Label htmlFor="paidBy" className="text-sm font-medium">Paid by</Label>
               <Select value={formData.paidBy} onValueChange={(value) => setFormData({ ...formData, paidBy: value })}>
-                <SelectTrigger className="mt-1">
+                <SelectTrigger id="paidBy" className="mt-1">
                   <SelectValue placeholder="Who paid?" />
                 </SelectTrigger>
                 <SelectContent>
@@ -169,7 +191,7 @@ export const EditExpenseForm: React.FC<EditExpenseFormProps> = ({ expense, isOpe
             <div>
               <Label htmlFor="category" className="text-sm font-medium">Category</Label>
               <Select value={formData.category} onValueChange={(value) => setFormData({ ...formData, category: value })}>
-                <SelectTrigger className="mt-1">
+                <SelectTrigger id="category" className="mt-1">
                   <SelectValue placeholder="Select category" />
                 </SelectTrigger>
                 <SelectContent>
@@ -235,13 +257,13 @@ export const EditExpenseForm: React.FC<EditExpenseFormProps> = ({ expense, isOpe
                 <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center space-y-2 sm:space-y-0">
                   <h4 className="font-medium text-sm sm:text-base">Split Details</h4>
                   {formData.splitType === 'percentage' && (
-                    <span className={`text-sm ${getRemainingAmount() === 0 ? 'text-green-600' : 'text-orange-600'}`}>
+                    <span className={`text-sm ${getRemainingAmount() === 0 ? 'text-settled' : 'text-owes'}`}>
                       Remaining: {getRemainingAmount()}%
                     </span>
                   )}
                   {formData.splitType === 'exact' && (
-                    <span className={`text-sm ${Math.abs(getRemainingAmount()) < 0.01 ? 'text-green-600' : 'text-orange-600'}`}>
-                      Remaining: ${getRemainingAmount().toFixed(2)}
+                    <span className={`text-sm ${Math.abs(getRemainingAmount()) < 0.01 ? 'text-settled' : 'text-owes'}`}>
+                      Remaining: {formatAmount(getRemainingAmount(), selectedGroup?.settings?.currency)}
                     </span>
                   )}
                 </div>
@@ -254,13 +276,14 @@ export const EditExpenseForm: React.FC<EditExpenseFormProps> = ({ expense, isOpe
                         <span className="text-sm text-muted-foreground">
                           {formData.splitType === 'percentage' 
                             ? `${splitData[member.id] || 0}%` 
-                            : `$${(splitData[member.id] || 0).toFixed(2)}`
+                            : formatAmount(splitData[member.id] || 0, selectedGroup?.settings?.currency)
                           }
                         </span>
                       </div>
                       
                       {formData.splitType === 'percentage' ? (
                         <Slider
+                          aria-label={`${member.name}'s percentage`}
                           value={[splitData[member.id] || 0]}
                           onValueChange={([value]) => updateSplitAmount(member.id, value)}
                           max={100}
@@ -270,6 +293,7 @@ export const EditExpenseForm: React.FC<EditExpenseFormProps> = ({ expense, isOpe
                       ) : (
                         <div className="flex flex-col sm:flex-row items-stretch sm:items-center space-y-2 sm:space-y-0 sm:space-x-2">
                           <Slider
+                            aria-label={`${member.name}'s share`}
                             value={[splitData[member.id] || 0]}
                             onValueChange={([value]) => updateSplitAmount(member.id, value)}
                             max={parseFloat(formData.amount) || 100}
@@ -281,6 +305,7 @@ export const EditExpenseForm: React.FC<EditExpenseFormProps> = ({ expense, isOpe
                             step="0.01"
                             value={splitData[member.id] || 0}
                             onChange={(e) => updateSplitAmount(member.id, parseFloat(e.target.value) || 0)}
+                            aria-label={`${member.name}'s share`}
                             className="w-full sm:w-20 text-xs"
                           />
                         </div>
@@ -299,7 +324,7 @@ export const EditExpenseForm: React.FC<EditExpenseFormProps> = ({ expense, isOpe
             <Button 
               type="submit" 
               disabled={loading}
-              className="w-full sm:w-auto bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700"
+              className="w-full sm:w-auto "
             >
               {loading ? 'Updating...' : 'Update Expense'}
             </Button>

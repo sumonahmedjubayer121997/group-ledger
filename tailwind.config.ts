@@ -1,4 +1,5 @@
 import type { Config } from "tailwindcss";
+import tailwindcssAnimate from "tailwindcss-animate";
 
 export default {
 	darkMode: ["class"],
@@ -18,7 +19,22 @@ export default {
 			}
 		},
 		extend: {
+			fontFamily: {
+				display: ['"Instrument Serif"', 'Georgia', 'serif'],
+				inter: ['Inter', '"Noto Sans Bengali"', 'system-ui', 'sans-serif']
+			},
 			colors: {
+				lp: {
+					paper: 'var(--lp-paper)',
+					surface: 'var(--lp-surface)',
+					ink: 'var(--lp-ink)',
+					muted: 'var(--lp-muted)',
+					rule: 'var(--lp-rule)',
+					settled: 'var(--lp-settled)',
+					owes: 'var(--lp-owes)'
+				},
+				settled: 'hsl(var(--settled))',
+				owes: 'hsl(var(--owes))',
 				border: 'hsl(var(--border))',
 				input: 'hsl(var(--input))',
 				ring: 'hsl(var(--ring))',
@@ -84,13 +100,18 @@ export default {
 					to: {
 						height: '0'
 					}
+				},
+				'coin-drop': {
+					from: { transform: 'translateY(-36px)', opacity: '0' },
+					to: { transform: 'translateY(0)', opacity: '1' }
 				}
 			},
 			animation: {
 				'accordion-down': 'accordion-down 0.2s ease-out',
-				'accordion-up': 'accordion-up 0.2s ease-out'
+				'accordion-up': 'accordion-up 0.2s ease-out',
+				'coin-drop': 'coin-drop 0.45s cubic-bezier(0.34, 1.56, 0.64, 1) both'
 			}
 		}
 	},
-	plugins: [require("tailwindcss-animate")],
+	plugins: [tailwindcssAnimate],
 } satisfies Config;

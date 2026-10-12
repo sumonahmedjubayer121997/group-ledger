@@ -10,6 +10,7 @@ import { useExpenseStore } from '@/stores/expenseStore';
 import { Member } from '@/stores/expenseStore';
 import { useAuth } from '@/contexts/AuthContext';
 import { v4 as uuidv4 } from 'uuid';
+import { formatAmount } from '@/lib/money';
 
 interface SettlementDialogProps {
   isOpen: boolean;
@@ -17,6 +18,7 @@ interface SettlementDialogProps {
   fromMember: Member;
   toMember: Member;
   amount: number;
+  currency?: string;
   groupId: string;
 }
 
@@ -34,6 +36,7 @@ export const SettlementDialog: React.FC<SettlementDialogProps> = ({
   fromMember,
   toMember,
   amount,
+  currency = "USD",
   groupId
 }) => {
   const { addSettlement } = useExpenseStore();
@@ -76,9 +79,9 @@ export const SettlementDialog: React.FC<SettlementDialogProps> = ({
           <DialogTitle>Record Settlement</DialogTitle>
         </DialogHeader>
         <form onSubmit={handleSubmit} className="space-y-4">
-          <div className="text-sm text-gray-600 bg-gray-50 p-3 rounded-lg">
+          <div className="text-sm text-muted-foreground bg-muted/50 p-3 rounded-lg">
             <p><strong>{fromMember.name}</strong> pays <strong>{toMember.name}</strong></p>
-            <p className="text-lg font-semibold">${amount.toFixed(2)}</p>
+            <p className="text-lg font-semibold tabular-nums">{formatAmount(amount, currency)}</p>
           </div>
 
           <div>

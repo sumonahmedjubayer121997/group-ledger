@@ -15,6 +15,7 @@ import { useExpenseStore } from '@/stores/expenseStore';
 import { format } from 'date-fns';
 import { cn } from '@/lib/utils';
 
+import { formatCalendarDate } from "@/lib/dates";
 interface SearchAndFilterProps {
   onResultsChange?: (results: any) => void;
 }
@@ -154,9 +155,9 @@ export const SearchAndFilter: React.FC<SearchAndFilterProps> = ({ onResultsChang
               {(filters.dateRange.from || filters.dateRange.to) && (
                 <Badge variant="secondary" className="flex items-center gap-1">
                   <Calendar className="h-3 w-3" />
-                  {filters.dateRange.from && format(filters.dateRange.from, 'MMM dd')}
+                  {filters.dateRange.from && formatCalendarDate(filters.dateRange.from)}
                   {filters.dateRange.from && filters.dateRange.to && ' - '}
-                  {filters.dateRange.to && format(filters.dateRange.to, 'MMM dd')}
+                  {filters.dateRange.to && formatCalendarDate(filters.dateRange.to)}
                   <X 
                     className="h-3 w-3 cursor-pointer hover:text-destructive" 
                     onClick={() => updateFilters({ dateRange: { from: null, to: null } })}
@@ -234,7 +235,7 @@ export const SearchAndFilter: React.FC<SearchAndFilterProps> = ({ onResultsChang
                         !filters.dateRange.from && "text-muted-foreground"
                       )}
                     >
-                      {filters.dateRange.from ? format(filters.dateRange.from, "PPP") : "From date"}
+                      {filters.dateRange.from ? formatCalendarDate(filters.dateRange.from) : "From date"}
                     </Button>
                   </PopoverTrigger>
                   <PopoverContent className="w-auto p-0">
@@ -255,7 +256,7 @@ export const SearchAndFilter: React.FC<SearchAndFilterProps> = ({ onResultsChang
                         !filters.dateRange.to && "text-muted-foreground"
                       )}
                     >
-                      {filters.dateRange.to ? format(filters.dateRange.to, "PPP") : "To date"}
+                      {filters.dateRange.to ? formatCalendarDate(filters.dateRange.to) : "To date"}
                     </Button>
                   </PopoverTrigger>
                   <PopoverContent className="w-auto p-0">

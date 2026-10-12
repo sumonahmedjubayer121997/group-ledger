@@ -44,7 +44,7 @@ export const useSearch = (
     const query = searchQuery.toLowerCase().trim();
     
     // Filter expenses
-    let filteredExpenses = expenses.filter((expense) => {
+    const filteredExpenses = expenses.filter((expense) => {
       // Text search
       const matchesQuery = !query || (
         expense.description.toLowerCase().includes(query) ||
@@ -79,7 +79,7 @@ export const useSearch = (
     });
 
     // Filter personal expenses
-    let filteredPersonalExpenses = personalExpenses.filter((expense) => {
+    const filteredPersonalExpenses = personalExpenses.filter((expense) => {
       // Text search
       const matchesQuery = !query || (
         expense.description.toLowerCase().includes(query) ||
@@ -103,7 +103,7 @@ export const useSearch = (
     });
 
     // Filter groups
-    let filteredGroups = groups.filter((group) => {
+    const filteredGroups = groups.filter((group) => {
       const matchesQuery = !query || (
         group.name.toLowerCase().includes(query) ||
         group.description?.toLowerCase().includes(query) ||
@@ -116,7 +116,7 @@ export const useSearch = (
     });
 
     // Filter members
-    let filteredMembers = allMembers.filter((member) => {
+    const filteredMembers = allMembers.filter((member) => {
       const matchesQuery = !query || (
         member.name.toLowerCase().includes(query) ||
         member.email.toLowerCase().includes(query)

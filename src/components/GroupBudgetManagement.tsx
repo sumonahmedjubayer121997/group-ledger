@@ -184,20 +184,26 @@ export const GroupBudgetManagement: React.FC<GroupBudgetManagementProps> = ({
 
   const getBudgetStatus = (usage: any) => {
     if (usage.isOverBudget) {
-      return { status: "over", color: "text-red-600", icon: AlertTriangle };
+      return { status: "over", color: "text-destructive", icon: AlertTriangle };
     } else if (usage.isNearLimit) {
       return {
         status: "warning",
-        color: "text-yellow-600",
+        color: "text-owes",
         icon: AlertTriangle,
       };
     } else {
-      return { status: "good", color: "text-green-600", icon: CheckCircle };
+      return { status: "good", color: "text-settled", icon: CheckCircle };
     }
   };
 
   return (
-    <Dialog open={isOpen} onOpenChange={setIsOpen}>
+    <Dialog
+      open={isOpen}
+      onOpenChange={(open) => {
+        setIsOpen(open);
+        if (!open) onBudgetEdited?.();
+      }}
+    >
       <DialogTrigger asChild>{children}</DialogTrigger>
       <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
@@ -343,9 +349,9 @@ export const GroupBudgetManagement: React.FC<GroupBudgetManagementProps> = ({
             <CardContent>
               {groupBudgets.length === 0 ? (
                 <div className="text-center py-8">
-                  <Target className="w-12 h-12 text-gray-400 mx-auto mb-3" />
-                  <p className="text-gray-500">No budgets created yet</p>
-                  <p className="text-sm text-gray-400">
+                  <Target className="w-12 h-12 text-muted-foreground mx-auto mb-3" />
+                  <p className="text-muted-foreground">No budgets created yet</p>
+                  <p className="text-sm text-muted-foreground">
                     Create your first budget to start tracking spending
                   </p>
                 </div>
@@ -368,7 +374,7 @@ export const GroupBudgetManagement: React.FC<GroupBudgetManagementProps> = ({
                               />
                               <div>
                                 <h3 className="font-semibold">{budget.name}</h3>
-                                <p className="text-sm text-gray-600">
+                                <p className="text-sm text-muted-foreground">
                                   {budget.category === "overall"
                                     ? "Overall Budget"
                                     : budget.category || "Overall"}{" "}
@@ -400,7 +406,7 @@ export const GroupBudgetManagement: React.FC<GroupBudgetManagementProps> = ({
                                   <Button
                                     variant="ghost"
                                     size="sm"
-                                    className="text-red-600"
+                                    className="text-destructive"
                                   >
                                     <Trash2 className="w-4 h-4" />
                                   </Button>
@@ -423,7 +429,7 @@ export const GroupBudgetManagement: React.FC<GroupBudgetManagementProps> = ({
                                       onClick={() =>
                                         handleDeleteBudget(budget.id)
                                       }
-                                      className="bg-red-600 hover:bg-red-700"
+                                      className="bg-destructive hover:bg-destructive"
                                     >
                                       Delete
                                     </AlertDialogAction>
@@ -450,7 +456,7 @@ export const GroupBudgetManagement: React.FC<GroupBudgetManagementProps> = ({
                                 className="h-2"
                               />
                               <div className="flex justify-between items-center">
-                                <span className="text-sm text-gray-600">
+                                <span className="text-sm text-muted-foreground">
                                   {usage.percentage.toFixed(1)}% used
                                 </span>
                                 {usage.isOverBudget && (
@@ -464,7 +470,7 @@ export const GroupBudgetManagement: React.FC<GroupBudgetManagementProps> = ({
                                 {usage.isNearLimit && !usage.isOverBudget && (
                                   <Badge
                                     variant="outline"
-                                    className="text-yellow-600 text-xs"
+                                    className="text-owes text-xs"
                                   >
                                     Near Limit
                                   </Badge>

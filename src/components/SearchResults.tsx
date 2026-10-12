@@ -15,7 +15,9 @@ import {
 } from "lucide-react";
 import { Expense, Group, Member } from "@/stores/expenseStore";
 import { useExpenseStore } from "@/stores/expenseStore";
-import { format, formatDistanceToNow } from "date-fns";
+import { useCurrencyOf } from "@/stores/useLedger";
+import { formatAmount } from "@/lib/money";
+import { formatDate } from "@/lib/dates";
 
 interface SearchResultsProps {
   expenses: Expense[];
@@ -31,12 +33,11 @@ export const SearchResults: React.FC<SearchResultsProps> = ({
   searchQuery,
 }) => {
   const { setSelectedGroup } = useExpenseStore();
+  const allGroups = useExpenseStore((s) => s.groups);
+  const currencyOf = useCurrencyOf();
 
-  // Helper function to get group name by groupId
-  const getGroupName = (groupId: string) => {
-    const group = groups.find((g) => g.id === groupId);
-    return group ? group.name : `Group ${groupId}`;
-  };
+  // Look names up in all of the user's groups, not just the groups that matched the search.
+  const getGroupName = (groupId: string) => allGroups.find((g) => g.id === groupId)?.name ?? "Unknown group";
 
   const totalResults = expenses.length + groups.length + members.length;
 
@@ -97,7 +98,7 @@ export const SearchResults: React.FC<SearchResultsProps> = ({
               {expenses.map((expense) => (
                 <Card
                   key={expense.id}
-                  className="hover:shadow-md transition-shadow"
+                  className="transition-shadow"
                 >
                   <CardContent className="p-4">
                     <div className="flex items-start justify-between">
@@ -113,7 +114,7 @@ export const SearchResults: React.FC<SearchResultsProps> = ({
                         <div className="space-y-1 text-sm text-muted-foreground">
                           <div className="flex items-center gap-2">
                             <User className="h-3 w-3" />
-                            <span>Paid by X{expense.paidBy.name}</span>
+                            <span>Paid by {expense.paidBy.name}</span>
                           </div>
                           <div className="flex items-center gap-2">
                             <GroupIcon className="h-3 w-3" />
@@ -122,11 +123,7 @@ export const SearchResults: React.FC<SearchResultsProps> = ({
                           <div className="flex items-center gap-2">
                             <Calendar className="h-3 w-3" />
                             <span>
-                              {format(new Date(expense.date), "PPP")} (
-                              {formatDistanceToNow(new Date(expense.date), {
-                                addSuffix: true,
-                              })}
-                              )
+                              {formatDate(expense.date)}
                             </span>
                           </div>
                           <div className="flex items-center gap-2">
@@ -141,8 +138,7 @@ export const SearchResults: React.FC<SearchResultsProps> = ({
 
                       <div className="text-right">
                         <div className="flex items-center gap-1 text-lg font-bold">
-                          <DollarSign className="h-4 w-4" />
-                          {expense.amount.toFixed(2)}
+                          {formatAmount(expense.amount, currencyOf(expense.groupId))}
                         </div>
                       </div>
                     </div>
@@ -165,7 +161,7 @@ export const SearchResults: React.FC<SearchResultsProps> = ({
               {groups.map((group) => (
                 <Card
                   key={group.id}
-                  className="hover:shadow-md transition-shadow"
+                  className="transition-shadow"
                 >
                   <CardContent className="p-4">
                     <div className="flex items-start justify-between">
@@ -239,7 +235,7 @@ export const SearchResults: React.FC<SearchResultsProps> = ({
               {members.map((member) => (
                 <Card
                   key={member.id}
-                  className="hover:shadow-md transition-shadow"
+                  className="transition-shadow"
                 >
                   <CardContent className="p-4">
                     <div className="flex items-center gap-3">

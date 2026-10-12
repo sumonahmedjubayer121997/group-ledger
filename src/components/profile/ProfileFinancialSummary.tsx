@@ -9,65 +9,95 @@ import { UserProfile } from '@/contexts/AuthContext';
 import { useExpenseStore } from '@/stores/expenseStore';
 import { usePersonalExpenseStore } from '@/stores/personalExpenseStore';
 import { useAuth } from '@/contexts/AuthContext';
-import { PersonalBudgetTracker } from '@/components/PersonalBudgetTracker';
+import { useUserBalances } from '@/stores/useLedger';
+import { formatMoney, formatTotals, toCents, toCurrencyCode } from '@/lib/money';
 
+import { formatCalendarDate } from "@/lib/dates";
 interface ProfileFinancialSummaryProps {
   userProfile: UserProfile;
 }
 
+const addTo = (totals: Map<string, number>, currency: string, cents: number) =>
+  totals.set(currency, (totals.get(currency) ?? 0) + cents);
+
+const csvCell = (value: unknown) => `"${String(value ?? '').replace(/"/g, '""')}"`;
+
+/** "You're owed £269.46" / "You owe $12.00", one line per currency. */
+const BalanceLines: React.FC<{ owedToYou: Map<string, number>; youOwe: Map<string, number> }> = ({ owedToYou, youOwe }) => {
+  if (owedToYou.size === 0 && youOwe.size === 0) {
+    return (
+      <div>
+        <p className="text-3xl font-bold text-settled">Settled</p>
+        <p className="text-muted-foreground">Nobody owes anything</p>
+      </div>
+    );
+  }
+  return (
+    <div className="space-y-2">
+      {owedToYou.size > 0 && (
+        <div>
+          <p className="text-2xl font-bold tabular-nums text-settled">{formatTotals(owedToYou)}</p>
+          <p className="text-muted-foreground">You're owed</p>
+        </div>
+      )}
+      {youOwe.size > 0 && (
+        <div>
+          <p className="text-2xl font-bold tabular-nums text-destructive">{formatTotals(youOwe)}</p>
+          <p className="text-muted-foreground">You owe</p>
+        </div>
+      )}
+    </div>
+  );
+};
+
 export const ProfileFinancialSummary: React.FC<ProfileFinancialSummaryProps> = ({ userProfile }) => {
   const { user } = useAuth();
-  const { expenses, calculateBalances } = useExpenseStore();
-  const { getTotalPersonalSpending, getPersonalSpendingByCategory } = usePersonalExpenseStore();
+  const { expenses, groups } = useExpenseStore();
+  const { getTotalPersonalSpending } = usePersonalExpenseStore();
+  const { owedToYou, youOwe } = useUserBalances(user?.uid);
 
-  const balances = calculateBalances();
-  const userBalance = balances[user?.uid || ''] || 0;
-  const isOwed = userBalance > 0;
-  const owes = userBalance < 0;
+  const currencyOfGroup = new Map(groups.map((g) => [g.id, toCurrencyCode(g.settings?.currency)]));
+  const groupName = new Map(groups.map((g) => [g.id, g.name]));
+  const personalCurrency = toCurrencyCode(userProfile.preferences?.currency);
 
-  const formatCurrency = (amount: number) => {
-    return new Intl.NumberFormat('en-GB', {
-      style: 'currency',
-      currency: userProfile.preferences?.currency || 'GBP'
-    }).format(Math.abs(amount));
-  };
-
-  // Group expenses (existing functionality)
+  // What you paid in groups, per currency
   const userGroupExpenses = expenses.filter(expense => expense.paidBy.id === user?.uid);
-  const totalGroupPaid = userGroupExpenses.reduce((sum, expense) => sum + expense.amount, 0);
+  const groupPaid = new Map<string, number>();
+  for (const e of userGroupExpenses) addTo(groupPaid, currencyOfGroup.get(e.groupId) ?? 'USD', toCents(e.amount));
 
-  // Personal expenses (new functionality)
-  const totalPersonalSpending = user ? getTotalPersonalSpending(user.uid) : 0;
-  const personalSpendingByCategory = user ? getPersonalSpendingByCategory(user.uid) : {};
+  // Personal expenses use your preferred currency
+  const personalCents = toCents(user ? getTotalPersonalSpending(user.uid) : 0);
 
-  // Calculate spending by category for group expenses
-  const groupCategorySpending = userGroupExpenses.reduce((acc, expense) => {
-    acc[expense.category] = (acc[expense.category] || 0) + expense.amount;
-    return acc;
-  }, {} as Record<string, number>);
+  const totalSpending = new Map(groupPaid);
+  if (personalCents) addTo(totalSpending, personalCurrency, personalCents);
 
-  const topGroupCategories = Object.entries(groupCategorySpending)
-    .sort(([, a], [, b]) => b - a)
-    .slice(0, 5);
-
-  const topPersonalCategories = Object.entries(personalSpendingByCategory)
-    .sort(([, a], [, b]) => b - a)
-    .slice(0, 5);
+  // Group spending by category, kept per currency
+  const categoryRows = new Map<string, { category: string; currency: string; cents: number }>();
+  for (const e of userGroupExpenses) {
+    const currency = currencyOfGroup.get(e.groupId) ?? 'USD';
+    const category = e.category?.trim() || 'Uncategorised';
+    const key = `${currency}|${category}`;
+    const row = categoryRows.get(key) ?? { category, currency, cents: 0 };
+    row.cents += toCents(e.amount);
+    categoryRows.set(key, row);
+  }
+  const topGroupCategories = [...categoryRows.values()].sort((a, b) => b.cents - a.cents).slice(0, 5);
+  const largestIn = (currency: string) =>
+    Math.max(1, ...topGroupCategories.filter((r) => r.currency === currency).map((r) => r.cents));
 
   const handleExportGroupData = () => {
-    // Create CSV content for group expenses
     const csvContent = [
-      ['Date', 'Description', 'Amount', 'Category', 'Group'],
+      ['Date', 'Description', 'Amount', 'Currency', 'Category', 'Group'],
       ...userGroupExpenses.map(expense => [
-        expense.date.toLocaleDateString(),
+        formatCalendarDate(expense.date),
         expense.description,
-        expense.amount.toString(),
+        (toCents(expense.amount) / 100).toFixed(2),
+        currencyOfGroup.get(expense.groupId) ?? '',
         expense.category,
-        expense.groupId
+        groupName.get(expense.groupId) ?? expense.groupId,
       ])
-    ].map(row => row.join(',')).join('\n');
+    ].map(row => row.map(csvCell).join(',')).join('\n');
 
-    // Download CSV
     const blob = new Blob([csvContent], { type: 'text/csv' });
     const url = window.URL.createObjectURL(blob);
     const a = document.createElement('a');
@@ -79,9 +109,8 @@ export const ProfileFinancialSummary: React.FC<ProfileFinancialSummaryProps> = (
 
   return (
     <Tabs defaultValue="overview" className="space-y-6">
-      <TabsList className="grid w-full grid-cols-3">
+      <TabsList>
         <TabsTrigger value="overview">Overview</TabsTrigger>
-        <TabsTrigger value="personal">Personal Budget</TabsTrigger>
         <TabsTrigger value="groups">Group Activity</TabsTrigger>
       </TabsList>
 
@@ -94,26 +123,7 @@ export const ProfileFinancialSummary: React.FC<ProfileFinancialSummaryProps> = (
             </CardHeader>
             <CardContent>
               <div className="text-center">
-                {userBalance === 0 ? (
-                  <div>
-                    <p className="text-3xl font-bold text-green-600">£0.00</p>
-                    <p className="text-muted-foreground">All settled up!</p>
-                  </div>
-                ) : isOwed ? (
-                  <div>
-                    <p className="text-3xl font-bold text-green-600">
-                      +{formatCurrency(userBalance)}
-                    </p>
-                    <p className="text-muted-foreground">You're owed</p>
-                  </div>
-                ) : (
-                  <div>
-                    <p className="text-3xl font-bold text-red-600">
-                      -{formatCurrency(userBalance)}
-                    </p>
-                    <p className="text-muted-foreground">You owe</p>
-                  </div>
-                )}
+                <BalanceLines owedToYou={owedToYou} youOwe={youOwe} />
               </div>
             </CardContent>
           </Card>
@@ -127,7 +137,7 @@ export const ProfileFinancialSummary: React.FC<ProfileFinancialSummaryProps> = (
             </CardHeader>
             <CardContent>
               <div className="text-center">
-                <p className="text-3xl font-bold">{formatCurrency(totalGroupPaid)}</p>
+                <p className="text-2xl font-bold tabular-nums">{formatTotals(groupPaid)}</p>
                 <p className="text-muted-foreground">{userGroupExpenses.length} transactions</p>
               </div>
             </CardContent>
@@ -142,7 +152,7 @@ export const ProfileFinancialSummary: React.FC<ProfileFinancialSummaryProps> = (
             </CardHeader>
             <CardContent>
               <div className="text-center">
-                <p className="text-3xl font-bold">{formatCurrency(totalPersonalSpending)}</p>
+                <p className="text-2xl font-bold tabular-nums">{formatMoney(personalCents, personalCurrency)}</p>
                 <p className="text-muted-foreground">Personal budget</p>
               </div>
             </CardContent>
@@ -154,16 +164,12 @@ export const ProfileFinancialSummary: React.FC<ProfileFinancialSummaryProps> = (
             </CardHeader>
             <CardContent>
               <div className="text-center">
-                <p className="text-3xl font-bold">{formatCurrency(totalGroupPaid + totalPersonalSpending)}</p>
+                <p className="text-2xl font-bold tabular-nums">{formatTotals(totalSpending)}</p>
                 <p className="text-muted-foreground">Combined total</p>
               </div>
             </CardContent>
           </Card>
         </div>
-      </TabsContent>
-
-      <TabsContent value="personal" className="space-y-6">
-        <PersonalBudgetTracker />
       </TabsContent>
 
       <TabsContent value="groups" className="space-y-6">
@@ -175,26 +181,7 @@ export const ProfileFinancialSummary: React.FC<ProfileFinancialSummaryProps> = (
             </CardHeader>
             <CardContent>
               <div className="text-center">
-                {userBalance === 0 ? (
-                  <div>
-                    <p className="text-3xl font-bold text-green-600">£0.00</p>
-                    <p className="text-muted-foreground">All settled up!</p>
-                  </div>
-                ) : isOwed ? (
-                  <div>
-                    <p className="text-3xl font-bold text-green-600">
-                      +{formatCurrency(userBalance)}
-                    </p>
-                    <p className="text-muted-foreground">You're owed</p>
-                  </div>
-                ) : (
-                  <div>
-                    <p className="text-3xl font-bold text-red-600">
-                      -{formatCurrency(userBalance)}
-                    </p>
-                    <p className="text-muted-foreground">You owe</p>
-                  </div>
-                )}
+                <BalanceLines owedToYou={owedToYou} youOwe={youOwe} />
               </div>
             </CardContent>
           </Card>
@@ -208,7 +195,7 @@ export const ProfileFinancialSummary: React.FC<ProfileFinancialSummaryProps> = (
             </CardHeader>
             <CardContent>
               <div className="text-center">
-                <p className="text-3xl font-bold">{formatCurrency(totalGroupPaid)}</p>
+                <p className="text-2xl font-bold tabular-nums">{formatTotals(groupPaid)}</p>
                 <p className="text-muted-foreground">{userGroupExpenses.length} transactions</p>
               </div>
             </CardContent>
@@ -240,20 +227,17 @@ export const ProfileFinancialSummary: React.FC<ProfileFinancialSummaryProps> = (
           </CardHeader>
           <CardContent>
             <div className="space-y-4">
-              {topGroupCategories.map(([category, amount]) => {
-                const percentage = (amount / totalGroupPaid) * 100;
-                return (
-                  <div key={category} className="space-y-2">
-                    <div className="flex justify-between items-center">
-                      <span className="font-medium">{category}</span>
-                      <span className="text-sm text-muted-foreground">
-                        {formatCurrency(amount)} ({percentage.toFixed(1)}%)
-                      </span>
-                    </div>
-                    <Progress value={percentage} className="h-2" />
+              {topGroupCategories.map((row) => (
+                <div key={`${row.currency}-${row.category}`} className="space-y-2">
+                  <div className="flex justify-between items-center">
+                    <span className="font-medium">{row.category}</span>
+                    <span className="text-sm tabular-nums text-muted-foreground">
+                      {formatMoney(row.cents, row.currency)}
+                    </span>
                   </div>
-                );
-              })}
+                  <Progress value={(row.cents / largestIn(row.currency)) * 100} className="h-2" />
+                </div>
+              ))}
               {topGroupCategories.length === 0 && (
                 <p className="text-center text-muted-foreground py-8">
                   No group spending data available

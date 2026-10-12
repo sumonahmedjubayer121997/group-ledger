@@ -165,8 +165,8 @@ export const GroupPictureUpload: React.FC<GroupPictureUploadProps> = ({
   return (
     <Dialog open={isOpen} onOpenChange={handleDialogOpenChange}>
       <DialogTrigger asChild>
-        <Button size="sm" variant="outline" className="rounded-full">
-          <Camera className="h-4 w-4" />
+        <Button size="sm" variant="outline" className="rounded-full" aria-label={type === 'coverImage' ? 'Change cover image' : 'Change group photo'}>
+          <Camera className="h-4 w-4" aria-hidden="true" />
         </Button>
       </DialogTrigger>
       <DialogContent className="sm:max-w-[500px] max-h-[80vh] overflow-y-auto">
@@ -252,9 +252,9 @@ export const GroupPictureUpload: React.FC<GroupPictureUploadProps> = ({
                         type="button"
                         onClick={() => handleDefaultSelect(imageId)}
                         className={`rounded-full border-2 transition-all ${
-                          selectedImage === `https://images.unsplash.com/${imageId}?w=150&h=150&fit=crop&crop=face`
+ selectedImage === `https://images.unsplash.com/${imageId}?w=150&h=150&fit=crop&crop=face`
                             ? 'border-primary'
-                            : 'border-transparent hover:border-gray-300'
+                            : 'border-transparent hover:border-border'
                         }`}
                       >
                         <Avatar className="h-16 w-16">
@@ -274,9 +274,9 @@ export const GroupPictureUpload: React.FC<GroupPictureUploadProps> = ({
                         type="button"
                         onClick={() => handleDefaultSelect(imageId)}
                         className={`rounded-full border-2 transition-all ${
-                          selectedImage === `https://images.unsplash.com/${imageId}?w=150&h=150&fit=crop&crop=face`
+ selectedImage === `https://images.unsplash.com/${imageId}?w=150&h=150&fit=crop&crop=face`
                             ? 'border-primary'
-                            : 'border-transparent hover:border-gray-300'
+                            : 'border-transparent hover:border-border'
                         }`}
                       >
                         <Avatar className="h-16 w-16">
@@ -299,10 +299,10 @@ export const GroupPictureUpload: React.FC<GroupPictureUploadProps> = ({
                       type="button"
                       onClick={() => handleAestheticSelect(url)}
                       className={`rounded-full border-2 transition-all ${
-                        selectedImage === url
-                          ? 'border-primary'
-                          : 'border-transparent hover:border-gray-300'
-                      }`}
+ selectedImage === url
+ ? 'border-primary'
+ : 'border-transparent hover:border-border'
+ }`}
                     >
                       <Avatar className="h-16 w-16">
                         <AvatarImage src={url} />

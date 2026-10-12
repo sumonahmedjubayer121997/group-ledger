@@ -1,0 +1,19 @@
+rules_version = '2';
+
+// SplitWize Storage rules: people upload images into their own folder only.
+service firebase.storage {
+  match /b/{bucket}/o {
+    match /{folder}/{uid}/{fileName} {
+      allow read: if request.auth != null
+        && folder in ['profile-pictures', 'group-photos', 'group-cover-images'];
+
+      allow create, update: if request.auth != null
+        && request.auth.uid == uid
+        && folder in ['profile-pictures', 'group-photos', 'group-cover-images']
+        && request.resource.size < 5 * 1024 * 1024
+        && request.resource.contentType.matches('image/.*');
+
+      allow delete: if request.auth != null && request.auth.uid == uid;
+    }
+  }
+}

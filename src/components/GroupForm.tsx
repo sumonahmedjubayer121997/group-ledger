@@ -3,6 +3,8 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { SUPPORTED_CURRENCIES, toCurrencyCode } from "@/lib/money";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { useAuth } from "@/contexts/AuthContext";
@@ -23,9 +25,11 @@ interface MemberInput {
 }
 
 export const GroupForm = ({ isOpen, onClose }: GroupFormProps) => {
-  const { user } = useAuth();
+  const { user, userProfile } = useAuth();
   const { addGroup } = useExpenseStore();
   const [groupName, setGroupName] = useState("");
+  // New groups start in your default currency (Profile → Preferences).
+  const [currency, setCurrency] = useState(() => toCurrencyCode(userProfile?.preferences?.currency));
   const [description, setDescription] = useState("");
   const [memberInputs, setMemberInputs] = useState<MemberInput[]>([{ name: "", email: "" }]);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -56,7 +60,7 @@ export const GroupForm = ({ isOpen, onClose }: GroupFormProps) => {
         .filter(member => member.email.trim() !== "")
         .map(async (member) => {
           const existingUser = await getUserByEmail(member.email.trim());
-          const id = existingUser ? existingUser.uid : `temp-${Date.now()}-${Math.random()}`;
+          const id = existingUser ? existingUser.uid : `temp-${crypto.randomUUID()}`;
           return {
             userId: id,
             id: id,
@@ -73,7 +77,7 @@ export const GroupForm = ({ isOpen, onClose }: GroupFormProps) => {
           userId: user.uid,
           id: user.uid,
           email: user.email || "",
-          name: user.displayName || "You",
+          name: userProfile?.name || user.displayName || "You",
           role: "admin" as const,
         },
         ...resolvedMembers,
@@ -93,7 +97,7 @@ export const GroupForm = ({ isOpen, onClose }: GroupFormProps) => {
         groupType: "private" as const,
         inviteCode: crypto.randomUUID(),
         settings: {
-          currency: "USD",
+          currency,
           simplifyDebts: true,
           notifications: true,
           recurringBills: false,
@@ -118,9 +122,9 @@ export const GroupForm = ({ isOpen, onClose }: GroupFormProps) => {
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="sm:max-w-[425px]">
+      <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-[460px]">
         <DialogHeader>
-          <DialogTitle>Create New Group</DialogTitle>
+          <DialogTitle>New group</DialogTitle>
         </DialogHeader>
         <form onSubmit={handleSubmit} className="space-y-6">
           <div className="space-y-2">
@@ -143,6 +147,22 @@ export const GroupForm = ({ isOpen, onClose }: GroupFormProps) => {
               placeholder="What's this group for?"
               className="min-h-[80px]"
             />
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="groupCurrency">Currency</Label>
+            <Select value={currency} onValueChange={setCurrency}>
+              <SelectTrigger id="groupCurrency">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {SUPPORTED_CURRENCIES.map(({ code, label }) => (
+                  <SelectItem key={code} value={code}>
+                    {label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
 
           <div className="space-y-4">
@@ -184,12 +204,14 @@ export const GroupForm = ({ isOpen, onClose }: GroupFormProps) => {
                     value={member.name}
                     onChange={(e) => updateMemberInput(index, 'name', e.target.value)}
                     placeholder="Name"
+                    aria-label={`Member ${index + 1} name`}
                     className="flex-1"
                   />
                   <Input
                     value={member.email}
                     onChange={(e) => updateMemberInput(index, 'email', e.target.value)}
                     placeholder="Email"
+                    aria-label={`Member ${index + 1} email`}
                     type="email"
                     className="flex-1"
                   />
@@ -199,6 +221,7 @@ export const GroupForm = ({ isOpen, onClose }: GroupFormProps) => {
                       variant="ghost"
                       size="sm"
                       onClick={() => removeMemberField(index)}
+                      aria-label={`Remove member ${index + 1}`}
                       className="text-destructive hover:text-destructive/80"
                     >
                       <X className="h-4 w-4" />
