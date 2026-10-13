@@ -1,19 +1,36 @@
-import { Link } from "react-router-dom";
+import { Link, useSearchParams } from "react-router-dom";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { PageHeader } from "@/components/PageHeader";
 import { PageSkeleton } from "@/components/PageSkeleton";
 import { GroupBudgetsPanel } from "@/components/budgets/GroupBudgetsPanel";
 import { PersonalBudgetsPanel } from "@/components/budgets/PersonalBudgetsPanel";
+import { LoansPanel } from "@/components/loans/LoansPanel";
 import { useExpenseStore } from "@/stores/expenseStore";
 import { useBudgetStore } from "@/stores/budgetStore";
 import { toCurrencyCode } from "@/lib/money";
 
-/** The one place for budgets: each group's shared budgets, and your personal ones. */
-const BudgetsPage = () => {
+const TABS = ["loans", "budgets", "group-budgets"] as const;
+type Tab = (typeof TABS)[number];
+
+/** Your own money: loans you gave or took outside groups, your budgets, and your groups' budgets. */
+const PersonalPage = () => {
   const groups = useExpenseStore((s) => s.groups);
   const groupsLoaded = useExpenseStore((s) => s.groupsLoaded);
   const budgets = useBudgetStore((s) => s.budgets);
+  // The open tab lives in the URL (?tab=budgets), so links and the back button work.
+  const [params, setParams] = useSearchParams();
+  const tab: Tab = TABS.find((t) => t === params.get("tab")) ?? "loans";
+  const setTab = (next: string) =>
+    setParams(
+      (prev) => {
+        const p = new URLSearchParams(prev);
+        if (next === "loans") p.delete("tab");
+        else p.set("tab", next);
+        return p;
+      },
+      { replace: true }
+    );
   // Archived groups only appear here if they still have budgets.
   const shown = groups.filter((g) => !g.isArchived || budgets.some((b) => b.groupId === g.id && b.isActive));
 
@@ -21,14 +38,28 @@ const BudgetsPage = () => {
 
   return (
     <>
-      <PageHeader title="Budgets" description="Spending limits for your groups, and for yourself." />
-      <Tabs defaultValue="groups">
-        <TabsList>
-          <TabsTrigger value="groups">Group budgets</TabsTrigger>
-          <TabsTrigger value="personal">Personal budgets</TabsTrigger>
+      <PageHeader title="Personal" description="Money you lent or borrowed, and your budgets." />
+      <Tabs value={tab} onValueChange={setTab}>
+        {/* Scrolls sideways on the narrowest phones rather than spilling off the screen. */}
+        <TabsList className="max-w-full justify-start overflow-x-auto">
+          <TabsTrigger value="loans">Loans</TabsTrigger>
+          <TabsTrigger value="budgets">My budgets</TabsTrigger>
+          <TabsTrigger value="group-budgets">Group budgets</TabsTrigger>
         </TabsList>
 
-        <TabsContent value="groups" className="mt-6 space-y-4">
+        <TabsContent value="loans" className="mt-6">
+          <LoansPanel />
+        </TabsContent>
+
+        <TabsContent value="budgets" className="mt-6">
+          <Card>
+            <CardContent className="p-6">
+              <PersonalBudgetsPanel />
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="group-budgets" className="mt-6 space-y-4">
           {shown.length === 0 ? (
             <p className="text-sm text-muted-foreground">Create a group first; budgets belong to a group.</p>
           ) : (
@@ -50,17 +81,9 @@ const BudgetsPage = () => {
             ))
           )}
         </TabsContent>
-
-        <TabsContent value="personal" className="mt-6">
-          <Card>
-            <CardContent className="p-6">
-              <PersonalBudgetsPanel />
-            </CardContent>
-          </Card>
-        </TabsContent>
       </Tabs>
     </>
   );
 };
 
-export default BudgetsPage;
+export default PersonalPage;

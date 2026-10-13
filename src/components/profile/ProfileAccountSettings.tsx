@@ -34,6 +34,8 @@ export const ProfileAccountSettings: React.FC<ProfileAccountSettingsProps> = ({ 
   const [currentPassword, setCurrentPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
+  const [nameError, setNameError] = useState('');
+  const [pwErrors, setPwErrors] = useState<{ current?: string; next?: string; confirm?: string }>({});
   const [profilePhotoURL, setProfilePhotoURL] = useState(userProfile.photoURL || '');
   // Read from Firebase Auth (the source of truth), not the copy saved in the profile.
   const [emailVerified, setEmailVerified] = useState(user.emailVerified);
@@ -43,11 +45,7 @@ export const ProfileAccountSettings: React.FC<ProfileAccountSettingsProps> = ({ 
 
   const handleUpdateDisplayName = async () => {
     if (!displayName.trim()) {
-      toast({
-        title: "Error",
-        description: "Display name cannot be empty",
-        variant: "destructive"
-      });
+      setNameError('Add the name people will see.');
       return;
     }
 
@@ -55,13 +53,11 @@ export const ProfileAccountSettings: React.FC<ProfileAccountSettingsProps> = ({ 
     try {
       await updateUserProfile({ name: displayName });
       toast({
-        title: "Success",
-        description: "Display name updated successfully"
+        title: "Name saved"
       });
     } catch (error) {
       toast({
-        title: "Error",
-        description: "Failed to update display name",
+        title: "Couldn't save your name", description: "Please try again.",
         variant: "destructive"
       });
     } finally {
@@ -74,32 +70,12 @@ export const ProfileAccountSettings: React.FC<ProfileAccountSettingsProps> = ({ 
   };
 
   const handleUpdatePassword = async () => {
-    if (!currentPassword || !newPassword || !confirmPassword) {
-      toast({
-        title: "Error",
-        description: "Please fill in all password fields",
-        variant: "destructive"
-      });
-      return;
-    }
-
-    if (newPassword !== confirmPassword) {
-      toast({
-        title: "Error",
-        description: "New passwords don't match",
-        variant: "destructive"
-      });
-      return;
-    }
-
-    if (newPassword.length < 6) {
-      toast({
-        title: "Error",
-        description: "Password must be at least 6 characters long",
-        variant: "destructive"
-      });
-      return;
-    }
+    const problems: typeof pwErrors = {};
+    if (!currentPassword) problems.current = 'Enter your current password.';
+    if (newPassword.length < 6) problems.next = 'Use at least 6 characters.';
+    else if (newPassword !== confirmPassword) problems.confirm = "This doesn't match the new password.";
+    setPwErrors(problems);
+    if (problems.current || problems.next || problems.confirm) return;
 
     setIsLoading(true);
     try {
@@ -108,13 +84,11 @@ export const ProfileAccountSettings: React.FC<ProfileAccountSettingsProps> = ({ 
       setNewPassword('');
       setConfirmPassword('');
       toast({
-        title: "Success",
-        description: "Password updated successfully"
+        title: "Password changed"
       });
     } catch (error) {
       toast({
-        title: "Error",
-        description: "Failed to update password. Please check your current password.",
+        title: "Couldn't change your password", description: "Check your current password and try again.",
         variant: "destructive"
       });
     } finally {
@@ -127,13 +101,11 @@ export const ProfileAccountSettings: React.FC<ProfileAccountSettingsProps> = ({ 
     try {
       await resendVerificationEmail();
       toast({
-        title: "Success",
-        description: "Verification email sent successfully"
+        title: "Verification email sent", description: "Check your inbox."
       });
     } catch (error) {
       toast({
-        title: "Error",
-        description: "Failed to send verification email",
+        title: "Couldn't send the email", description: "Please try again.",
         variant: "destructive"
       });
     } finally {
@@ -204,12 +176,12 @@ export const ProfileAccountSettings: React.FC<ProfileAccountSettingsProps> = ({ 
 
   return (
     <div className="space-y-4 sm:space-y-6">
-      {/* Profile Information */}
+      {/* Your profile */}
       <Card>
         <CardHeader className="pb-3 sm:pb-6">
           <CardTitle className="flex items-center gap-2 text-base sm:text-lg">
             <UserIcon className="h-4 w-4 sm:h-5 sm:w-5" />
-            Profile Information
+            Your profile
           </CardTitle>
           <CardDescription className="text-sm">
             Update your display name and profile photo
@@ -217,14 +189,19 @@ export const ProfileAccountSettings: React.FC<ProfileAccountSettingsProps> = ({ 
         </CardHeader>
         <CardContent className="space-y-4 pt-0">
           <div className="space-y-2">
-            <Label htmlFor="displayName" className="text-sm">Display Name</Label>
+            <Label htmlFor="displayName" className="text-sm">Name</Label>
             <div className="flex flex-col sm:flex-row gap-2">
               <Input
                 id="displayName"
                 value={displayName}
-                onChange={(e) => setDisplayName(e.target.value)}
-                placeholder="Enter your display name"
+                onChange={(e) => {
+                  setDisplayName(e.target.value);
+                  setNameError('');
+                }}
+                placeholder="The name people see"
                 className="flex-1"
+                aria-invalid={!!nameError}
+                aria-describedby={nameError ? 'displayName-error' : undefined}
               />
               <Button 
                 onClick={handleUpdateDisplayName}
@@ -232,9 +209,14 @@ export const ProfileAccountSettings: React.FC<ProfileAccountSettingsProps> = ({ 
                 className="w-full sm:w-auto"
                 size="sm"
               >
-                Update
+                Save
               </Button>
             </div>
+            {nameError && (
+              <p id="displayName-error" className="text-sm text-destructive">
+                {nameError}
+              </p>
+            )}
           </div>
           
           <div className="space-y-2">
@@ -252,12 +234,12 @@ export const ProfileAccountSettings: React.FC<ProfileAccountSettingsProps> = ({ 
         </CardContent>
       </Card>
 
-      {/* Email Verification */}
+      {/* Email */}
       <Card>
         <CardHeader className="pb-3 sm:pb-6">
           <CardTitle className="flex items-center gap-2 text-base sm:text-lg">
             <Mail className="h-4 w-4 sm:h-5 sm:w-5" />
-            Email Verification
+            Email
           </CardTitle>
           <CardDescription className="text-sm">
             Verified emails let friends add you by email and let you accept group invites
@@ -275,7 +257,7 @@ export const ProfileAccountSettings: React.FC<ProfileAccountSettingsProps> = ({ 
                   </Badge>
                 ) : (
                   <Badge variant="outline" className="text-owes text-xs">
-                    Pending Verification
+                    Not verified yet
                   </Badge>
                 )}
               </div>
@@ -306,7 +288,7 @@ export const ProfileAccountSettings: React.FC<ProfileAccountSettingsProps> = ({ 
         <CardHeader className="pb-3 sm:pb-6">
           <CardTitle className="flex items-center gap-2 text-base sm:text-lg">
             <Key className="h-4 w-4 sm:h-5 sm:w-5" />
-            Password Settings
+            Password
           </CardTitle>
           <CardDescription className="text-sm">
             Change your account password
@@ -314,45 +296,73 @@ export const ProfileAccountSettings: React.FC<ProfileAccountSettingsProps> = ({ 
         </CardHeader>
         <CardContent className="space-y-4 pt-0">
           <div className="space-y-2">
-            <Label htmlFor="currentPassword" className="text-sm">Current Password</Label>
+            <Label htmlFor="currentPassword" className="text-sm">Current password</Label>
             <Input
               id="currentPassword"
               type="password"
               value={currentPassword}
-              onChange={(e) => setCurrentPassword(e.target.value)}
-              placeholder="Enter current password"
+              onChange={(e) => {
+                setCurrentPassword(e.target.value);
+                setPwErrors((er) => ({ ...er, current: undefined }));
+              }}
+              aria-invalid={!!pwErrors.current}
+              aria-describedby={pwErrors.current ? 'currentPassword-error' : undefined}
             />
+            {pwErrors.current && (
+              <p id="currentPassword-error" className="text-sm text-destructive">
+                {pwErrors.current}
+              </p>
+            )}
           </div>
           
           <div className="space-y-2">
-            <Label htmlFor="newPassword" className="text-sm">New Password</Label>
+            <Label htmlFor="newPassword" className="text-sm">New password</Label>
             <Input
               id="newPassword"
               type="password"
               value={newPassword}
-              onChange={(e) => setNewPassword(e.target.value)}
-              placeholder="Enter new password"
+              onChange={(e) => {
+                setNewPassword(e.target.value);
+                setPwErrors((er) => ({ ...er, next: undefined }));
+              }}
+              placeholder="At least 6 characters"
+              aria-invalid={!!pwErrors.next}
+              aria-describedby={pwErrors.next ? 'newPassword-error' : undefined}
             />
+            {pwErrors.next && (
+              <p id="newPassword-error" className="text-sm text-destructive">
+                {pwErrors.next}
+              </p>
+            )}
           </div>
           
           <div className="space-y-2">
-            <Label htmlFor="confirmPassword" className="text-sm">Confirm New Password</Label>
+            <Label htmlFor="confirmPassword" className="text-sm">New password again</Label>
             <Input
               id="confirmPassword"
               type="password"
               value={confirmPassword}
-              onChange={(e) => setConfirmPassword(e.target.value)}
-              placeholder="Confirm new password"
+              onChange={(e) => {
+                setConfirmPassword(e.target.value);
+                setPwErrors((er) => ({ ...er, confirm: undefined }));
+              }}
+              aria-invalid={!!pwErrors.confirm}
+              aria-describedby={pwErrors.confirm ? 'confirmPassword-error' : undefined}
             />
+            {pwErrors.confirm && (
+              <p id="confirmPassword-error" className="text-sm text-destructive">
+                {pwErrors.confirm}
+              </p>
+            )}
           </div>
           
           <Button 
             onClick={handleUpdatePassword}
-            disabled={isLoading || !currentPassword || !newPassword || !confirmPassword}
+            disabled={isLoading}
             className="w-full"
             size="sm"
           >
-            Update Password
+            Change password
           </Button>
         </CardContent>
       </Card>
@@ -370,12 +380,12 @@ export const ProfileAccountSettings: React.FC<ProfileAccountSettingsProps> = ({ 
         </Card>
       )}
 
-      {/* Connected Accounts */}
+      {/* Sign-in methods */}
       <Card>
         <CardHeader className="pb-3 sm:pb-6">
           <CardTitle className="flex items-center gap-2 text-base sm:text-lg">
             <Link className="h-4 w-4 sm:h-5 sm:w-5" />
-            Connected Accounts
+            Sign-in methods
           </CardTitle>
           <CardDescription className="text-sm">
             Ways you can sign in

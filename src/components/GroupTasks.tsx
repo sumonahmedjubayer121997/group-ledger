@@ -220,7 +220,7 @@ export const GroupTasks: React.FC<GroupTasksProps> = ({ groupId, members }) => {
             onClick={() => setShowAddForm(!showAddForm)}
           >
             <Plus className="w-4 h-4 mr-1" />
-            Add Task
+            Add task
           </Button>
         </div>
       </CardHeader>
@@ -233,7 +233,7 @@ export const GroupTasks: React.FC<GroupTasksProps> = ({ groupId, members }) => {
               setShowAddForm(false);
               resetForm();
             }}
-            submitLabel="Create Task"
+            submitLabel="Create task"
           />
         )}
 
@@ -253,7 +253,7 @@ export const GroupTasks: React.FC<GroupTasksProps> = ({ groupId, members }) => {
                   <TaskForm
                     onSubmit={() => handleUpdateTask(task.id)}
                     onCancel={cancelEditing}
-                    submitLabel="Update Task"
+                    submitLabel="Save task"
                   />
                 ) : (
                   <>

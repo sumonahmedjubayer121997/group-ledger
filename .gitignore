@@ -33,3 +33,6 @@ ui-debug.log
 
 # Local data backups (contain account IDs)
 backups/
+
+# Throwaway accounts for the local Firebase emulators (npm run emulators)
+tests/fixtures/emulator-accounts.json

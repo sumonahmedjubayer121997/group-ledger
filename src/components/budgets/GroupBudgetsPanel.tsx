@@ -1,18 +1,9 @@
 import { useMemo, useState } from "react";
 import { Plus } from "lucide-react";
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
 import { GroupBudgetManagement } from "@/components/GroupBudgetManagement";
 import { useAuth } from "@/contexts/AuthContext";
+import { deferWithUndo, useHidden } from "@/lib/undo";
 import { useToast } from "@/hooks/use-toast";
 import { useBudgetStore, type Budget } from "@/stores/budgetStore";
 import { useExpenseStore, type Group } from "@/stores/expenseStore";
@@ -28,12 +19,12 @@ export function GroupBudgetsPanel({ group, compactEmpty = false }: { group: Grou
   const deleteBudget = useBudgetStore((s) => s.deleteBudget);
   const expenses = useExpenseStore((s) => s.expenses);
   const [editing, setEditing] = useState<Budget | null>(null);
-  const [deleting, setDeleting] = useState<Budget | null>(null);
+  const hidden = useHidden((s) => s.hidden);
 
   const currency = toCurrencyCode(group.settings?.currency);
   const role = group.members.find((m) => m.id === user?.uid)?.role;
   const canWrite = role === "admin" || role === "member";
-  const active = budgets.filter((b) => b.groupId === group.id && b.isActive);
+  const active = budgets.filter((b) => b.groupId === group.id && b.isActive && !hidden.has(`budget-${b.id}`));
   const usage = useMemo(
     () =>
       new Map(
@@ -47,17 +38,14 @@ export function GroupBudgetsPanel({ group, compactEmpty = false }: { group: Grou
     [expenses, group.id, budgets, getBudgetUsage]
   );
 
-  const confirmDelete = async () => {
-    if (!deleting) return;
-    try {
-      await deleteBudget(deleting.id, user?.uid || "", group.id);
-      toast({ title: "Budget deleted", description: `"${deleting.name}" was removed.` });
-    } catch {
-      toast({ title: "Couldn't delete the budget", description: "Please try again.", variant: "destructive" });
-    } finally {
-      setDeleting(null);
-    }
-  };
+  /** Gone at once, with Undo; the real delete happens 8 seconds later. */
+  const remove = (budget: Budget) =>
+    deferWithUndo({
+      id: `budget-${budget.id}`,
+      title: `Deleted the "${budget.name}" budget`,
+      description: "Expenses aren't affected.",
+      run: () => deleteBudget(budget.id, user?.uid || "", group.id),
+    });
 
   const addButton = canWrite && (
     <GroupBudgetManagement group={group}>
@@ -86,7 +74,7 @@ export function GroupBudgetsPanel({ group, compactEmpty = false }: { group: Grou
                 currency={currency}
                 detail={`${budget.type === "group_category" && budget.category ? budget.category : "Whole group"} · ${budget.period}`}
                 onEdit={canWrite ? () => setEditing(budget) : undefined}
-                onDelete={canWrite ? () => setDeleting(budget) : undefined}
+                onDelete={canWrite ? () => remove(budget) : undefined}
               />
             ))}
           </ul>
@@ -100,20 +88,6 @@ export function GroupBudgetsPanel({ group, compactEmpty = false }: { group: Grou
         </GroupBudgetManagement>
       )}
 
-      <AlertDialog open={!!deleting} onOpenChange={(open) => !open && setDeleting(null)}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Delete "{deleting?.name}"?</AlertDialogTitle>
-            <AlertDialogDescription>The budget is removed for everyone in {group.name}. Expenses aren't affected.</AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction onClick={confirmDelete} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
-              Delete
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
     </div>
   );
 }

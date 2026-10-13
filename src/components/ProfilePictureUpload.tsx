@@ -60,8 +60,7 @@ export const ProfilePictureUpload: React.FC<ProfilePictureUploadProps> = ({
 
     if (file.size > 5 * 1024 * 1024) { // 5MB limit
       toast({
-        title: "Error",
-        description: "Image must be less than 5MB",
+        title: "That image is too big", description: "Choose one under 5 MB.",
         variant: "destructive"
       });
       return;
@@ -77,14 +76,12 @@ export const ProfilePictureUpload: React.FC<ProfilePictureUploadProps> = ({
       setPreviewUrl(downloadURL);
       
       toast({
-        title: "Success",
-        description: "Image uploaded successfully"
+        title: "Image uploaded"
       });
     } catch (error) {
       console.error('Upload error:', error);
       toast({
-        title: "Error",
-        description: "Failed to upload image",
+        title: "Couldn't upload the image", description: "Please try again.",
         variant: "destructive"
       });
     } finally {
@@ -121,13 +118,11 @@ export const ProfilePictureUpload: React.FC<ProfilePictureUploadProps> = ({
       setIsOpen(false);
       
       toast({
-        title: "Success",
-        description: "Profile picture updated successfully"
+        title: "Profile picture updated"
       });
     } catch (error) {
       toast({
-        title: "Error",
-        description: "Failed to update profile picture",
+        title: "Couldn't update your picture", description: "Please try again.",
         variant: "destructive"
       });
     } finally {
@@ -152,7 +147,7 @@ export const ProfilePictureUpload: React.FC<ProfilePictureUploadProps> = ({
       </DialogTrigger>
       <DialogContent className="sm:max-w-[500px] max-h-[80vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>Update Profile Picture</DialogTitle>
+          <DialogTitle>Change your picture</DialogTitle>
         </DialogHeader>
         
         <div className="space-y-6">
@@ -188,7 +183,7 @@ export const ProfilePictureUpload: React.FC<ProfilePictureUploadProps> = ({
 
             <TabsContent value="upload" className="space-y-4">
               <div className="space-y-2">
-                <Label htmlFor="picture">Upload Image</Label>
+                <Label htmlFor="picture">Upload an image</Label>
                 <Input
                   id="picture"
                   type="file"

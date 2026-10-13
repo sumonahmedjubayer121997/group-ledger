@@ -100,7 +100,7 @@ export const GroupPinnedNotes: React.FC<GroupPinnedNotesProps> = ({ groupId, isA
         <div className="flex items-center justify-between">
           <CardTitle className={`${isMobile ? 'text-lg' : 'text-xl'} flex items-center gap-2`}>
             <Pin className="w-5 h-5" />
-            Pinned Notes
+            Pinned notes
           </CardTitle>
           {isAdmin && (
             <Button
@@ -109,7 +109,7 @@ export const GroupPinnedNotes: React.FC<GroupPinnedNotesProps> = ({ groupId, isA
               onClick={() => setShowAddForm(!showAddForm)}
             >
               <Plus className="w-4 h-4 mr-1" />
-              Add Note
+              Add note
             </Button>
           )}
         </div>

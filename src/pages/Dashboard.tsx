@@ -1,12 +1,14 @@
-import { useMemo, useState } from "react";
+import { useMemo } from "react";
 import { Link } from "react-router-dom";
-import { Archive, ChevronRight, HandCoins, Plus, Receipt, Users } from "lucide-react";
+import { Archive, ChevronRight, HandCoins, Plus, QrCode, Receipt, Users } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { BalanceCard } from "@/components/BalanceCard";
+import { FirstRunChecklist } from "@/components/FirstRunChecklist";
+import { LoansSummary } from "@/components/loans/LoansSummary";
+import { InstallBanner } from "@/components/InstallBanner";
 import { PageHeader } from "@/components/PageHeader";
 import { PageSkeleton } from "@/components/PageSkeleton";
 import { useAuth } from "@/contexts/AuthContext";
@@ -78,7 +80,7 @@ function GroupRow({ group, net, currency }: { group: Group; net: number; currenc
         <div className="min-w-0 flex-1">
           <p className="truncate font-medium">{group.name}</p>
           <p className="truncate text-xs text-muted-foreground">
-            {group.members.length} {group.members.length === 1 ? "member" : "members"} · {expenseCount}{" "}
+            {group.members.length} {group.members.length === 1 ? "person" : "people"} · {expenseCount}{" "}
             {expenseCount === 1 ? "expense" : "expenses"}
           </p>
         </div>
@@ -129,14 +131,13 @@ function RecentActivity({ items }: { items: ActivityItem[] }) {
 
 const Dashboard = () => {
   const { user, userProfile } = useAuth();
-  const { openAddExpense, openNewGroup } = useAppActions();
+  const { openAddExpense, openNewGroup, openJoinGroup } = useAppActions();
   const groups = useExpenseStore((s) => s.groups);
   const groupsLoaded = useExpenseStore((s) => s.groupsLoaded);
   const expenses = useExpenseStore((s) => s.expenses);
   const groupSettlements = useExpenseStore((s) => s.groupSettlements);
   const currencyOf = useCurrencyOf();
   const balances = useUserBalances(user?.uid);
-  const [settleOpen, setSettleOpen] = useState(false);
 
   const netByGroup = useMemo(() => new Map(balances.perGroup.map((p) => [p.group.id, p])), [balances.perGroup]);
   const active = groups.filter((g) => !g.isArchived);
@@ -144,13 +145,17 @@ const Dashboard = () => {
 
   const activity = useMemo<ActivityItem[]>(() => {
     const groupName = new Map(groups.map((g) => [g.id, g.name]));
+    const first = (name: string) => name.trim().split(/\s+/)[0] || name;
     const nameIn = (groupId: string, memberId: string) =>
-      groups.find((g) => g.id === groupId)?.members.find((m) => m.id === memberId)?.name ?? "Someone";
+      memberId === user?.uid
+        ? "you"
+        : first(groups.find((g) => g.id === groupId)?.members.find((m) => m.id === memberId)?.name ?? "Someone");
+    const cap = (text: string) => text.charAt(0).toUpperCase() + text.slice(1);
     const items: ActivityItem[] = expenses.map((e) => ({
       id: `e-${e.id}`,
       kind: "expense",
       title: e.description || "Expense",
-      detail: `${groupName.get(e.groupId) ?? "A group"} · paid by ${e.paidBy?.name ?? "someone"}`,
+      detail: `${groupName.get(e.groupId) ?? "A group"} · ${e.paidBy?.id === user?.uid ? "you paid" : `${first(e.paidBy?.name ?? "someone")} paid`}`,
       amount: formatAmount(e.amount, currencyOf(e.groupId)),
       at: toDate(e.date) ?? new Date(0),
     }));
@@ -159,7 +164,7 @@ const Dashboard = () => {
         items.push({
           id: `s-${s.id}`,
           kind: "payment",
-          title: `${nameIn(groupId, s.fromMemberId)} paid ${nameIn(groupId, s.toMemberId)}`,
+          title: `${cap(nameIn(groupId, s.fromMemberId))} paid ${nameIn(groupId, s.toMemberId)}`,
           detail: groupName.get(groupId) ?? "A group",
           amount: formatAmount(s.amount, currencyOf(groupId)),
           at: toDate(s.date) ?? new Date(0),
@@ -167,11 +172,11 @@ const Dashboard = () => {
       }
     }
     return items.sort((a, b) => b.at.getTime() - a.at.getTime()).slice(0, 8);
-  }, [expenses, groups, groupSettlements, currencyOf]);
+  }, [expenses, groups, groupSettlements, currencyOf, user?.uid]);
 
   if (!groupsLoaded) return <PageSkeleton />;
 
-  const firstName = (userProfile?.name || user?.displayName || "").split(/\s+/)[0];
+  const firstName = (userProfile?.name || user?.displayName || "").trim().split(/\s+/)[0];
   const hasDebts = balances.debts.length > 0;
   const owedText = balances.owedToYou.size ? formatTotals(balances.owedToYou) : null;
   const openBalances = balances.perGroup.filter((p) => p.net !== 0).length;
@@ -182,7 +187,7 @@ const Dashboard = () => {
         title={`${greeting(new Date().getHours())}${firstName ? `, ${firstName}` : ""}`}
         description={
           active.length === 0
-            ? "Create a group to start splitting expenses."
+            ? "Three quick steps and you're splitting."
             : owedText
               ? `You're owed ${owedText} in ${openBalances} ${openBalances === 1 ? "group" : "groups"}.`
               : `Here's where things stand across your ${active.length} ${active.length === 1 ? "group" : "groups"}.`
@@ -190,22 +195,30 @@ const Dashboard = () => {
       />
 
       <div className="space-y-6">
+        <InstallBanner />
+        <FirstRunChecklist />
+        {groups.length > 0 && (
+        <>
         <BalanceStrip owedToYou={balances.owedToYou} youOwe={balances.youOwe} />
 
         <section aria-label="Quick actions" className="flex flex-wrap gap-2">
-          <Button onClick={() => openAddExpense()}>
+          <Button onClick={() => openAddExpense(undefined, "dashboard")}>
             <Plus aria-hidden="true" />
             Add expense
-          </Button>
-          <Button variant="outline" onClick={() => setSettleOpen(true)} disabled={!hasDebts}>
-            <HandCoins aria-hidden="true" />
-            {hasDebts ? "Settle up" : "Nothing to settle"}
           </Button>
           <Button variant="outline" onClick={openNewGroup}>
             <Users aria-hidden="true" />
             New group
           </Button>
+          <Button variant="outline" onClick={openJoinGroup}>
+            <QrCode aria-hidden="true" />
+            Join a group
+          </Button>
         </section>
+
+        {hasDebts && <BalanceCard debts={balances.debts} showGroupName title="To settle" />}
+
+        <LoansSummary />
 
         <div className="grid gap-6 lg:grid-cols-5">
           <Card className="min-w-0 lg:col-span-3">
@@ -253,17 +266,10 @@ const Dashboard = () => {
             <RecentActivity items={activity} />
           </div>
         </div>
+        </>
+        )}
       </div>
 
-      <Dialog open={settleOpen} onOpenChange={setSettleOpen}>
-        <DialogContent className="sm:max-w-lg">
-          <DialogHeader>
-            <DialogTitle>Settle up</DialogTitle>
-            <DialogDescription>Record a payment you made or received. Balances update for everyone in the group.</DialogDescription>
-          </DialogHeader>
-          <BalanceCard debts={balances.debts} showGroupName bare />
-        </DialogContent>
-      </Dialog>
     </>
   );
 };

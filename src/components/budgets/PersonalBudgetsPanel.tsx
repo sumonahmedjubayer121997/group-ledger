@@ -1,21 +1,12 @@
 import { useMemo, useState } from "react";
 import { Plus } from "lucide-react";
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useAuth } from "@/contexts/AuthContext";
+import { deferWithUndo, useHidden } from "@/lib/undo";
 import { useToast } from "@/hooks/use-toast";
 import { useBudgetStore, type Budget } from "@/stores/budgetStore";
 import { useExpenseStore } from "@/stores/expenseStore";
@@ -53,10 +44,11 @@ export function PersonalBudgetsPanel() {
   const [form, setForm] = useState(emptyForm);
   const [editing, setEditing] = useState<Budget | null>(null);
   const [open, setOpen] = useState(false);
-  const [deleting, setDeleting] = useState<Budget | null>(null);
+  const hidden = useHidden((s) => s.hidden);
   const [saving, setSaving] = useState(false);
+  const [errors, setErrors] = useState<{ name?: string; limit?: string }>({});
 
-  const mine = budgets.filter((b) => b.type === "individual" && b.isActive && (!b.userId || b.userId === user?.uid));
+  const mine = budgets.filter((b) => b.type === "individual" && b.isActive && (!b.userId || b.userId === user?.uid) && !hidden.has(`budget-${b.id}`));
 
   // Older budgets have no currency: use the one most of your expenses are in.
   const mainCurrency = useMemo(() => {
@@ -87,6 +79,7 @@ export function PersonalBudgetsPanel() {
   const startNew = () => {
     setEditing(null);
     setForm({ ...emptyForm, currency: mainCurrency });
+    setErrors({});
     setOpen(true);
   };
   const startEdit = (budget: Budget) => {
@@ -98,15 +91,18 @@ export function PersonalBudgetsPanel() {
       period: budget.period,
       alertThreshold: String(budget.alertThreshold ?? 80),
     });
+    setErrors({});
     setOpen(true);
   };
 
-  const save = async () => {
-    const limit = parseFloat(form.limit);
-    if (!form.name.trim() || !(limit > 0) || !user) {
-      toast({ title: "Name and limit needed", description: "Give the budget a name and a limit above zero.", variant: "destructive" });
-      return;
-    }
+  const save = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const limit = parseFloat(form.limit.replace(",", "."));
+    const problems: typeof errors = {};
+    if (!form.name.trim()) problems.name = "Give the budget a name.";
+    if (!(limit > 0)) problems.limit = "Set a limit above zero.";
+    setErrors(problems);
+    if (problems.name || problems.limit || !user || saving) return;
     const data = {
       name: form.name.trim(),
       type: "individual" as const,
@@ -121,7 +117,7 @@ export function PersonalBudgetsPanel() {
     try {
       if (editing) await updateBudget(editing.id, data, user.uid);
       else await addBudget(data, user.uid);
-      toast({ title: editing ? "Budget updated" : "Budget created", description: data.name });
+      toast({ title: editing ? `Saved "${data.name}"` : `Added the "${data.name}" budget` });
       setOpen(false);
     } catch {
       toast({ title: "Couldn't save the budget", description: "Please try again.", variant: "destructive" });
@@ -130,17 +126,14 @@ export function PersonalBudgetsPanel() {
     }
   };
 
-  const confirmDelete = async () => {
-    if (!deleting || !user) return;
-    try {
-      await deleteBudget(deleting.id, user.uid);
-      toast({ title: "Budget deleted", description: `"${deleting.name}" was removed.` });
-    } catch {
-      toast({ title: "Couldn't delete the budget", description: "Please try again.", variant: "destructive" });
-    } finally {
-      setDeleting(null);
-    }
-  };
+  /** Gone at once, with Undo; the real delete happens 8 seconds later. */
+  const remove = (budget: Budget) =>
+    deferWithUndo({
+      id: `budget-${budget.id}`,
+      title: `Deleted the "${budget.name}" budget`,
+      description: "Your expenses aren't affected.",
+      run: () => deleteBudget(budget.id, user?.uid || ""),
+    });
 
   return (
     <div>
@@ -161,7 +154,7 @@ export function PersonalBudgetsPanel() {
                 currency={currency}
                 detail={`Your share in ${currency} groups · ${budget.period}`}
                 onEdit={() => startEdit(budget)}
-                onDelete={() => setDeleting(budget)}
+                onDelete={() => remove(budget)}
               />
             );
           })}
@@ -178,15 +171,46 @@ export function PersonalBudgetsPanel() {
             <DialogTitle>{editing ? "Edit personal budget" : "New personal budget"}</DialogTitle>
             <DialogDescription>Set a limit for your own share of shared spending.</DialogDescription>
           </DialogHeader>
-          <div className="grid gap-4">
+          <form onSubmit={save} className="grid gap-4" noValidate>
             <div className="grid gap-1.5">
               <Label htmlFor="pb-name">Name</Label>
-              <Input id="pb-name" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} placeholder="e.g. Eating out" />
+              <Input
+                id="pb-name"
+                value={form.name}
+                onChange={(e) => {
+                  setForm({ ...form, name: e.target.value });
+                  setErrors((er) => ({ ...er, name: undefined }));
+                }}
+                placeholder="e.g. Eating out"
+                aria-invalid={!!errors.name}
+                aria-describedby={errors.name ? "pb-name-error" : undefined}
+              />
+              {errors.name && (
+                <p id="pb-name-error" className="text-sm text-destructive">
+                  {errors.name}
+                </p>
+              )}
             </div>
             <div className="grid grid-cols-2 gap-3">
               <div className="grid gap-1.5">
                 <Label htmlFor="pb-limit">Limit</Label>
-                <Input id="pb-limit" type="number" inputMode="decimal" min="0" step="0.01" value={form.limit} onChange={(e) => setForm({ ...form, limit: e.target.value })} />
+                <Input
+                  id="pb-limit"
+                  inputMode="decimal"
+                  className="money"
+                  value={form.limit}
+                  onChange={(e) => {
+                    setForm({ ...form, limit: e.target.value.replace(/[^\d.,]/g, "") });
+                    setErrors((er) => ({ ...er, limit: undefined }));
+                  }}
+                  aria-invalid={!!errors.limit}
+                  aria-describedby={errors.limit ? "pb-limit-error" : undefined}
+                />
+                {errors.limit && (
+                  <p id="pb-limit-error" className="text-sm text-destructive">
+                    {errors.limit}
+                  </p>
+                )}
               </div>
               <div className="grid gap-1.5">
                 <Label htmlFor="pb-currency">Currency</Label>
@@ -220,35 +244,21 @@ export function PersonalBudgetsPanel() {
               </div>
               <div className="grid gap-1.5">
                 <Label htmlFor="pb-alert">Warn at (%)</Label>
-                <Input id="pb-alert" type="number" min="1" max="100" value={form.alertThreshold} onChange={(e) => setForm({ ...form, alertThreshold: e.target.value })} />
+                <Input id="pb-alert" inputMode="numeric" value={form.alertThreshold} onChange={(e) => setForm({ ...form, alertThreshold: e.target.value.replace(/\D/g, "") })} />
               </div>
             </div>
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setOpen(false)} disabled={saving}>
-              Cancel
-            </Button>
-            <Button onClick={save} disabled={saving}>
-              {saving ? "Saving…" : editing ? "Save" : "Create budget"}
-            </Button>
-          </DialogFooter>
+            <DialogFooter className="gap-2 sm:gap-0">
+              <Button type="button" variant="outline" onClick={() => setOpen(false)} disabled={saving}>
+                Cancel
+              </Button>
+              <Button type="submit" disabled={saving}>
+                {saving ? "Saving…" : editing ? "Save changes" : "Add budget"}
+              </Button>
+            </DialogFooter>
+          </form>
         </DialogContent>
       </Dialog>
 
-      <AlertDialog open={!!deleting} onOpenChange={(o) => !o && setDeleting(null)}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Delete "{deleting?.name}"?</AlertDialogTitle>
-            <AlertDialogDescription>This removes the budget only. Your expenses aren't affected.</AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction onClick={confirmDelete} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
-              Delete
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
     </div>
   );
 }

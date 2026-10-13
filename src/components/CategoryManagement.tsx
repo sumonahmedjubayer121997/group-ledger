@@ -5,7 +5,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
+import { doneWithUndo } from '@/lib/undo';
 import { Plus, Trash2, Edit, Tag, Palette } from 'lucide-react';
 import { useCategoryStore } from '@/stores/categoryStore';
 import { useAuth } from '@/contexts/AuthContext';
@@ -75,8 +75,7 @@ export const CategoryManagement: React.FC<CategoryManagementProps> = ({ isOpen, 
     setNewCategoryColor(colorOptions[0]);
     
     toast({
-      title: "Success",
-      description: "Category added successfully",
+      title: "Category added",
     });
   };
 
@@ -102,17 +101,20 @@ export const CategoryManagement: React.FC<CategoryManagementProps> = ({ isOpen, 
     setEditColor('');
     
     toast({
-      title: "Success",
-      description: "Category updated successfully",
+      title: "Category renamed",
     });
   };
 
   const handleDeleteCategory = (categoryId: string) => {
+    const removed = useCategoryStore.getState().categories.find((c) => c.id === categoryId);
     deleteCategory(categoryId);
-    toast({
-      title: "Success",
-      description: "Category deleted successfully",
-    });
+    if (removed) {
+      doneWithUndo({
+        title: `Deleted "${removed.name}"`,
+        description: "Expenses keep their category name.",
+        undo: () => useCategoryStore.setState((state) => ({ categories: [...state.categories, removed] })),
+      });
+    }
   };
 
   const customCategories = userCategories.filter(cat => !cat.isDefault);
@@ -124,7 +126,7 @@ export const CategoryManagement: React.FC<CategoryManagementProps> = ({ isOpen, 
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Tag className="h-5 w-5" />
-            Manage Categories
+            Manage categories
           </DialogTitle>
         </DialogHeader>
 
@@ -136,7 +138,7 @@ export const CategoryManagement: React.FC<CategoryManagementProps> = ({ isOpen, 
             </CardHeader>
             <CardContent className="space-y-4">
               <div>
-                <Label htmlFor="categoryName">Category Name</Label>
+                <Label htmlFor="categoryName">Category name</Label>
                 <Input
                   id="categoryName"
                   value={newCategoryName}
@@ -167,7 +169,7 @@ export const CategoryManagement: React.FC<CategoryManagementProps> = ({ isOpen, 
 
               <Button onClick={handleAddCategory} className="w-full">
                 <Plus className="h-4 w-4 mr-2" />
-                Add Category
+                Add category
               </Button>
             </CardContent>
           </Card>
@@ -243,33 +245,13 @@ export const CategoryManagement: React.FC<CategoryManagementProps> = ({ isOpen, 
                               size="sm"
                               variant="ghost"
                               onClick={() => handleEditCategory(category.id)}
+                              aria-label={`Rename ${category.name}`}
                             >
-                              <Edit className="h-4 w-4" />
+                              <Edit className="h-4 w-4" aria-hidden="true" />
                             </Button>
-                            <AlertDialog>
-                              <AlertDialogTrigger asChild>
-                                <Button size="sm" variant="ghost">
-                                  <Trash2 className="h-4 w-4 text-destructive" />
-                                </Button>
-                              </AlertDialogTrigger>
-                              <AlertDialogContent className="bg-card">
-                                <AlertDialogHeader>
-                                  <AlertDialogTitle>Delete Category</AlertDialogTitle>
-                                  <AlertDialogDescription>
-                                    Are you sure you want to delete "{category.name}"? This action cannot be undone.
-                                  </AlertDialogDescription>
-                                </AlertDialogHeader>
-                                <AlertDialogFooter>
-                                  <AlertDialogCancel>Cancel</AlertDialogCancel>
-                                  <AlertDialogAction
-                                    onClick={() => handleDeleteCategory(category.id)}
-                                    className="bg-destructive hover:bg-destructive"
-                                  >
-                                    Delete
-                                  </AlertDialogAction>
-                                </AlertDialogFooter>
-                              </AlertDialogContent>
-                            </AlertDialog>
+                            <Button size="sm" variant="ghost" onClick={() => handleDeleteCategory(category.id)} aria-label={`Delete ${category.name}`}>
+                              <Trash2 className="h-4 w-4 text-destructive" aria-hidden="true" />
+                            </Button>
                           </>
                         )}
                       </div>

@@ -20,7 +20,7 @@ export default function PublicApp() {
         <Route path="/" element={<LandingPage onGetStarted={toSignIn} />} />
         <Route path="/signin" element={signIn()} />
         <Route path="/join/:code" element={signIn("Sign in or create a free account to accept your group invite.")} />
-        {["/expenses", "/groups/:groupId", "/budgets", "/categories", "/search", "/profile"].map((path) => (
+        {["/expenses", "/groups/:groupId", "/personal", "/people/:personId", "/budgets", "/categories", "/search", "/profile"].map((path) => (
           <Route key={path} path={path} element={signIn("Sign in to continue.")} />
         ))}
         <Route path="*" element={<NotFound />} />

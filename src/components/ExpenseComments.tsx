@@ -5,7 +5,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Card, CardContent } from '@/components/ui/card';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
-import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
+import { deferWithUndo, useHidden } from '@/lib/undo';
 import { MessageCircle, Send, Reply, Edit, Trash2, MoreVertical } from 'lucide-react';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { useCommentStore, ExpenseComment } from '@/stores/commentStore';
@@ -37,7 +37,9 @@ export const ExpenseComments: React.FC<ExpenseCommentsProps> = ({ expense, isOpe
   const [editingComment, setEditingComment] = useState<string | null>(null);
   const [editContent, setEditContent] = useState('');
 
-  const comments = getThreadedComments(expense.id);
+  const hidden = useHidden((s) => s.hidden);
+  const shown = (c: ExpenseComment) => !hidden.has(`comment-${c.id}`);
+  const comments = getThreadedComments(expense.id).filter(shown);
 
   const handleAddComment = () => {
     if (!newComment.trim() || !user) return;
@@ -53,7 +55,6 @@ export const ExpenseComments: React.FC<ExpenseCommentsProps> = ({ expense, isOpe
     setNewComment('');
     toast({
       title: "Comment added",
-      description: "Your comment has been added successfully",
     });
   };
 
@@ -73,7 +74,6 @@ export const ExpenseComments: React.FC<ExpenseCommentsProps> = ({ expense, isOpe
     setReplyingTo(null);
     toast({
       title: "Reply added",
-      description: "Your reply has been added successfully",
     });
   };
 
@@ -89,17 +89,12 @@ export const ExpenseComments: React.FC<ExpenseCommentsProps> = ({ expense, isOpe
     setEditingComment(null);
     setEditContent('');
     toast({
-      title: "Comment updated",
-      description: "Your comment has been updated successfully",
+      title: "Comment saved",
     });
   };
 
   const handleDeleteComment = (commentId: string) => {
-    deleteComment(commentId);
-    toast({
-      title: "Comment deleted",
-      description: "Comment has been deleted successfully",
-    });
+    deferWithUndo({ id: `comment-${commentId}`, title: "Comment deleted", run: async () => deleteComment(commentId) });
   };
 
   const renderComment = (comment: ExpenseComment & { replies?: ExpenseComment[] }, isReply = false) => {
@@ -182,31 +177,10 @@ export const ExpenseComments: React.FC<ExpenseCommentsProps> = ({ expense, isOpe
                       <Edit className="h-3 w-3 mr-2" />
                       Edit
                     </DropdownMenuItem>
-                    <AlertDialog>
-                      <AlertDialogTrigger asChild>
-                        <DropdownMenuItem onSelect={(e) => e.preventDefault()}>
-                          <Trash2 className="h-3 w-3 mr-2" />
-                          Delete
-                        </DropdownMenuItem>
-                      </AlertDialogTrigger>
-                      <AlertDialogContent className="bg-card">
-                        <AlertDialogHeader>
-                          <AlertDialogTitle>Delete Comment</AlertDialogTitle>
-                          <AlertDialogDescription>
-                            Are you sure you want to delete this comment? This action cannot be undone.
-                          </AlertDialogDescription>
-                        </AlertDialogHeader>
-                        <AlertDialogFooter>
-                          <AlertDialogCancel>Cancel</AlertDialogCancel>
-                          <AlertDialogAction
-                            onClick={() => handleDeleteComment(comment.id)}
-                            className="bg-destructive hover:bg-destructive"
-                          >
-                            Delete
-                          </AlertDialogAction>
-                        </AlertDialogFooter>
-                      </AlertDialogContent>
-                    </AlertDialog>
+                    <DropdownMenuItem onClick={() => handleDeleteComment(comment.id)}>
+                      <Trash2 className="h-3 w-3 mr-2" aria-hidden="true" />
+                      Delete
+                    </DropdownMenuItem>
                   </DropdownMenuContent>
                 </DropdownMenu>
               )}
@@ -239,7 +213,7 @@ export const ExpenseComments: React.FC<ExpenseCommentsProps> = ({ expense, isOpe
         </Card>
 
         {/* Render replies */}
-        {comment.replies && comment.replies.map(reply => renderComment(reply, true))}
+        {comment.replies && comment.replies.filter(shown).map(reply => renderComment(reply, true))}
       </div>
     );
   };
@@ -270,7 +244,7 @@ export const ExpenseComments: React.FC<ExpenseCommentsProps> = ({ expense, isOpe
             )}
           </div>
 
-          {/* Add Comment */}
+          {/* Add comment */}
           <div className="border-t pt-4 mt-4">
             <div className="space-y-3">
               <Textarea
@@ -290,7 +264,7 @@ export const ExpenseComments: React.FC<ExpenseCommentsProps> = ({ expense, isOpe
                 </span>
                 <Button onClick={handleAddComment} disabled={!newComment.trim()}>
                   <Send className="h-4 w-4 mr-2" />
-                  Add Comment
+                  Add comment
                 </Button>
               </div>
             </div>

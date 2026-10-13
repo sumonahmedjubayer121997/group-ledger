@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useEffect, useState } from 'react';
+import React, { createContext, useContext, useEffect, useRef, useState } from 'react';
 import {
   User,
   onAuthStateChanged,
@@ -66,8 +66,24 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
+  // Whoever was signed in a moment ago, to notice signing out (or a deleted account).
+  const previousUid = useRef<string | null>(null);
+
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
+      if (previousUid.current && !firebaseUser) {
+        // Signed out: forget that account's data saved on this device, then start fresh.
+        previousUid.current = null;
+        try {
+          const { clearLocalData } = await import('@/lib/firebase');
+          await clearLocalData();
+        } catch {
+          // Another open tab may still be using it; it's replaced on the next sign-in anyway.
+        }
+        window.location.replace('/');
+        return;
+      }
+      previousUid.current = firebaseUser?.uid ?? null;
       setUser(firebaseUser);
       setInitializing(false);
 

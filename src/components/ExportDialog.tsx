@@ -10,26 +10,36 @@ import { useAuth } from '@/contexts/AuthContext';
 import { expenseShares, formatTotals, fromCents, makeResolver, toCents, toCurrencyCode } from '@/lib/money';
 import { Download, FileText, FileSpreadsheet } from 'lucide-react';
 import { format, startOfMonth, startOfYear, subDays } from 'date-fns';
-import type { jsPDF as JsPDF } from 'jspdf';
 import { useToast } from '@/hooks/use-toast';
+import { summarizeSpending } from '@/lib/spendingSummary';
 
 interface ExportDialogProps {
   children: React.ReactNode;
   /** Pre-selects one group (e.g. when opened from a group page). */
   groupId?: string;
+  /** Export just these expenses (selected on the Expenses page); hides the filters. */
+  onlyIds?: string[];
 }
 
-declare module 'jspdf' {
-  interface jsPDF {
-    autoTable: (options: unknown) => jsPDF;
-  }
-}
+/**
+ * The PDF library is large, so it only downloads when someone exports a PDF. jspdf-autotable 5 no
+ * longer adds doc.autoTable() when imported as a module, so its autoTable(doc, options) is used.
+ */
+const loadPdf = async () => {
+  const [{ jsPDF }, { autoTable }, { buildReport, pdfMoney }] = await Promise.all([
+    import('jspdf'),
+    import('jspdf-autotable'),
+    import('@/lib/pdfReport'),
+  ]);
+  return { jsPDF, autoTable, buildReport, pdfMoney };
+};
 
-/** The PDF library is large, so it only downloads when someone exports a PDF. */
-const loadPdf = async (): Promise<new () => JsPDF> => {
-  const { default: PDF } = await import('jspdf');
-  await import('jspdf-autotable');
-  return PDF as unknown as new () => JsPDF;
+const rangeLabels: Record<string, string> = {
+  all: 'All time',
+  today: 'Today',
+  last_30_days: 'Last 30 days',
+  this_month: 'This month',
+  this_year: 'This year',
 };
 
 type Row = {
@@ -64,7 +74,7 @@ const download = (blob: Blob, filename: string) => {
 
 const slug = (text: string) => text.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'expenses';
 
-export const ExportDialog: React.FC<ExportDialogProps> = ({ children, groupId }) => {
+export const ExportDialog: React.FC<ExportDialogProps> = ({ children, groupId, onlyIds }) => {
   const [open, setOpen] = useState(false);
   const [exportFormat, setExportFormat] = useState<'csv' | 'pdf'>('csv');
   const [dateRange, setDateRange] = useState('all');
@@ -78,9 +88,13 @@ export const ExportDialog: React.FC<ExportDialogProps> = ({ children, groupId })
   const { toast } = useToast();
 
   const groupsById = useMemo(() => new Map(groups.map((g) => [g.id, g] as [string, Group])), [groups]);
+  const only = useMemo(() => (onlyIds ? new Set(onlyIds) : null), [onlyIds]);
   const inScope = useMemo(
-    () => expenses.filter((e) => groupsById.has(e.groupId) && (selectedGroup === 'all' || e.groupId === selectedGroup)),
-    [expenses, groupsById, selectedGroup]
+    () =>
+      expenses.filter(
+        (e) => groupsById.has(e.groupId) && (only ? only.has(e.id) : selectedGroup === 'all' || e.groupId === selectedGroup)
+      ),
+    [expenses, groupsById, selectedGroup, only]
   );
   const categories = useMemo(() => [...new Set(inScope.map((e) => e.category).filter(Boolean))].sort(), [inScope]);
 
@@ -125,7 +139,7 @@ export const ExportDialog: React.FC<ExportDialogProps> = ({ children, groupId })
     return t;
   }, [rows]);
 
-  const baseName = `${selectedGroup === 'all' ? 'splitwize' : slug(groupsById.get(selectedGroup)?.name ?? '')}-expenses-${format(new Date(), 'yyyy-MM-dd')}`;
+  const baseName = `${only ? 'splitwize-selected' : selectedGroup === 'all' ? 'splitwize' : slug(groupsById.get(selectedGroup)?.name ?? '')}-expenses-${format(new Date(), 'yyyy-MM-dd')}`;
 
   const exportToCSV = () => {
     const header = ['Date', 'Group', 'Description', 'Category', 'Amount', 'Currency', 'Paid by', 'Split between', 'Your share'];
@@ -148,32 +162,65 @@ export const ExportDialog: React.FC<ExportDialogProps> = ({ children, groupId })
     download(new Blob(['﻿' + [header.map(csvCell).join(','), ...lines].join('\r\n')], { type: 'text/csv;charset=utf-8' }), `${baseName}.csv`);
   };
 
-  // The PDF fonts can't draw every currency symbol (e.g. ৳), so amounts use ISO codes.
-  const pdfAmount = (cents: number, currency: string) =>
-    `${currency} ${fromCents(cents).toLocaleString('en', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
-
+  /** A summary per currency (as on the Insights tab), then every expense. */
   const exportToPDF = async () => {
-    const PDF = await loadPdf();
-    const doc = new PDF();
-    doc.setFontSize(18);
-    doc.text('SplitWize expense report', 14, 20);
-    doc.setFontSize(10);
-    doc.text(`Generated ${format(new Date(), 'd MMMM yyyy')}  ·  ${rows.length} expenses`, 14, 28);
-    const totalsText = [...totals].map(([c, cents]) => pdfAmount(cents, c)).join('   ');
-    doc.text(`Total: ${totalsText || '0'}`, 14, 35);
-    doc.autoTable({
-      head: [['Date', 'Group', 'Description', 'Amount', 'Paid by', 'Your share']],
-      body: rows.map((r) => [
-        format(r.date, 'd MMM yyyy'),
-        r.group,
-        r.description,
-        pdfAmount(r.amountCents, r.currency),
-        r.paidBy,
-        pdfAmount(r.yourShareCents, r.currency),
-      ]),
-      startY: 42,
-      styles: { fontSize: 8 },
-      headStyles: { fillColor: [31, 41, 55] },
+    const { jsPDF, autoTable, buildReport, pdfMoney } = await loadPdf();
+    const doc = new jsPDF();
+
+    const counts = new Map<string, number>();
+    for (const r of rows) counts.set(r.currency, (counts.get(r.currency) ?? 0) + 1);
+    const sections = [...counts]
+      .sort((a, b) => b[1] - a[1])
+      .map(([currency]) => ({
+        currency,
+        summary: summarizeSpending(
+          rows
+            .filter((r) => r.currency === currency)
+            .map((r) => ({ cents: r.amountCents, shareCents: r.yourShareCents, category: r.category, payer: r.paidBy, date: r.date, description: r.description }))
+        ),
+      }));
+
+    const dates =
+      dateRange === 'custom'
+        ? `${startDate ? format(new Date(`${startDate}T00:00:00`), 'd MMM yyyy') : 'the start'} to ${endDate ? format(new Date(`${endDate}T00:00:00`), 'd MMM yyyy') : 'today'}`
+        : rangeLabels[dateRange] ?? 'All time';
+    const scope = only
+      ? `${rows.length} selected ${rows.length === 1 ? 'expense' : 'expenses'}`
+      : [
+          selectedGroup === 'all' ? 'All groups' : groupsById.get(selectedGroup)?.name ?? 'One group',
+          category === 'all' ? '' : category,
+          dates,
+          `${rows.length} ${rows.length === 1 ? 'expense' : 'expenses'}`,
+        ]
+          .filter(Boolean)
+          .join(' · ');
+
+    // A4 leaves 182 mm; Description takes what's left.
+    const manyGroups = new Set(rows.map((r) => r.group)).size > 1;
+    buildReport(doc, autoTable, {
+      title: 'Expense report',
+      scope,
+      sections,
+      table: {
+        columns: [
+          { title: 'Date', width: 21 },
+          ...(manyGroups ? [{ title: 'Group', width: 28 }] : []),
+          { title: 'Description' },
+          { title: 'Category', width: 27 },
+          { title: 'Paid by', width: 26 },
+          { title: 'Amount', width: 22, align: 'right' as const },
+          { title: 'Your share', width: 20, align: 'right' as const },
+        ],
+        body: rows.map((r) => [
+          format(r.date, 'd MMM yyyy'),
+          ...(manyGroups ? [r.group] : []),
+          r.description,
+          r.category,
+          r.paidBy,
+          pdfMoney(r.amountCents, r.currency),
+          pdfMoney(r.yourShareCents, r.currency),
+        ]),
+      },
     });
     doc.save(`${baseName}.pdf`);
   };
@@ -199,7 +246,11 @@ export const ExportDialog: React.FC<ExportDialogProps> = ({ children, groupId })
             <Download className="w-5 h-5" />
             <span>Export expenses</span>
           </DialogTitle>
-          <DialogDescription>Download expenses as a spreadsheet (CSV) or a printable PDF.</DialogDescription>
+          <DialogDescription>
+            {only
+              ? `Download the ${only.size} selected expense${only.size === 1 ? '' : 's'} as a spreadsheet (CSV) or a printable PDF.`
+              : 'Download expenses as a spreadsheet (CSV) or a printable PDF.'}
+          </DialogDescription>
         </DialogHeader>
 
         <div className="space-y-5 py-2">
@@ -219,6 +270,8 @@ export const ExportDialog: React.FC<ExportDialogProps> = ({ children, groupId })
             </RadioGroup>
           </div>
 
+          {!only && (
+          <>
           <div className="grid gap-4 sm:grid-cols-2">
             <div className="space-y-2">
               <Label htmlFor="export-group">Group</Label>
@@ -282,6 +335,8 @@ export const ExportDialog: React.FC<ExportDialogProps> = ({ children, groupId })
               </div>
             )}
           </div>
+          </>
+          )}
 
           <div className="rounded-lg bg-muted/50 p-4" aria-live="polite">
             <div className="font-medium">

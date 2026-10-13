@@ -1,6 +1,7 @@
 import { useMemo } from "react";
 import { useExpenseStore, type Expense, type Group, type Member, type Settlement } from "./expenseStore";
 import { debtsToShow, groupLedger, toCurrencyCode, type Debt, type GroupLedger } from "@/lib/money";
+import { useHidden } from "@/lib/undo";
 
 export type Person = { id: string; name: string; email?: string; isFormer?: boolean };
 
@@ -22,7 +23,10 @@ export type GroupLedgerView = {
 };
 
 /** Builds the ledger for one group from its expenses and its Firestore settlements. */
-export function buildGroupLedger(group: Group, expenses: Expense[], settlements: Settlement[]): GroupLedgerView {
+export function buildGroupLedger(group: Group, allExpenses: Expense[], allSettlements: Settlement[], hidden?: Set<string>): GroupLedgerView {
+  // Items deleted a moment ago (still undoable) no longer count.
+  const expenses = hidden?.size ? allExpenses.filter((e) => !hidden.has(`expense-${e.id}`)) : allExpenses;
+  const settlements = hidden?.size ? allSettlements.filter((s) => !hidden.has(`payment-${s.id}`)) : allSettlements;
   const members = group.members.map((m) => ({ id: m.id, email: m.email, name: m.name }));
   const ledger = groupLedger({ members, expenses, settlements });
   const currency = toCurrencyCode(group.settings?.currency);
@@ -55,6 +59,7 @@ export function useGroupLedger(groupId: string | undefined): GroupLedgerView | n
   const group = useExpenseStore((s) => s.groups.find((g) => g.id === groupId));
   const expenses = useExpenseStore((s) => s.expenses);
   const settlements = useExpenseStore((s) => (groupId ? s.groupSettlements[groupId] : undefined));
+  const hidden = useHidden((s) => s.hidden);
 
   return useMemo(() => {
     if (!group) return null;
@@ -62,8 +67,9 @@ export function useGroupLedger(groupId: string | undefined): GroupLedgerView | n
       group,
       expenses.filter((e) => e.groupId === group.id),
       settlements ?? [],
+      hidden,
     );
-  }, [group, expenses, settlements]);
+  }, [group, expenses, settlements, hidden]);
 }
 
 export type UserBalances = {
@@ -80,6 +86,7 @@ export function useUserBalances(userId: string | undefined): UserBalances {
   const groups = useExpenseStore((s) => s.groups);
   const expenses = useExpenseStore((s) => s.expenses);
   const groupSettlements = useExpenseStore((s) => s.groupSettlements);
+  const hidden = useHidden((s) => s.hidden);
 
   return useMemo(() => {
     const owedToYou = new Map<string, number>();
@@ -94,6 +101,7 @@ export function useUserBalances(userId: string | undefined): UserBalances {
         group,
         expenses.filter((e) => e.groupId === group.id),
         groupSettlements[group.id] ?? [],
+        hidden,
       );
       const net = view.ledger.nets.get(userId) ?? 0;
       const mine = view.debts.filter((d) => d.from === userId || d.to === userId);
@@ -103,7 +111,7 @@ export function useUserBalances(userId: string | undefined): UserBalances {
       if (net < 0) youOwe.set(view.currency, (youOwe.get(view.currency) ?? 0) - net);
     }
     return { perGroup, debts, owedToYou, youOwe };
-  }, [userId, groups, expenses, groupSettlements]);
+  }, [userId, groups, expenses, groupSettlements, hidden]);
 }
 
 /** Currency code for any group in the store, e.g. currencyOf(expense.groupId) -> "GBP". */

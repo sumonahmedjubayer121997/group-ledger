@@ -3,7 +3,6 @@ import { useNavigate } from 'react-router-dom';
 import { Archive, ArchiveRestore, Trash2 } from 'lucide-react';
 import {
   AlertDialog,
-  AlertDialogAction,
   AlertDialogCancel,
   AlertDialogContent,
   AlertDialogDescription,
@@ -17,13 +16,14 @@ import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
 import { useExpenseStore, type Group } from '@/stores/expenseStore';
 import { deleteGroupCompletely } from '@/services/firebaseService';
+import { doneWithUndo } from '@/lib/undo';
 
 /** Archive / restore (any member) and permanent delete (admins), each behind an honest confirmation. */
 export const GroupLifecycleActions: React.FC<{ group: Group; isAdmin: boolean; compact?: boolean }> = ({ group, isAdmin, compact }) => {
   const { archiveGroup, unarchiveGroup } = useExpenseStore();
   const { toast } = useToast();
   const navigate = useNavigate();
-  const [confirm, setConfirm] = useState<'archive' | 'delete' | null>(null);
+  const [confirm, setConfirm] = useState<'delete' | null>(null);
   const [typedName, setTypedName] = useState('');
   const [busy, setBusy] = useState(false);
 
@@ -34,8 +34,13 @@ export const GroupLifecycleActions: React.FC<{ group: Group; isAdmin: boolean; c
         await unarchiveGroup(group.id);
         toast({ title: 'Group restored', description: `${group.name} is back in your groups list.` });
       } else {
+        // No "Are you sure?": archiving hides nothing for good, and Undo brings it straight back.
         await archiveGroup(group.id);
-        toast({ title: 'Group archived', description: `${group.name} moved to Archived. Nothing was deleted.` });
+        doneWithUndo({
+          title: `Archived ${group.name}`,
+          description: 'It moved to Archived. Nothing was deleted.',
+          undo: () => unarchiveGroup(group.id),
+        });
       }
     } catch {
       toast({ title: 'Something went wrong', description: 'Please try again.', variant: 'destructive' });
@@ -64,7 +69,7 @@ export const GroupLifecycleActions: React.FC<{ group: Group; isAdmin: boolean; c
 
   return (
     <>
-      <Button variant="outline" size={size} className="w-full justify-start" onClick={() => (group.isArchived ? archive() : setConfirm('archive'))} disabled={busy}>
+      <Button variant="outline" size={size} className="w-full justify-start" onClick={() => void archive()} disabled={busy}>
         {group.isArchived ? <ArchiveRestore className="mr-2 h-4 w-4" /> : <Archive className="mr-2 h-4 w-4" />}
         {group.isArchived ? 'Restore group' : 'Archive group'}
       </Button>
@@ -74,24 +79,6 @@ export const GroupLifecycleActions: React.FC<{ group: Group; isAdmin: boolean; c
           Delete group
         </Button>
       )}
-
-      <AlertDialog open={confirm === 'archive'} onOpenChange={(open) => !open && setConfirm(null)}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Archive {group.name}?</AlertDialogTitle>
-            <AlertDialogDescription>
-              The group moves to the Archived section of your groups list. Expenses, balances and chat are kept, and you can
-              restore it at any time.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel disabled={busy}>Cancel</AlertDialogCancel>
-            <AlertDialogAction onClick={archive} disabled={busy}>
-              Archive group
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
 
       <AlertDialog open={confirm === 'delete'} onOpenChange={(open) => { if (!open) { setConfirm(null); setTypedName(''); } }}>
         <AlertDialogContent>

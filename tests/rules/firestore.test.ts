@@ -16,6 +16,7 @@ import {
   getDocs,
   orderBy,
   query,
+  serverTimestamp,
   setDoc,
   updateDoc,
   where,
@@ -410,5 +411,69 @@ describe("invite links", () => {
         "users.vic": { name: "Vic", email: "vic@example.com", role: "member", inviteCode: CODE },
       }),
     );
+  });
+});
+
+describe("usage events", () => {
+  it("accepts counts and timings from signed-in people, and nothing else", async () => {
+    const add = (who: ReturnType<typeof as>, data: Record<string, unknown>) =>
+      setDoc(doc(collection(who, "usageEvents")), { event: "expense_saved", at: serverTimestamp(), v: 1, ...data });
+    await assertSucceeds(add(as(BOB), { durationMs: 8400, guessesChanged: 1, source: "group" }));
+    await assertFails(add(as(BOB), { description: "Hotel" }));
+    await assertFails(add(as(BOB), { durationMs: "slow" }));
+    await assertFails(add(env.unauthenticatedContext().firestore(), {}));
+    await assertFails(getDocs(collection(as(ALICE), "usageEvents")));
+  });
+});
+
+describe("personal loans", () => {
+  const loan = (over: Record<string, unknown> = {}) => ({
+    direction: "lent",
+    person: "Rahim",
+    personId: null,
+    amountCents: 500000,
+    currency: "BDT",
+    date: new Date("2026-10-01T12:00:00Z"),
+    dueDate: null,
+    note: "",
+    repayments: [],
+    createdAt: serverTimestamp(),
+    updatedAt: serverTimestamp(),
+    ...over,
+  });
+  const ref = (who: ReturnType<typeof as>, owner: string, id = "loan1") => doc(who, "users", owner, "loans", id);
+
+  it("lets only the owner create, read, change and delete their loans", async () => {
+    await assertSucceeds(setDoc(ref(as(BOB), "bob"), loan()));
+    await assertSucceeds(getDoc(ref(as(BOB), "bob")));
+    await assertSucceeds(getDocs(collection(as(BOB), "users", "bob", "loans")));
+    await assertFails(getDoc(ref(as(ALICE), "bob")));
+    await assertFails(getDocs(collection(as(ALICE), "users", "bob", "loans")));
+    await assertFails(setDoc(ref(as(ALICE), "bob", "loan2"), loan()));
+    await assertFails(updateDoc(ref(as(ALICE), "bob"), { note: "changed" }));
+    await assertFails(deleteDoc(ref(as(ALICE), "bob")));
+    await assertSucceeds(
+      updateDoc(ref(as(BOB), "bob"), {
+        repayments: [{ id: "r1", amountCents: 200000, date: new Date("2026-10-05T12:00:00Z"), note: "" }],
+        updatedAt: serverTimestamp(),
+      })
+    );
+    await assertSucceeds(deleteDoc(ref(as(BOB), "bob")));
+  });
+
+  it("rejects loans that don't look like loans", async () => {
+    const db = as(BOB);
+    await assertFails(setDoc(ref(db, "bob", "a"), loan({ direction: "gift" })));
+    await assertFails(setDoc(ref(db, "bob", "b"), loan({ amountCents: 0 })));
+    await assertFails(setDoc(ref(db, "bob", "c"), loan({ amountCents: 12.5 })));
+    await assertFails(setDoc(ref(db, "bob", "d"), loan({ person: "" })));
+    await assertFails(setDoc(ref(db, "bob", "e"), loan({ currency: "TAKA" })));
+    await assertFails(setDoc(ref(db, "bob", "f"), loan({ secret: "x" })));
+    await assertFails(setDoc(ref(db, "bob", "g"), loan({ date: "yesterday" })));
+  });
+
+  it("keeps when a loan was first recorded", async () => {
+    await assertSucceeds(setDoc(ref(as(BOB), "bob", "keep"), loan()));
+    await assertFails(updateDoc(ref(as(BOB), "bob", "keep"), { createdAt: new Date("2020-01-01T00:00:00Z") }));
   });
 });

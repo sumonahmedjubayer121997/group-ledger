@@ -9,6 +9,8 @@
     "build:dev": "vite build --mode development",
     "lint": "eslint .",
     "preview": "vite preview",
+    "emulators": "firebase emulators:start --only auth,firestore,storage --project demo-splitwize",
+    "dev:emulators": "vite --mode emulators --port 8081",
     "test:rules": "firebase emulators:exec --only auth,firestore,storage --project demo-splitwize \"vitest run --config vitest.rules.config.ts\"",
     "test": "vitest run",
     "typecheck": "tsc --noEmit -p tsconfig.app.json"
@@ -59,6 +61,7 @@
     "input-otp": "^1.2.4",
     "jspdf": "^3.0.1",
     "jspdf-autotable": "^5.0.2",
+    "jsqr": "^1.4.0",
     "lucide-react": "^0.462.0",
     "next-themes": "^0.3.0",
     "papaparse": "^5.5.3",
@@ -98,6 +101,7 @@
     "typescript": "^5.5.3",
     "typescript-eslint": "8.71",
     "vite": "^6.3.6",
+    "vite-plugin-pwa": "^0.21.1",
     "vitest": "^3.2.7"
   }
 }

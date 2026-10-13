@@ -1,6 +1,6 @@
-import type { ReactNode } from "react";
-import { Link, NavLink } from "react-router-dom";
-import { Home, LogOut, Monitor, Moon, Plus, Receipt, Search, Sun, Tag, Upload, User, Users, Wallet } from "lucide-react";
+import { useCallback, useEffect, useState, type ReactNode } from "react";
+import { Link, NavLink, useSearchParams } from "react-router-dom";
+import { Home, LogOut, Monitor, Moon, MonitorDown, Plus, Receipt, Search, Sun, Upload, User, Users, Wallet } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import {
@@ -21,11 +21,13 @@ import { useThemeSetting } from "@/hooks/useThemeSetting";
 import { useAuth } from "@/contexts/AuthContext";
 import { cn } from "@/lib/utils";
 import { useAppActions } from "./appActions";
+import { CommandBar } from "./CommandBar";
+import { ShortcutsDialog, useShortcuts } from "./shortcuts";
 
 const mainNav = [
   { to: "/", label: "Overview", icon: Home, end: true },
   { to: "/expenses", label: "Expenses", icon: Receipt, end: false },
-  { to: "/budgets", label: "Budgets", icon: Wallet, end: false },
+  { to: "/personal", label: "Personal", icon: Wallet, end: false },
 ];
 
 const initials = (name: string) =>
@@ -39,7 +41,7 @@ const initials = (name: string) =>
 
 function AccountMenu() {
   const { user, userProfile, logout } = useAuth();
-  const { openNewGroup } = useAppActions();
+  const { openNewGroup, installState, openInstall } = useAppActions();
   const { theme, change } = useThemeSetting();
   const name = userProfile?.name || user?.displayName || "You";
 
@@ -69,18 +71,18 @@ function AccountMenu() {
           <Users aria-hidden="true" />
           New group
         </DropdownMenuItem>
-        <DropdownMenuItem asChild>
-          <Link to="/categories">
-            <Tag aria-hidden="true" />
-            Categories
-          </Link>
-        </DropdownMenuItem>
         <ImportDialog>
           <DropdownMenuItem onSelect={(event) => event.preventDefault()}>
             <Upload aria-hidden="true" />
             Import expenses
           </DropdownMenuItem>
         </ImportDialog>
+        {(installState === "prompt" || installState === "ios") && (
+          <DropdownMenuItem onSelect={openInstall}>
+            <MonitorDown aria-hidden="true" />
+            Install the app
+          </DropdownMenuItem>
+        )}
         <DropdownMenuSeparator />
         <DropdownMenuLabel className="text-xs font-normal text-muted-foreground">Theme</DropdownMenuLabel>
         <DropdownMenuRadioGroup value={theme} onValueChange={change}>
@@ -142,7 +144,7 @@ function BottomBar() {
         <li className="flex items-center justify-center">
           <button
             type="button"
-            onClick={() => openAddExpense()}
+            onClick={() => openAddExpense(undefined, "bottom-bar")}
             className="flex h-12 w-12 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-sm transition-transform active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
             aria-label="Add expense"
           >
@@ -150,9 +152,9 @@ function BottomBar() {
           </button>
         </li>
         <li>
-          <NavLink to="/budgets" className={item}>
+          <NavLink to="/personal" className={item}>
             <Wallet className="h-5 w-5" aria-hidden="true" />
-            Budgets
+            Personal
           </NavLink>
         </li>
         <li>
@@ -168,7 +170,43 @@ function BottomBar() {
 
 /** One header and layout for every signed-in page. */
 export function AppShell({ children }: { children: ReactNode }) {
-  const { openAddExpense } = useAppActions();
+  const { openAddExpense, openJoinGroup } = useAppActions();
+  const [searchOpen, setSearchOpen] = useState(false);
+  const [shortcutsOpen, setShortcutsOpen] = useState(false);
+  const isMac = typeof navigator !== "undefined" && /Mac|iPhone|iPad/.test(navigator.platform);
+  const onAdd = useCallback(() => openAddExpense(undefined, "shortcut"), [openAddExpense]);
+  const onSearch = useCallback(() => setSearchOpen(true), []);
+  const onHelp = useCallback(() => setShortcutsOpen(true), []);
+  useShortcuts({ onAdd, onSearch, onHelp });
+
+  // The installed app's icon shortcuts open /?action=add-expense or /?action=join.
+  const [params, setParams] = useSearchParams();
+  useEffect(() => {
+    const action = params.get("action");
+    if (!action) return;
+    if (action === "add-expense") openAddExpense(undefined, "app-shortcut");
+    if (action === "join") openJoinGroup();
+    setParams(
+      (prev) => {
+        const next = new URLSearchParams(prev);
+        next.delete("action");
+        return next;
+      },
+      { replace: true }
+    );
+  }, [params, setParams, openAddExpense, openJoinGroup]);
+
+  // Ctrl+K (⌘K on a Mac) opens the command bar from anywhere.
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "k") {
+        e.preventDefault();
+        setSearchOpen((open) => !open);
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, []);
 
   return (
     <div className="min-h-screen bg-background text-foreground">
@@ -195,13 +233,20 @@ export function AppShell({ children }: { children: ReactNode }) {
             ))}
           </nav>
           <div className="ml-auto flex items-center gap-1 sm:gap-2">
-            <Button variant="ghost" size="icon" asChild>
-              <Link to="/search" aria-label="Search">
-                <Search aria-hidden="true" />
-              </Link>
+            <Button variant="ghost" size="icon" className="md:hidden" onClick={() => setSearchOpen(true)} aria-label="Search">
+              <Search aria-hidden="true" />
             </Button>
+            <button
+              type="button"
+              onClick={() => setSearchOpen(true)}
+              className="hidden h-9 w-56 items-center gap-2 rounded-lg border bg-card px-3 text-sm text-muted-foreground transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring md:flex"
+            >
+              <Search className="h-4 w-4" aria-hidden="true" />
+              <span className="flex-1 text-left">Search</span>
+              <kbd className="rounded border px-1.5 font-inter text-[11px]">{isMac ? "⌘K" : "Ctrl K"}</kbd>
+            </button>
             <NotificationBell />
-            <Button className="hidden md:inline-flex" onClick={() => openAddExpense()}>
+            <Button className="hidden md:inline-flex" onClick={() => openAddExpense(undefined, "header")}>
               <Plus aria-hidden="true" />
               Add expense
             </Button>
@@ -216,6 +261,8 @@ export function AppShell({ children }: { children: ReactNode }) {
 
       <BottomBar />
       <OfflineIndicator />
+      <CommandBar open={searchOpen} onOpenChange={setSearchOpen} onShowShortcuts={() => setShortcutsOpen(true)} />
+      <ShortcutsDialog open={shortcutsOpen} onOpenChange={setShortcutsOpen} isMac={isMac} />
     </div>
   );
 }

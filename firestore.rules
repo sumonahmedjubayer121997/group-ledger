@@ -42,6 +42,21 @@ service cloud.firestore {
       return canWriteIn(groupData(groupId));
     }
 
+    // A personal loan (users/{uid}/loans): who, which way, how much, and any repayments.
+    function validLoan(d) {
+      return d.keys().hasOnly(['direction', 'person', 'personId', 'amountCents', 'currency', 'date', 'dueDate',
+                               'note', 'repayments', 'createdAt', 'updatedAt'])
+        && d.direction in ['lent', 'borrowed']
+        && d.person is string && d.person.size() > 0 && d.person.size() <= 80
+        && (d.personId == null || (d.personId is string && d.personId.size() <= 128))
+        && d.amountCents is int && d.amountCents > 0 && d.amountCents <= 100000000000
+        && d.currency is string && d.currency.size() == 3
+        && d.date is timestamp
+        && (d.dueDate == null || d.dueDate is timestamp)
+        && d.note is string && d.note.size() <= 500
+        && d.repayments is list && d.repayments.size() <= 200;
+    }
+
     // ---------- user profiles ----------
     match /users/{uid} {
       // Members' names and photos are shown inside groups.
@@ -61,6 +76,14 @@ service cloud.firestore {
 
       match /budgets/{budgetId} {
         allow read, write: if signedIn() && request.auth.uid == uid;
+      }
+
+      // Personal loans are private: only their owner can see or change them.
+      match /loans/{loanId} {
+        allow read, delete: if signedIn() && request.auth.uid == uid;
+        allow create: if signedIn() && request.auth.uid == uid && validLoan(request.resource.data);
+        allow update: if signedIn() && request.auth.uid == uid && validLoan(request.resource.data)
+          && request.resource.data.createdAt == resource.data.createdAt;
       }
     }
 
@@ -212,6 +235,20 @@ service cloud.firestore {
         && resource.data.to == request.auth.uid
         && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['isRead']);
       allow delete: if signedIn() && resource.data.to == request.auth.uid;
+    }
+
+    // ---------- anonymous usage events (counts and timings only) ----------
+    // Written by the app to measure whether core jobs got faster; nobody can read them from the app.
+    match /usageEvents/{eventId} {
+      allow create: if signedIn()
+        && request.resource.data.keys().hasOnly(['event', 'at', 'v', 'durationMs', 'guessesChanged', 'source'])
+        && request.resource.data.event is string
+        && request.resource.data.event.size() <= 40
+        && request.resource.data.at == request.time
+        && (!('durationMs' in request.resource.data) || request.resource.data.durationMs is int)
+        && (!('guessesChanged' in request.resource.data) || request.resource.data.guessesChanged is int)
+        && (!('source' in request.resource.data) || (request.resource.data.source is string && request.resource.data.source.size() <= 30));
+      allow read, update, delete: if false;
     }
 
     // Everything else is closed.

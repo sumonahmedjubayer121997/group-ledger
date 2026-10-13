@@ -8,7 +8,8 @@ import { Textarea } from '@/components/ui/textarea';
 import { Switch } from '@/components/ui/switch';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useExpenseStore, Group } from '@/stores/expenseStore';
-import { Settings, Upload, Save, Copy, RefreshCw } from 'lucide-react';
+import { Upload, Save, Copy, RefreshCw, ChevronDown } from 'lucide-react';
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { regenerateInviteLink, setLinkJoining } from '@/services/firebaseService';
 import { toast } from "sonner";
 import { GroupPictureUpload } from '@/components/GroupPictureUpload';
@@ -118,11 +119,10 @@ export const GroupSettings: React.FC<GroupSettingsProps> = ({ group }) => {
   coverImage,
 });
 
-    console.log("Group updated successfully!");
-    toast.success("Group settings updated successfully!");
+    toast.success("Saved your changes");
   } catch (err) {
     console.error("Failed to update group settings:", err);
-    toast.error("Failed to update group settings.");
+    toast.error("Couldn't save your changes", { description: "Please try again." });
   }
 };
 
@@ -130,61 +130,16 @@ export const GroupSettings: React.FC<GroupSettingsProps> = ({ group }) => {
     <div className="space-y-6">
       <Card>
         <CardHeader>
-          <CardTitle className="flex items-center space-x-2">
-            <Settings className="w-5 h-5" />
-            <span>Group Settings</span>
-          </CardTitle>
+          <CardTitle className="text-xl">Group details</CardTitle>
         </CardHeader>
         <CardContent className="space-y-6">
-          {/* Basic Information */}
-          <div className="space-y-4">
-            <h3 className="text-lg font-medium">Basic Information</h3>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <Label htmlFor="name">Group Name</Label>
-                <Input
-                  id="name"
-                  value={name}
-                  onChange={(e) => setName(e.target.value)}
-                  placeholder="Enter group name"
-                />
-              </div>
-              <div>
-                <Label htmlFor="location">Location (Optional)</Label>
-                <Input
-                  id="location"
-                  value={location}
-                  onChange={(e) => setLocation(e.target.value)}
-                  placeholder="e.g., New York, Paris"
-                />
-              </div>
+          <div className="grid gap-4 md:grid-cols-2">
+            <div className="space-y-1.5">
+              <Label htmlFor="name">Name</Label>
+              <Input id="name" value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g. Flat 4B" />
             </div>
-            <div>
-              <Label htmlFor="description">Description</Label>
-              <Textarea
-                id="description"
-                value={description}
-                onChange={(e) => setDescription(e.target.value)}
-                placeholder="Describe your group"
-                rows={3}
-              />
-            </div>
-            <div>
-              <Label htmlFor="tags">Tags (comma separated)</Label>
-              <Input
-                id="tags"
-                value={tags}
-                onChange={(e) => setTags(e.target.value)}
-                placeholder="e.g., Trip, Flatmates, Office"
-              />
-            </div>
-          </div>
-
-          {/* Financial Settings */}
-          <div className="space-y-4">
-            <h3 className="text-lg font-medium">Financial Settings</h3>
-            <div>
-              <Label htmlFor="currency">Default Currency</Label>
+            <div className="space-y-1.5">
+              <Label htmlFor="currency">Currency</Label>
               <Select value={currency} onValueChange={setCurrency}>
                 <SelectTrigger id="currency">
                   <SelectValue placeholder="Select currency" />
@@ -198,103 +153,38 @@ export const GroupSettings: React.FC<GroupSettingsProps> = ({ group }) => {
                 </SelectContent>
               </Select>
             </div>
-            <div className="flex items-center justify-between">
-              <div>
-                <Label htmlFor="simplify-debts">Simplify Debts</Label>
-                <p className="text-sm text-muted-foreground">
-                  Automatically reduce circular debts to minimize transactions
-                </p>
-              </div>
-              <Switch
-                id="simplify-debts"
-                checked={simplifyDebts}
-                onCheckedChange={setSimplifyDebts}
-              />
-            </div>
+          </div>
+          <div className="space-y-1.5">
+            <Label htmlFor="description">Description</Label>
+            <Textarea id="description" value={description} onChange={(e) => setDescription(e.target.value)} placeholder="What's this group for?" rows={2} />
           </div>
 
-          {/* Feature Settings */}
-          <div className="space-y-4">
-            <h3 className="text-lg font-medium">Features</h3>
-            <div className="flex items-center justify-between">
-              <div>
-                <Label htmlFor="notifications">Notifications</Label>
-                <p className="text-sm text-muted-foreground">
-                  Receive notifications for group activities
-                </p>
-              </div>
-              <Switch
-                id="notifications"
-                checked={notifications}
-                onCheckedChange={setNotifications}
-              />
+          <div className="flex items-center justify-between gap-4">
+            <div>
+              <Label htmlFor="simplify-debts">Simplify debts</Label>
+              <p className="text-sm text-muted-foreground">Settle with the fewest payments, instead of paying back each expense.</p>
             </div>
+            <Switch id="simplify-debts" checked={simplifyDebts} onCheckedChange={setSimplifyDebts} />
           </div>
-
-          {/* Group Customization */}
-          <div className="space-y-4">
-            
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-             
-             <div className="space-y-4">
-  <h3 className="text-lg font-medium">Customization</h3>
-  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-    <div>
-      <Label>Group Photo</Label>
-      <div className="mt-2 flex items-center space-x-3">
-        <div className="w-16 h-16 bg-muted rounded-lg flex items-center justify-center">
-          {photo ? (
-            <img src={photo} alt="Group" className="w-full h-full object-cover rounded-lg" />
-          ) : (
-            <Upload className="w-6 h-6 text-muted-foreground" />
-          )}
-        </div>
-        {/* Enable upload and connect to photo handler */}
-        <GroupPictureUpload
-  currentPhotoURL={photo || undefined}
-  onPhotoChange={handlePhotoChange}
-  type="photo"
-// Save on photo change 
-/>
-      </div>
-    </div>
-    <div>
-      <Label>Cover Image</Label>
-      <div className="mt-2 flex items-center space-x-3">
-        <div className="w-32 h-16 bg-muted rounded-lg flex items-center justify-center">
-          {coverImage ? (
-            <img src={coverImage} alt="Cover" className="w-full h-full object-cover rounded-lg" />
-          ) : (
-            <Upload className="w-6 h-6 text-muted-foreground" />
-          )}
-        </div>
-        {/* Use a separate handler for cover image */}
-        <GroupPictureUpload
-  currentPhotoURL={coverImage || undefined}
-  onPhotoChange={handleCoverImageChange}
-  type="coverImage"
-/>
-      </div>
-    </div>
-  </div>
-</div>
+          <div className="flex items-center justify-between gap-4">
+            <div>
+              <Label htmlFor="notifications">Notifications</Label>
+              <p className="text-sm text-muted-foreground">Tell members about new expenses and payments in this group.</p>
             </div>
+            <Switch id="notifications" checked={notifications} onCheckedChange={setNotifications} />
           </div>
 
           {/* Invite link */}
-          <div className="space-y-4">
-            <h3 className="text-lg font-medium">Invite link</h3>
-            <div className="flex items-center justify-between">
+          <div className="space-y-3 border-t pt-6">
+            <div className="flex items-center justify-between gap-4">
               <div>
                 <Label htmlFor="link-joining">Anyone with the link can join</Label>
-                <p className="text-sm text-muted-foreground">
-                  When off, the group is invite-only and members add people by email.
-                </p>
+                <p className="text-sm text-muted-foreground">When off, the group is invite-only and members add people by email.</p>
               </div>
               <Switch id="link-joining" checked={linkEnabled} onCheckedChange={toggleLink} disabled={linkBusy} />
             </div>
             {linkEnabled && (
-              <div className="flex items-center space-x-2">
+              <div className="flex items-center gap-2">
                 <Input
                   value={inviteLink}
                   placeholder="No link yet. Create one."
@@ -310,21 +200,60 @@ export const GroupSettings: React.FC<GroupSettingsProps> = ({ group }) => {
                   disabled={!inviteLink}
                   onClick={() => navigator.clipboard.writeText(inviteLink).then(() => toast.success('Link copied'))}
                 >
-                  <Copy className="w-4 h-4" />
+                  <Copy aria-hidden="true" />
                 </Button>
                 <Button variant="outline" size="sm" onClick={regenerateLink} disabled={linkBusy}>
-                  <RefreshCw className="w-4 h-4 mr-2" />
+                  <RefreshCw aria-hidden="true" />
                   New link
                 </Button>
               </div>
             )}
           </div>
 
-          {/* Save Button */}
-          <div className="flex justify-end pt-4">
-            <Button onClick={handleSave} className="flex items-center space-x-2">
-              <Save className="w-4 h-4" />
-              <span>Save Settings</span>
+          {/* Rarely changed, so out of the way. */}
+          <Collapsible className="border-t pt-4">
+            <CollapsibleTrigger className="group flex items-center gap-1.5 rounded-sm text-sm text-muted-foreground hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+              More details
+              <ChevronDown className="h-4 w-4 transition-transform group-data-[state=open]:rotate-180" aria-hidden="true" />
+            </CollapsibleTrigger>
+            <CollapsibleContent className="mt-4 space-y-4">
+              <div className="grid gap-4 md:grid-cols-2">
+                <div className="space-y-1.5">
+                  <Label htmlFor="location">Location</Label>
+                  <Input id="location" value={location} onChange={(e) => setLocation(e.target.value)} placeholder="e.g. Dhaka, London" />
+                </div>
+                <div className="space-y-1.5">
+                  <Label htmlFor="tags">Tags</Label>
+                  <Input id="tags" value={tags} onChange={(e) => setTags(e.target.value)} placeholder="Trip, Flatmates" />
+                </div>
+              </div>
+              <div className="grid gap-4 md:grid-cols-2">
+                <div>
+                  <Label>Group photo</Label>
+                  <div className="mt-2 flex items-center gap-3">
+                    <div className="flex h-16 w-16 items-center justify-center rounded-lg bg-muted">
+                      {photo ? <img src={photo} alt="" className="h-full w-full rounded-lg object-cover" /> : <Upload className="h-6 w-6 text-muted-foreground" aria-hidden="true" />}
+                    </div>
+                    <GroupPictureUpload currentPhotoURL={photo || undefined} onPhotoChange={handlePhotoChange} type="photo" />
+                  </div>
+                </div>
+                <div>
+                  <Label>Cover image</Label>
+                  <div className="mt-2 flex items-center gap-3">
+                    <div className="flex h-16 w-32 items-center justify-center rounded-lg bg-muted">
+                      {coverImage ? <img src={coverImage} alt="" className="h-full w-full rounded-lg object-cover" /> : <Upload className="h-6 w-6 text-muted-foreground" aria-hidden="true" />}
+                    </div>
+                    <GroupPictureUpload currentPhotoURL={coverImage || undefined} onPhotoChange={handleCoverImageChange} type="coverImage" />
+                  </div>
+                </div>
+              </div>
+            </CollapsibleContent>
+          </Collapsible>
+
+          <div className="flex justify-end">
+            <Button onClick={handleSave}>
+              <Save aria-hidden="true" />
+              Save changes
             </Button>
           </div>
         </CardContent>

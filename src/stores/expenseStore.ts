@@ -15,6 +15,7 @@ import {
   updateMemberRole as updateMemberRoleFirebase,
   createSettlement as createSettlementFirebase,
   subscribeToGroupSettlements,
+  deleteSettlement as deleteSettlementFirebase,
   logGroupActivity,
   type GroupActivityType,
 } from '@/services/firebaseService';
@@ -135,17 +136,22 @@ interface ExpenseStore {
   
   // Updated methods for Firebase
   addExpense: (expense: Omit<Expense, 'id'>, userId: string) => Promise<void>;
-  addGroup: (group: Omit<Group, 'id'>, userId: string) => Promise<void>;
+  /** Resolves to the new group's id. */
+  addGroup: (group: Omit<Group, 'id'>, userId: string) => Promise<string>;
   updateGroup: (id: string, updates: Partial<Group>) => Promise<void>;
   addMemberToGroup: (groupId: string, member: Omit<Member, 'joinedAt' | 'role'>, userId: string) => Promise<void>;
   removeMemberFromGroup: (groupId: string, memberId: string) => Promise<void>;
   updateMemberRole: (groupId: string, memberId: string, role: Member['role']) => Promise<void>;
-  addSettlement: (settlement: Omit<Settlement, 'id' | 'status'>, groupId: string, userId: string) => Promise<void>;
+  /** Records a payment and returns it (so it can be undone). */
+  addSettlement: (settlement: Omit<Settlement, 'id' | 'status'>, groupId: string, userId: string) => Promise<Settlement>;
+  removeSettlement: (settlementId: string) => Promise<void>;
   addActivity: (activity: Omit<GroupActivity, 'id' | 'timestamp'>) => void;
   addRecurringExpense: (recurring: Omit<RecurringExpense, 'id'>) => void;
   processRecurringExpenses: () => void;
-  updateExpense: (id: string, expense: Partial<Expense>) => Promise<void>;
-  deleteExpense: (id: string, groupId: string) => Promise<void>;
+  /** quiet: no notifications or activity line (bulk changes record one summary with logBulkChange). */
+  updateExpense: (id: string, expense: Partial<Expense>, opts?: { quiet?: boolean }) => Promise<void>;
+  deleteExpense: (id: string, groupId: string, opts?: { quiet?: boolean }) => Promise<void>;
+  logBulkChange: (groupId: string, type: 'expense_updated' | 'expense_deleted', description: string) => void;
   
   // Navigation methods
   setSelectedGroup: (group: Group | null) => void;
@@ -158,6 +164,30 @@ interface ExpenseStore {
   getSettlementHistory: () => Settlement[];
   archiveGroup: (groupId: string) => Promise<void>;
   unarchiveGroup: (groupId: string) => Promise<void>;
+}
+
+/**
+ * A just-created group shows up locally a moment before the server has saved it. A listener started in
+ * that moment is refused by the rules (they look the group up) and Firestore doesn't retry it, so the
+ * group would show no expenses until a reload. Start again a few times, a second or two apart.
+ */
+function withRetry(start: (onError: (error: Error) => void) => () => void, attempts = 5): () => void {
+  let stop: () => void = () => undefined;
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  let left = attempts;
+  let cancelled = false;
+  const run = () => {
+    stop = start(() => {
+      if (cancelled || left-- <= 0) return;
+      timer = setTimeout(run, 1500);
+    });
+  };
+  run();
+  return () => {
+    cancelled = true;
+    clearTimeout(timer);
+    stop();
+  };
 }
 
 export const useExpenseStore = create<ExpenseStore>()(
@@ -266,23 +296,26 @@ export const useExpenseStore = create<ExpenseStore>()(
                   // Only subscribe if we don't already have a subscription for this group
                   if (!expenseUnsubscribers.has(group.id)) {
                     console.log('Setting up expense subscription for group:', group.id);
-                    const expensesUnsubscriber = subscribeToGroupExpenses(group.id, (expenses) => {
-                      console.log('Expenses updated for group:', group.id, expenses.length, 'expenses');
-                      set(state => ({
-                        expenses: [
-                          ...state.expenses.filter(e => e.groupId !== group.id),
-                          ...expenses
-                        ]
-                      }));
-                    });
+                    const expensesUnsubscriber = withRetry((onError) =>
+                      subscribeToGroupExpenses(group.id, (expenses) => {
+                        set(state => ({
+                          expenses: [
+                            ...state.expenses.filter(e => e.groupId !== group.id),
+                            ...expenses
+                          ]
+                        }));
+                      }, onError)
+                    );
                     expenseUnsubscribers.set(group.id, expensesUnsubscriber);
                   }
                   if (!settlementUnsubscribers.has(group.id)) {
-                    const settlementsUnsubscriber = subscribeToGroupSettlements(group.id, (settlements) => {
-                      set(state => ({
-                        groupSettlements: { ...state.groupSettlements, [group.id]: settlements },
-                      }));
-                    });
+                    const settlementsUnsubscriber = withRetry((onError) =>
+                      subscribeToGroupSettlements(group.id, (settlements) => {
+                        set(state => ({
+                          groupSettlements: { ...state.groupSettlements, [group.id]: settlements },
+                        }));
+                      }, onError)
+                    );
                     settlementUnsubscribers.set(group.id, settlementsUnsubscriber);
                   }
                 });
@@ -435,6 +468,7 @@ export const useExpenseStore = create<ExpenseStore>()(
       userName: group.members[0]?.name || 'Unknown',
       description: `Created group "${group.name}"`,
     });
+    return newGroup.id;
   } catch (error) {
     console.error('❌ Failed to create group:', error);
     set({ error: 'Failed to create group', loading: false });
@@ -476,6 +510,7 @@ export const useExpenseStore = create<ExpenseStore>()(
             console.error('Error adding member to group:', error);
             set({ error: 'Failed to add member', loading: false });
             throw error;
+            throw error;
           }
         },
 
@@ -496,10 +531,13 @@ export const useExpenseStore = create<ExpenseStore>()(
             console.error('Error removing member from group:', error);
             set({ error: 'Failed to remove member', loading: false });
             throw error;
+            throw error;
           }
         },
 
-        updateExpense: async (id, updatedExpense) => {
+        logBulkChange: (groupId, type, description) => record(groupId, type, description),
+
+        updateExpense: async (id, updatedExpense, opts) => {
           const isOnline = useOfflineStore.getState().isOnline;
           const expense = get().expenses.find(e => e.id === id);
           
@@ -528,7 +566,7 @@ export const useExpenseStore = create<ExpenseStore>()(
               const groups = get().groups;
               const group = groups.find(g => g.id === expense.groupId);
               
-              if (group && group.settings?.notifications !== false) {
+              if (group && group.settings?.notifications !== false && !opts?.quiet) {
                 // Notify all group members except the one who updated the expense 
                 const membersToNotify = group.members.filter(m => m.id !== get().currentUserId);
                 
@@ -546,15 +584,16 @@ export const useExpenseStore = create<ExpenseStore>()(
               set({ loading: false });
               // Firebase listener will update the state
               
-              record(expense.groupId, 'expense_updated', `edited "${updatedExpense.description ?? expense.description}"`);
+              if (!opts?.quiet) record(expense.groupId, 'expense_updated', `edited "${updatedExpense.description ?? expense.description}"`);
             }
           } catch (error) {
             console.error('Error updating expense:', error);
             set({ error: 'Failed to update expense', loading: false });
+            throw error;
           }
         },
 
-        deleteExpense: async (id, groupId) => {
+        deleteExpense: async (id, groupId, opts) => {
           const isOnline = useOfflineStore.getState().isOnline;
           const expense = get().expenses.find(e => e.id === id);
           
@@ -582,7 +621,7 @@ export const useExpenseStore = create<ExpenseStore>()(
               const groups = get().groups;
               const group = groups.find(g => g.id === expense.groupId);
               
-              if (group && group.settings?.notifications !== false) {
+              if (group && group.settings?.notifications !== false && !opts?.quiet) {
                 // Notify all group members except the one who deleted the expense
                 const membersToNotify = group.members.filter(m => m.id !== get().currentUserId);
                 
@@ -597,11 +636,12 @@ export const useExpenseStore = create<ExpenseStore>()(
                 }
               }
               
-              record(groupId, 'expense_deleted', `deleted "${expense.description}"`);
+              if (!opts?.quiet) record(groupId, 'expense_deleted', `deleted "${expense.description}"`);
             }
           } catch (error) {
             console.error('Error deleting expense:', error);
             set({ error: 'Failed to delete expense', loading: false });
+            throw error;
           }
         },
 
@@ -628,6 +668,11 @@ export const useExpenseStore = create<ExpenseStore>()(
           }));
         },
 
+        removeSettlement: async (settlementId) => {
+          await deleteSettlementFirebase(settlementId);
+          set((state) => ({ settlements: state.settlements.filter((s) => s.id !== settlementId) }));
+        },
+
         addSettlement: async (settlement, groupId, userId) => {
           try {
             set({ loading: true, error: null });
@@ -642,13 +687,7 @@ export const useExpenseStore = create<ExpenseStore>()(
               loading: false
             }));
             
-            // Add activity
-            get().addActivity({
-              type: 'settlement_made',
-              userId,
-              userName: settlement.fromMemberId,
-              description: `Settlement of $${settlement.amount.toFixed(2)} recorded`,
-            });
+            return createdSettlement;
           } catch (error) {
             console.error('Error adding settlement:', error);
             set({ error: 'Failed to add settlement', loading: false });

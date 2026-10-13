@@ -152,7 +152,7 @@ export const GroupPolls: React.FC<GroupPollsProps> = ({ groupId }) => {
             onClick={() => setShowAddForm(!showAddForm)}
           >
             <Plus className="w-4 h-4 mr-1" />
-            Create Poll
+            Create poll
           </Button>
         </div>
       </CardHeader>
@@ -196,7 +196,7 @@ export const GroupPolls: React.FC<GroupPollsProps> = ({ groupId }) => {
                   className="w-full"
                 >
                   <Plus className="w-4 h-4 mr-1" />
-                  Add Option
+                  Add option
                 </Button>
               )}
             </div>
@@ -215,7 +215,7 @@ export const GroupPolls: React.FC<GroupPollsProps> = ({ groupId }) => {
                 size={isMobile ? "sm" : "default"}
               >
                 <Save className="w-4 h-4 mr-1" />
-                Create Poll
+                Create poll
               </Button>
               <Button
                 variant="outline"

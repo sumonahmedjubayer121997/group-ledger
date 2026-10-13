@@ -73,8 +73,7 @@ export const GroupPictureUpload: React.FC<GroupPictureUploadProps> = ({
 
     if (file.size > 5 * 1024 * 1024) {
       toast({
-        title: "Error",
-        description: "Image must be less than 5MB",
+        title: "That image is too big", description: "Choose one under 5 MB.",
         variant: "destructive"
       });
       return;
@@ -91,14 +90,12 @@ export const GroupPictureUpload: React.FC<GroupPictureUploadProps> = ({
       setPreviewUrl(downloadURL);
 
       toast({
-        title: "Success",
-        description: "Image uploaded successfully"
+        title: "Image uploaded"
       });
     } catch (error) {
       console.error('Upload error:', error);
       toast({
-        title: "Error",
-        description: "Failed to upload image",
+        title: "Couldn't upload the image", description: "Please try again.",
         variant: "destructive"
       });
     } finally {
@@ -129,8 +126,7 @@ export const GroupPictureUpload: React.FC<GroupPictureUploadProps> = ({
   const handleSave = async () => {
     if (!selectedImage) {
       toast({
-        title: "Error",
-        description: "Please select or upload an image.",
+        title: "Choose an image first",
         variant: "destructive"
       });
       return;
@@ -140,13 +136,11 @@ export const GroupPictureUpload: React.FC<GroupPictureUploadProps> = ({
       onPhotoChange?.(selectedImage);
       setIsOpen(false);
       toast({
-        title: "Success",
-        description: "Group image updated successfully"
+        title: "Group image updated"
       });
     } catch (error) {
       toast({
-        title: "Error",
-        description: "Failed to update group image",
+        title: "Couldn't update the group image", description: "Please try again.",
         variant: "destructive"
       });
     } finally {
@@ -209,7 +203,7 @@ export const GroupPictureUpload: React.FC<GroupPictureUploadProps> = ({
 
             <TabsContent value="upload" className="space-y-4">
               <div className="space-y-2">
-                <Label htmlFor="picture">Upload Image</Label>
+                <Label htmlFor="picture">Upload an image</Label>
                 <Input
                   id="picture"
                   type="file"

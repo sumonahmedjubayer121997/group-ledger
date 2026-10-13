@@ -1,6 +1,7 @@
-import { lazy, Suspense, useMemo, useState } from "react";
+import { lazy, Suspense, useEffect, useMemo, useState } from "react";
+import { useSearchParams } from "react-router-dom";
 import { startOfMonth, startOfYear, subDays, subMonths, endOfMonth } from "date-fns";
-import { Download, Plus, Search, X } from "lucide-react";
+import { CheckSquare, Download, Plus, Search, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -57,11 +58,21 @@ export default function ExpensesPage() {
   const expenses = useExpenseStore((s) => s.expenses);
   const currencyOf = useCurrencyOf();
 
-  const [query, setQuery] = useState("");
-  const [groupId, setGroupId] = useState(ALL);
+  // Links (e.g. from the command bar) can start the page filtered: ?q=rice&group=<id>&person=<id>.
+  const [params] = useSearchParams();
+  const [query, setQuery] = useState(params.get("q") ?? "");
+  const [groupId, setGroupId] = useState(params.get("group") ?? ALL);
   const [category, setCategory] = useState(ALL);
-  const [person, setPerson] = useState(ALL);
+  const [person, setPerson] = useState(params.get("person") ?? ALL);
   const [range, setRange] = useState<Range>("all");
+  const [selecting, setSelecting] = useState(false);
+  useEffect(() => {
+    setQuery(params.get("q") ?? "");
+    setGroupId(params.get("group") ?? ALL);
+    setPerson(params.get("person") ?? ALL);
+    setCategory(ALL);
+    setRange("all");
+  }, [params]);
 
   const mine = useMemo(() => {
     const ids = new Set(groups.map((g) => g.id));
@@ -120,7 +131,7 @@ export default function ExpensesPage() {
                 Export
               </Button>
             </ExportDialog>
-            <Button onClick={() => openAddExpense()}>
+            <Button onClick={() => openAddExpense(undefined, "expenses")}>
               <Plus aria-hidden="true" />
               Add expense
             </Button>
@@ -203,12 +214,20 @@ export default function ExpensesPage() {
               {filtered.length} {filtered.length === 1 ? "expense" : "expenses"}
               {filtered.length > 0 && <span className="money"> · {formatTotals(totals)}</span>}
             </p>
-            {filtering && (
-              <Button variant="ghost" size="sm" onClick={clear}>
-                <X aria-hidden="true" />
-                Clear filters
-              </Button>
-            )}
+            <div className="flex items-center gap-1">
+              {filtering && (
+                <Button variant="ghost" size="sm" onClick={clear}>
+                  <X aria-hidden="true" />
+                  Clear filters
+                </Button>
+              )}
+              {!selecting && filtered.length > 0 && (
+                <Button variant="ghost" size="sm" onClick={() => setSelecting(true)}>
+                  <CheckSquare aria-hidden="true" />
+                  Select
+                </Button>
+              )}
+            </div>
           </div>
 
           <Card>
@@ -217,6 +236,8 @@ export default function ExpensesPage() {
                 key={`${query}|${groupId}|${category}|${person}|${range}`}
                 expenses={filtered}
                 showGroup
+                selecting={selecting}
+                onDoneSelecting={() => setSelecting(false)}
                 emptyText={filtering ? "No expenses match these filters." : "No expenses yet. Add one to get started."}
               />
             </CardContent>

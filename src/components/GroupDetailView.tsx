@@ -1,34 +1,52 @@
-import { lazy, Suspense, useEffect, useMemo } from "react";
+import { lazy, Suspense, useEffect, useMemo, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
-import { Download, Plus, UserPlus } from "lucide-react";
+import { BarChart3, Download, MoreHorizontal, Plus, UserPlus } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { PageHeader } from "@/components/PageHeader";
 import { BalanceCard } from "./BalanceCard";
-import { ExpenseList } from "./ExpenseList";
+import { ExpenseList, type ListEvent } from "./ExpenseList";
 import { ExportDialog } from "./ExportDialog";
-import { GroupActivityFeed } from "./GroupActivityFeed";
 import { GroupInviteDialog } from "./GroupInviteDialog";
 import { GroupLifecycleActions } from "./GroupLifecycleActions";
 import { GroupMemberManagement } from "./GroupMemberManagement";
 import { GroupSettings } from "./GroupSettings";
 import { SettlementSummary } from "./SettlementSummary";
 import { GroupBudgetsPanel } from "./budgets/GroupBudgetsPanel";
+import { budgetStatus } from "./budgets/BudgetCard";
 import { useAppActions, useCurrentGroup } from "@/app/appActions";
 import { useAuth } from "@/contexts/AuthContext";
 import { useMemberPhotos } from "@/hooks/useMemberPhotos";
+import { ensureInviteLink, subscribeToGroupActivities, type GroupActivityRecord } from "@/services/firebaseService";
+import { useBudgetStore } from "@/stores/budgetStore";
 import { useExpenseStore, type Group } from "@/stores/expenseStore";
-import { useGroupLedger } from "@/stores/useLedger";
+import { useGroupLedger, type DebtView } from "@/stores/useLedger";
 import { formatMoney, toCents, toCurrencyCode } from "@/lib/money";
+import { toDate } from "@/lib/dates";
+import { useHidden } from "@/lib/undo";
 
-// Charts and chat are the heaviest tabs; they load when opened.
-const GroupAnalytics = lazy(() => import("./GroupAnalytics").then((m) => ({ default: m.GroupAnalytics })));
+// Charts and chat are the heaviest parts; they load when opened.
+const SpendingInsights = lazy(() => import("./SpendingInsights"));
 const GroupCommunicationHub = lazy(() => import("./GroupCommunicationHub").then((m) => ({ default: m.GroupCommunicationHub })));
 
-type TabKey = "overview" | "expenses" | "analytics" | "budgets" | "activity" | "members" | "chat" | "settings";
+type TabKey = "expenses" | "balances" | "chat" | "settings";
+
+/** Old links (?tab=analytics, ?tab=members…) still land somewhere sensible. */
+const legacyTab: Record<string, { tab: TabKey; charts?: boolean; section?: string }> = {
+  overview: { tab: "expenses" },
+  activity: { tab: "expenses" },
+  analytics: { tab: "expenses", charts: true },
+  budgets: { tab: "settings", section: "budgets" },
+  members: { tab: "settings", section: "members" },
+  communication: { tab: "chat" },
+};
+
+/** "Anik" from " Anik Mahmud" (some stored names have stray spaces). */
+const firstName = (name?: string) => name?.trim().split(/\s+/)[0] || "Someone";
 
 const initials = (name: string) =>
   name
@@ -39,6 +57,49 @@ const initials = (name: string) =>
     .slice(0, 2)
     .toUpperCase() || "?";
 
+/** Your own position in the group, said to you, with the action next to it. */
+function YourBalance({ debts, userId, currency }: { debts: DebtView[]; userId?: string; currency: string }) {
+  const { openSettle } = useAppActions();
+  const mine = debts.filter((d) => d.from === userId || d.to === userId);
+  if (mine.length === 0) {
+    return <p className="mb-6 text-sm text-muted-foreground">You're all square in this group.</p>;
+  }
+  return (
+    <section aria-label="Your balance" className="mb-6 space-y-2">
+      {mine.map((d) => {
+        const owedToYou = d.to === userId;
+        const other = owedToYou ? d.fromPerson : d.toPerson;
+        const first = firstName(other.name);
+        return (
+          <div
+            key={`${d.from}-${d.to}`}
+            className={`flex flex-wrap items-center justify-between gap-3 rounded-xl border-2 px-4 py-3 ${owedToYou ? "border-settled/30 bg-settled/5" : "border-owes/30 bg-owes/5"}`}
+          >
+            <p className="text-[15px]">
+              {owedToYou ? (
+                <>
+                  <span className="font-medium">{first}</span> owes you{" "}
+                  <span className="money font-medium text-settled">{formatMoney(d.cents, currency)}</span>
+                </>
+              ) : (
+                <>
+                  You owe <span className="font-medium">{first}</span>{" "}
+                  <span className="money font-medium text-owes">{formatMoney(d.cents, currency)}</span>
+                </>
+              )}
+            </p>
+            {!other.isFormer && (
+              <Button size="sm" variant="outline" onClick={() => openSettle(d)}>
+                Mark as paid
+              </Button>
+            )}
+          </div>
+        );
+      })}
+    </section>
+  );
+}
+
 interface GroupDetailViewProps {
   group: Group;
 }
@@ -48,28 +109,46 @@ export const GroupDetailView = ({ group }: GroupDetailViewProps) => {
   const { openAddExpense } = useAppActions();
   const unarchiveGroup = useExpenseStore((s) => s.unarchiveGroup);
   const allExpenses = useExpenseStore((s) => s.expenses);
+  const settlements = useExpenseStore((s) => s.groupSettlements[group.id]);
+  const budgets = useBudgetStore((s) => s.budgets);
+  const getBudgetUsage = useBudgetStore((s) => s.getBudgetUsage);
   useCurrentGroup(group.id);
 
   const role = group.members.find((m) => m.id === user?.uid)?.role;
   const isAdmin = role === "admin";
   const canWrite = isAdmin || role === "member";
 
-  const tabs: { value: TabKey; label: string }[] = [
-    { value: "overview", label: "Overview" },
-    { value: "expenses", label: "Expenses" },
-    { value: "analytics", label: "Analytics" },
-    { value: "budgets", label: "Budgets" },
-    { value: "activity", label: "Activity" },
-    { value: "members", label: "Members" },
-    { value: "chat", label: "Chat" },
-    ...(isAdmin ? [{ value: "settings" as const, label: "Settings" }] : []),
-  ];
-
   // The open tab lives in the URL (?tab=chat), so links and the back button work.
   const [params, setParams] = useSearchParams();
-  const requested = params.get("tab");
-  const tab: TabKey = tabs.some((t) => t.value === requested) ? (requested as TabKey) : "overview";
-  const setTab = (value: string) => setParams(value === "overview" ? {} : { tab: value }, { replace: true });
+  // ?invite=1 (from the command bar) opens the invite dialog once.
+  const [inviteOpen, setInviteOpen] = useState(false);
+  useEffect(() => {
+    if (params.get("invite") !== "1") return;
+    setInviteOpen(true);
+    setParams(
+      (prev) => {
+        const next = new URLSearchParams(prev);
+        next.delete("invite");
+        return next;
+      },
+      { replace: true }
+    );
+  }, [params, setParams]);
+  const requested = params.get("tab") ?? "expenses";
+  const legacy = legacyTab[requested];
+  const tab: TabKey = legacy?.tab ?? (["expenses", "balances", "chat", "settings"].includes(requested) ? (requested as TabKey) : "expenses");
+  const [showCharts, setShowCharts] = useState(!!legacy?.charts);
+  const setTab = (value: string) => setParams(value === "expenses" ? {} : { tab: value }, { replace: true });
+
+  /** Opens Settings at one of its sections (members, budgets). */
+  const openSection = (section: string) => {
+    setParams({ tab: "settings" }, { replace: true });
+    window.setTimeout(() => document.getElementById(`group-${section}`)?.scrollIntoView({ behavior: "smooth", block: "start" }), 80);
+  };
+  useEffect(() => {
+    if (legacy?.section) openSection(legacy.section);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [legacy?.section]);
 
   // Notifications about new messages ask for the chat tab this way.
   useEffect(() => {
@@ -79,18 +158,55 @@ export const GroupDetailView = ({ group }: GroupDetailViewProps) => {
     }
   }, [setParams]);
 
+  // Keep the invite link ready, so Invite shows its QR code straight away.
+  const linkReady = group.groupType === "public" && (group.inviteCode?.length ?? 0) >= 16;
+  useEffect(() => {
+    if (linkReady && canWrite) void ensureInviteLink(group).catch(() => undefined);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [linkReady, canWrite, group.id, group.name, group.inviteCode]);
+
+  // The group's change log (edits, deletions, member changes) shows inline in the expense list.
+  const [activity, setActivity] = useState<GroupActivityRecord[]>([]);
+  useEffect(() => subscribeToGroupActivities(group.id, setActivity), [group.id]);
+
   const ledger = useGroupLedger(group.id);
   const debts = ledger?.debts ?? [];
   const ignored = ledger?.ledger.ignoredSettlements.length ?? 0;
   const currency = toCurrencyCode(group.settings?.currency);
   const expenses = useMemo(() => allExpenses.filter((e) => e.groupId === group.id), [allExpenses, group.id]);
-  const recent = useMemo(
-    () => [...expenses].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()).slice(0, 5),
-    [expenses]
+  const hidden = useHidden((s) => s.hidden);
+  const totalCents = useMemo(
+    () => expenses.reduce((sum, e) => sum + (hidden.has(`expense-${e.id}`) ? 0 : toCents(e.amount)), 0),
+    [expenses, hidden]
   );
-  const totalCents = useMemo(() => expenses.reduce((sum, e) => sum + toCents(e.amount), 0), [expenses]);
-  const myNet = (user && ledger?.ledger.nets.get(user.uid)) || 0;
   const photos = useMemberPhotos(group.members.map((m) => m.id));
+
+  const events = useMemo<ListEvent[]>(() => {
+    const nameOf = (id: string) => (id === user?.uid ? "you" : firstName(ledger?.person(id).name) ?? "someone");
+    const cap = (text: string) => text.charAt(0).toUpperCase() + text.slice(1);
+    const payments: ListEvent[] = (settlements ?? []).map((s) => ({
+      id: `payment-${s.id}`,
+      kind: "payment",
+      at: toDate(s.date) ?? new Date(0),
+      text: `${cap(nameOf(s.fromMemberId))} paid ${nameOf(s.toMemberId)} ${formatMoney(toCents(s.amount), currency)}`,
+    }));
+    const changes: ListEvent[] = activity.map((a) => ({
+      id: `change-${a.id}`,
+      kind: "change",
+      at: a.createdAt,
+      text: `${a.actorId === user?.uid ? "You" : firstName(a.actorName)} ${a.description}`,
+    }));
+    return [...payments, ...changes];
+  }, [settlements, activity, ledger, user?.uid, currency]);
+
+  // One quiet line on the Expenses tab when a budget needs attention.
+  const budgetAlerts = useMemo(() => {
+    const usage = new Map(getBudgetUsage(expenses, undefined, group.id).map((u) => [u.budgetId, toCents(u.spent)]));
+    return budgets
+      .filter((b) => b.groupId === group.id && b.isActive)
+      .map((b) => ({ budget: b, spent: usage.get(b.id) ?? 0 }))
+      .filter(({ budget, spent }) => budgetStatus(spent, budget) !== "on-track");
+  }, [budgets, expenses, group.id, getBudgetUsage]);
 
   const addDisabledReason = group.isArchived ? "Restore the group to add expenses" : !canWrite ? "Viewers can't add expenses" : undefined;
 
@@ -101,22 +217,50 @@ export const GroupDetailView = ({ group }: GroupDetailViewProps) => {
         title={group.name}
         description={
           <>
-            {group.members.length} {group.members.length === 1 ? "member" : "members"} · {currency}
+            {group.members.length} {group.members.length === 1 ? "person" : "people"} · {currency}
             {group.description ? ` · ${group.description}` : ""}
           </>
         }
         actions={
           <>
-            <GroupInviteDialog group={group}>
-              <Button variant="outline">
-                <UserPlus aria-hidden="true" />
-                Invite
-              </Button>
-            </GroupInviteDialog>
-            <Button onClick={() => openAddExpense(group.id)} disabled={!!addDisabledReason} title={addDisabledReason}>
+            <button
+              type="button"
+              onClick={() => openSection("members")}
+              className="mr-1 flex -space-x-2 rounded-full focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+              aria-label={`${group.members.length} people: ${group.members.map((m) => m.name).join(", ")}. Open members`}
+            >
+              {group.members.slice(0, 4).map((m) => (
+                <Avatar key={m.id} className="h-8 w-8 border-2 border-background">
+                  <AvatarImage src={photos[m.id] || undefined} alt="" />
+                  <AvatarFallback className="bg-secondary text-[11px]">{initials(m.name)}</AvatarFallback>
+                </Avatar>
+              ))}
+            </button>
+            <Button variant="outline" onClick={() => setInviteOpen(true)}>
+              <UserPlus aria-hidden="true" />
+              Invite
+            </Button>
+            <GroupInviteDialog group={group} open={inviteOpen} onOpenChange={setInviteOpen} />
+            {/* Phones use the + in the bottom bar, which also starts in this group (see useCurrentGroup). */}
+            <Button className="max-md:hidden" onClick={() => openAddExpense(group.id, "group")} disabled={!!addDisabledReason} title={addDisabledReason}>
               <Plus aria-hidden="true" />
               Add expense
             </Button>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="ghost" size="icon" aria-label="More group actions">
+                  <MoreHorizontal aria-hidden="true" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <ExportDialog groupId={group.id}>
+                  <DropdownMenuItem onSelect={(e) => e.preventDefault()}>
+                    <Download aria-hidden="true" />
+                    Export expenses
+                  </DropdownMenuItem>
+                </ExportDialog>
+              </DropdownMenuContent>
+            </DropdownMenu>
           </>
         }
       />
@@ -130,169 +274,64 @@ export const GroupDetailView = ({ group }: GroupDetailViewProps) => {
         </div>
       )}
 
-      <div className="mb-6 grid grid-cols-2 gap-3 sm:grid-cols-3 sm:gap-4">
-        <Card>
-          <CardContent className="p-5">
-            <p className="text-sm text-muted-foreground">Total spent</p>
-            <p className="money mt-1 font-display text-[26px] leading-tight sm:text-[30px]">{formatMoney(totalCents, currency)}</p>
-            <p className="mt-1 text-xs text-muted-foreground">
-              {expenses.length} {expenses.length === 1 ? "expense" : "expenses"}
-            </p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="p-5">
-            <p className="text-sm text-muted-foreground">Your balance</p>
-            <p
-              className={`money mt-1 font-display text-[26px] leading-tight sm:text-[30px] ${myNet > 0 ? "text-settled" : myNet < 0 ? "text-owes" : "text-muted-foreground"}`}
-            >
-              {myNet === 0 ? "Settled up" : formatMoney(Math.abs(myNet), currency)}
-            </p>
-            <p className="mt-1 text-xs text-muted-foreground">{myNet > 0 ? "you're owed" : myNet < 0 ? "you owe" : "nothing owed either way"}</p>
-          </CardContent>
-        </Card>
-        <Card className="col-span-2 sm:col-span-1">
-          <CardContent className="p-5">
-            <p className="text-sm text-muted-foreground">Members</p>
-            <p className="mt-2 flex -space-x-2">
-              {group.members.slice(0, 6).map((m) => (
-                <Avatar key={m.id} className="h-9 w-9 border-2 border-card">
-                  <AvatarImage src={photos[m.id] || undefined} alt="" />
-                  <AvatarFallback className="bg-secondary text-xs">{initials(m.name)}</AvatarFallback>
-                </Avatar>
-              ))}
-            </p>
-            <p className="mt-2 truncate text-xs text-muted-foreground">{group.members.map((m) => m.name).join(", ")}</p>
-          </CardContent>
-        </Card>
-      </div>
+      <YourBalance debts={debts} userId={user?.uid} currency={currency} />
 
       <Tabs value={tab} onValueChange={setTab}>
-        <div className="-mx-4 overflow-x-auto px-4 [scrollbar-width:none] sm:mx-0 sm:px-0 [&::-webkit-scrollbar]:hidden">
-          <TabsList className="w-max">
-            {tabs.map((t) => (
-              <TabsTrigger key={t.value} value={t.value}>
-                {t.label}
-              </TabsTrigger>
-            ))}
-          </TabsList>
-        </div>
+        <TabsList>
+          <TabsTrigger value="expenses">Expenses</TabsTrigger>
+          <TabsTrigger value="balances">Balances</TabsTrigger>
+          <TabsTrigger value="chat">Chat</TabsTrigger>
+          <TabsTrigger value="settings">Settings</TabsTrigger>
+        </TabsList>
 
-        <TabsContent value="overview" className="mt-6">
-          <div className="grid gap-6 lg:grid-cols-3">
-            <div className="min-w-0 space-y-6 lg:col-span-2">
-              <BalanceCard
-                debts={debts}
-                note={
-                  ignored > 0
-                    ? `${ignored} recorded ${ignored === 1 ? "payment involves" : "payments involve"} people who aren't in this group, so ${ignored === 1 ? "it isn't" : "they aren't"} counted here.`
-                    : undefined
-                }
-              />
-              <Card>
-                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                  <CardTitle className="text-xl">Recent expenses</CardTitle>
-                  {expenses.length > recent.length && (
-                    <Button variant="link" size="sm" className="px-0" onClick={() => setTab("expenses")}>
-                      All {expenses.length}
-                    </Button>
-                  )}
-                </CardHeader>
-                <CardContent>
-                  <ExpenseList expenses={recent} pageSize={5} emptyText="No expenses yet. Add the first one." />
-                </CardContent>
-              </Card>
-              <SettlementSummary groupId={group.id} />
-            </div>
-
-            <div className="min-w-0 space-y-6">
-              <Card>
-                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                  <CardTitle className="text-xl">Members</CardTitle>
-                  <Button variant="link" size="sm" className="px-0" onClick={() => setTab("members")}>
-                    Manage
-                  </Button>
-                </CardHeader>
-                <CardContent>
-                  <ul className="space-y-3">
-                    {group.members.map((m) => (
-                      <li key={m.id} className="flex items-center gap-3">
-                        <Avatar className="h-8 w-8">
-                          <AvatarImage src={photos[m.id] || undefined} alt="" />
-                          <AvatarFallback className="bg-secondary text-xs">{initials(m.name)}</AvatarFallback>
-                        </Avatar>
-                        <div className="min-w-0 flex-1">
-                          <p className="truncate text-sm font-medium">
-                            {m.name}
-                            {m.id === user?.uid && <span className="font-normal text-muted-foreground"> (you)</span>}
-                          </p>
-                          <p className="truncate text-xs text-muted-foreground">{m.email || "No account yet"}</p>
-                        </div>
-                        {m.role && m.role !== "member" && <span className="text-xs capitalize text-muted-foreground">{m.role}</span>}
-                      </li>
-                    ))}
-                  </ul>
-                </CardContent>
-              </Card>
-
-              <Card>
-                <CardHeader className="pb-2">
-                  <CardTitle className="text-xl">Group actions</CardTitle>
-                </CardHeader>
-                <CardContent className="grid gap-2">
-                  <GroupInviteDialog group={group}>
-                    <Button variant="outline" className="w-full justify-start">
-                      <UserPlus aria-hidden="true" />
-                      Invite people
-                    </Button>
-                  </GroupInviteDialog>
-                  <ExportDialog groupId={group.id}>
-                    <Button variant="outline" className="w-full justify-start">
-                      <Download aria-hidden="true" />
-                      Export expenses
-                    </Button>
-                  </ExportDialog>
-                  <GroupLifecycleActions group={group} isAdmin={isAdmin} />
-                </CardContent>
-              </Card>
-            </div>
+        <TabsContent value="expenses" className="mt-6 space-y-4">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <p className="money text-sm text-muted-foreground">
+              {expenses.length} {expenses.length === 1 ? "expense" : "expenses"} · {formatMoney(totalCents, currency)} in total
+            </p>
+            <Button variant={showCharts ? "default" : "outline"} size="sm" aria-pressed={showCharts} onClick={() => setShowCharts(!showCharts)}>
+              <BarChart3 aria-hidden="true" />
+              Charts
+            </Button>
           </div>
+          {budgetAlerts.map(({ budget, spent }) => (
+            <p key={budget.id} className="flex flex-wrap items-center gap-x-2 text-sm">
+              <span className="money text-owes">
+                {budget.name}: {formatMoney(spent, currency)} of {formatMoney(toCents(budget.limit), currency)} spent ({budget.period})
+              </span>
+              <button
+                type="button"
+                onClick={() => openSection("budgets")}
+                className="rounded-sm text-muted-foreground underline-offset-4 hover:text-foreground hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+              >
+                See budgets
+              </button>
+            </p>
+          ))}
+          {showCharts ? (
+            <Suspense fallback={<Skeleton className="h-96" />}>
+              <SpendingInsights expenses={expenses} currencyOf={() => currency} />
+            </Suspense>
+          ) : (
+            <Card>
+              <CardContent className="p-4 sm:p-6">
+                <ExpenseList expenses={expenses} events={events} emptyText="No expenses yet. Add the first one." />
+              </CardContent>
+            </Card>
+          )}
         </TabsContent>
 
-        <TabsContent value="expenses" className="mt-6">
-          <Card>
-            <CardContent className="p-4 sm:p-6">
-              <ExpenseList expenses={expenses} emptyText="No expenses yet. Add the first one." />
-            </CardContent>
-          </Card>
-        </TabsContent>
-
-        <TabsContent value="analytics" className="mt-6">
-          <Suspense fallback={<Skeleton className="h-96" />}>
-            <GroupAnalytics group={group} />
-          </Suspense>
-        </TabsContent>
-
-        <TabsContent value="budgets" className="mt-6">
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-4">
-              <CardTitle className="text-xl">Budgets</CardTitle>
-              <Button variant="link" size="sm" className="px-0" asChild>
-                <Link to="/budgets">All budgets</Link>
-              </Button>
-            </CardHeader>
-            <CardContent>
-              <GroupBudgetsPanel group={group} />
-            </CardContent>
-          </Card>
-        </TabsContent>
-
-        <TabsContent value="activity" className="mt-6">
-          <GroupActivityFeed group={group} />
-        </TabsContent>
-
-        <TabsContent value="members" className="mt-6">
-          <GroupMemberManagement group={group} />
+        <TabsContent value="balances" className="mt-6 space-y-6">
+          <BalanceCard
+            debts={debts}
+            title="Who owes whom"
+            note={
+              ignored > 0
+                ? `${ignored} recorded ${ignored === 1 ? "payment involves" : "payments involve"} people who aren't in this group, so ${ignored === 1 ? "it isn't" : "they aren't"} counted here.`
+                : undefined
+            }
+          />
+          <SettlementSummary groupId={group.id} />
         </TabsContent>
 
         <TabsContent value="chat" className="mt-6">
@@ -301,11 +340,40 @@ export const GroupDetailView = ({ group }: GroupDetailViewProps) => {
           </Suspense>
         </TabsContent>
 
-        {isAdmin && (
-          <TabsContent value="settings" className="mt-6">
+        <TabsContent value="settings" className="mt-6 space-y-6">
+          <section id="group-members" className="scroll-mt-24">
+            <GroupMemberManagement group={group} />
+          </section>
+
+          <section id="group-budgets" className="scroll-mt-24">
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-4">
+                <CardTitle className="text-xl">Budgets</CardTitle>
+                <Button variant="link" size="sm" className="px-0" asChild>
+                  <Link to="/personal?tab=group-budgets">All budgets</Link>
+                </Button>
+              </CardHeader>
+              <CardContent>
+                <GroupBudgetsPanel group={group} />
+              </CardContent>
+            </Card>
+          </section>
+
+          {isAdmin ? (
             <GroupSettings group={group} />
-          </TabsContent>
-        )}
+          ) : (
+            <p className="text-sm text-muted-foreground">Only admins can change the group's name, currency and invite link.</p>
+          )}
+
+          <Card>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-xl">{group.isArchived ? "Restore or delete" : "Archive or delete"}</CardTitle>
+            </CardHeader>
+            <CardContent className="grid gap-2 sm:max-w-xs">
+              <GroupLifecycleActions group={group} isAdmin={isAdmin} />
+            </CardContent>
+          </Card>
+        </TabsContent>
       </Tabs>
     </>
   );

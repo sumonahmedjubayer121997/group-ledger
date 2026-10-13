@@ -1,8 +1,9 @@
-import React, { useState } from "react";
+import React from "react";
+import { Link } from "react-router-dom";
 import { Check } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { SettlementDialog } from "./SettlementDialog";
+import { useAppActions } from "@/app/appActions";
 import { useAuth } from "@/contexts/AuthContext";
 import { formatMoney } from "@/lib/money";
 import type { DebtView } from "@/stores/useLedger";
@@ -18,11 +19,21 @@ interface BalanceCardProps {
   title?: string;
 }
 
-const nameOf = (person: DebtView["fromPerson"]) => `${person.name}${person.isFormer ? " (left)" : ""}`;
+const nameOf = (person: DebtView["fromPerson"]) => `${person.name.trim().split(/\s+/)[0] || person.name}${person.isFormer ? " (left)" : ""}`;
 
-/** Who owes whom, one line per debt, each with a "Settle up" button. */
+/** A name that opens everything between you and that person. */
+const PersonName = ({ person }: { person: DebtView["fromPerson"] }) =>
+  person.isFormer ? (
+    <span className="font-medium">{nameOf(person)}</span>
+  ) : (
+    <Link to={`/people/${person.id}`} className="rounded-sm font-medium underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+      {nameOf(person)}
+    </Link>
+  );
+
+/** Who owes whom, one line per debt, each with "Mark as paid". Sentences about you say "you". */
 export const BalanceCard: React.FC<BalanceCardProps> = ({ debts, showGroupName = false, note, bare = false, title = "Balances" }) => {
-  const [selected, setSelected] = useState<DebtView | null>(null);
+  const { openSettle } = useAppActions();
   const { user } = useAuth();
   // Seen from your side: green when you're owed, amber when you owe, plain otherwise.
   const tone = (debt: DebtView) => (debt.to === user?.uid ? "text-settled" : debt.from === user?.uid ? "text-owes" : "text-foreground");
@@ -41,9 +52,17 @@ export const BalanceCard: React.FC<BalanceCardProps> = ({ debts, showGroupName =
           <li key={`${debt.groupId}-${debt.from}-${debt.to}`} className="flex items-center justify-between gap-3 py-3 first:pt-0 last:pb-0">
             <div className="min-w-0">
               <p className="text-sm">
-                <span className="font-medium">{nameOf(debt.fromPerson)}</span>
-                <span className="text-muted-foreground"> owes </span>
-                <span className="font-medium">{nameOf(debt.toPerson)}</span>
+                {debt.from === user?.uid ? (
+                  <>
+                    You <span className="text-muted-foreground">owe</span> <PersonName person={debt.toPerson} />
+                  </>
+                ) : (
+                  <>
+                    <PersonName person={debt.fromPerson} />
+                    <span className="text-muted-foreground"> owes </span>
+                    {debt.to === user?.uid ? <span className="font-medium">you</span> : <PersonName person={debt.toPerson} />}
+                  </>
+                )}
               </p>
               {showGroupName && <p className="truncate text-xs text-muted-foreground">{debt.groupName}</p>}
             </div>
@@ -53,10 +72,10 @@ export const BalanceCard: React.FC<BalanceCardProps> = ({ debts, showGroupName =
                 <Button
                   size="sm"
                   variant="outline"
-                  onClick={() => setSelected(debt)}
-                  aria-label={`Settle up: ${debt.fromPerson.name} pays ${debt.toPerson.name} ${formatMoney(debt.cents, debt.currency)}`}
+                  onClick={() => openSettle(debt)}
+                  aria-label={`Mark as paid: ${debt.fromPerson.name} paid ${debt.toPerson.name} ${formatMoney(debt.cents, debt.currency)}`}
                 >
-                  Settle up
+                  Mark as paid
                 </Button>
               )}
             </div>
@@ -81,17 +100,6 @@ export const BalanceCard: React.FC<BalanceCardProps> = ({ debts, showGroupName =
         </Card>
       )}
 
-      {selected && (
-        <SettlementDialog
-          isOpen={!!selected}
-          onClose={() => setSelected(null)}
-          fromMember={{ id: selected.from, userId: selected.from, name: selected.fromPerson.name, email: selected.fromPerson.email ?? "" }}
-          toMember={{ id: selected.to, userId: selected.to, name: selected.toPerson.name, email: selected.toPerson.email ?? "" }}
-          amount={selected.cents / 100}
-          currency={selected.currency}
-          groupId={selected.groupId}
-        />
-      )}
     </>
   );
 };

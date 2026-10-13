@@ -4,19 +4,27 @@ import { Badge } from '@/components/ui/badge';
 import { useExpenseStore } from '@/stores/expenseStore';
 import { useGroupLedger } from '@/stores/useLedger';
 import { formatMoney, toCents } from '@/lib/money';
-import { Handshake, Calendar, CreditCard } from 'lucide-react';
-import { format } from 'date-fns';
-
+import { Handshake, Calendar, CreditCard, X } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { useAuth } from '@/contexts/AuthContext';
 import { formatDate } from "@/lib/dates";
+import { deferWithUndo, useHidden } from '@/lib/undo';
+
+const methodLabel: Record<string, string> = { cash: 'Cash', bank_transfer: 'Bank transfer', paypal: 'PayPal', other: 'Other' };
 interface SettlementSummaryProps {
   groupId: string;
 }
 
 export const SettlementSummary: React.FC<SettlementSummaryProps> = ({ groupId }) => {
   const settlements = useExpenseStore((s) => s.groupSettlements[groupId]);
+  const removeSettlement = useExpenseStore((s) => s.removeSettlement);
+  const hidden = useHidden((s) => s.hidden);
+  const { user } = useAuth();
   const view = useGroupLedger(groupId);
   const loading = settlements === undefined;
-  const list = settlements ?? [];
+  const list = (settlements ?? []).filter((s) => !hidden.has(`payment-${s.id}`));
+  const role = view?.group.members.find((m) => m.id === user?.uid)?.role;
+  const canWrite = role === 'admin' || role === 'member';
   const currency = view?.currency ?? 'USD';
   const memberIds = new Set(view?.group.members.map((m) => m.id) ?? []);
   const counted = (s: { fromMemberId: string; toMemberId: string }) => memberIds.has(s.fromMemberId) && memberIds.has(s.toMemberId);
@@ -28,7 +36,7 @@ export const SettlementSummary: React.FC<SettlementSummaryProps> = ({ groupId })
         <CardTitle className="flex items-center justify-between">
           <div className="flex items-center space-x-2 text-card-foreground">
             <Handshake className="w-5 h-5 text-muted-foreground" />
-            <span>Settlement History</span>
+            <span>Payments</span>
           </div>
           {list.length > 0 && (
             <Badge variant="secondary" className="text-sm tabular-nums">
@@ -39,11 +47,11 @@ export const SettlementSummary: React.FC<SettlementSummaryProps> = ({ groupId })
       </CardHeader>
       <CardContent>
         {loading ? (
-          <p className="py-4 text-center text-muted-foreground">Loading settlements…</p>
+          <p className="py-4 text-center text-muted-foreground">Loading payments…</p>
         ) : list.length === 0 ? (
           <div className="text-center py-8">
-            <p className="text-muted-foreground">No settlements yet</p>
-            <p className="text-sm text-muted-foreground">Payments appear here once someone settles up.</p>
+            <p className="text-muted-foreground">No payments yet</p>
+            <p className="text-sm text-muted-foreground">They show up here when someone marks a debt as paid.</p>
           </div>
         ) : (
           <div className="space-y-3 max-h-64 overflow-y-auto">
@@ -55,7 +63,7 @@ export const SettlementSummary: React.FC<SettlementSummaryProps> = ({ groupId })
                   className="flex items-center justify-between gap-3 p-3 bg-muted/30 rounded-lg border border-border/50"
                 >
                   <div className="flex min-w-0 items-center space-x-3">
-                    <div className="w-8 h-8 shrink-0 bg-settled rounded-full flex items-center justify-center border border-settled/40">
+                    <div className="w-8 h-8 shrink-0 bg-settled/10 rounded-full flex items-center justify-center border border-settled/40">
                       <Handshake className="w-4 h-4 text-settled" />
                     </div>
                     <div className="min-w-0">
@@ -64,7 +72,8 @@ export const SettlementSummary: React.FC<SettlementSummaryProps> = ({ groupId })
                           {formatMoney(toCents(settlement.amount), currency)}
                         </span>
                         <span className="text-xs text-muted-foreground">
-                          {view?.person(settlement.fromMemberId).name} paid {view?.person(settlement.toMemberId).name}
+                          {settlement.fromMemberId === user?.uid ? 'You' : view?.person(settlement.fromMemberId).name} paid{' '}
+                          {settlement.toMemberId === user?.uid ? 'you' : view?.person(settlement.toMemberId).name}
                         </span>
                         {!isCounted && (
                           <Badge variant="outline" className="text-xs">
@@ -79,14 +88,34 @@ export const SettlementSummary: React.FC<SettlementSummaryProps> = ({ groupId })
                         </div>
                         <div className="flex items-center space-x-1 text-xs text-muted-foreground">
                           <CreditCard className="w-3 h-3" />
-                          <span>{settlement.paymentMethod}</span>
+                          <span>{methodLabel[settlement.paymentMethod] ?? settlement.paymentMethod}</span>
                         </div>
                       </div>
                     </div>
                   </div>
-                  {settlement.notes && (
-                    <div className="text-xs text-muted-foreground max-w-32 truncate">{settlement.notes}</div>
-                  )}
+                  <div className="flex shrink-0 items-center gap-1">
+                    {settlement.notes && (
+                      <div className="text-xs text-muted-foreground max-w-32 truncate">{settlement.notes}</div>
+                    )}
+                    {canWrite && (
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-8 w-8 text-muted-foreground"
+                        aria-label={`Remove the ${formatMoney(toCents(settlement.amount), currency)} payment`}
+                        onClick={() =>
+                          deferWithUndo({
+                            id: `payment-${settlement.id}`,
+                            title: 'Payment removed',
+                            description: 'Balances are back to how they were before it.',
+                            run: () => removeSettlement(settlement.id),
+                          })
+                        }
+                      >
+                        <X className="h-4 w-4" aria-hidden="true" />
+                      </Button>
+                    )}
+                  </div>
                 </div>
               );
             })}

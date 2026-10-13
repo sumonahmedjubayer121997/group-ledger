@@ -60,7 +60,7 @@ export const OfflineIndicator = () => {
           ) : (
             <>
               <Wifi className="h-4 w-4" />
-              Sync Now
+              Sync now
             </>
           )}
         </Button>

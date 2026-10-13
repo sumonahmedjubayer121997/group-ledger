@@ -7,22 +7,27 @@ import { Label } from '@/components/ui/label';
 import { Group } from '@/stores/expenseStore';
 import { useAuth } from '@/contexts/AuthContext';
 import { ensureInviteLink, setLinkJoining } from '@/services/firebaseService';
-import { Share, Copy, QrCode, Mail, Link2, Lock } from 'lucide-react';
+import { Share, Copy, Mail, Link2, Lock } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
+import { track } from '@/lib/usage';
 
 interface GroupInviteDialogProps {
   group: Group;
-  children: React.ReactNode;
+  /** The button that opens it; leave out when `open` is controlled. */
+  children?: React.ReactNode;
+  open?: boolean;
+  onOpenChange?: (open: boolean) => void;
 }
 
 /**
- * Invite people with the group's link (when the group allows joining by link). People can also be
- * added directly by email from the Members tab.
+ * Invite people with the group's QR code or link (when the group allows joining by link). People can also be
+ * added directly by email from the Settings tab.
  */
-export const GroupInviteDialog: React.FC<GroupInviteDialogProps> = ({ group, children }) => {
-  const [open, setOpen] = useState(false);
+export const GroupInviteDialog: React.FC<GroupInviteDialogProps> = ({ group, children, open: openProp, onOpenChange }) => {
+  const [openState, setOpenState] = useState(false);
+  const open = openProp ?? openState;
+  const setOpen = onOpenChange ?? setOpenState;
   const [email, setEmail] = useState('');
-  const [showQR, setShowQR] = useState(false);
   const [code, setCode] = useState(group.inviteCode);
   const [busy, setBusy] = useState(false);
   const { user } = useAuth();
@@ -33,6 +38,7 @@ export const GroupInviteDialog: React.FC<GroupInviteDialogProps> = ({ group, chi
   const canWrite = myRole === 'admin' || myRole === 'member';
   const linkEnabled = group.groupType === 'public';
   const inviteLink = code ? `${window.location.origin}/join/${code}` : '';
+  const canShare = typeof navigator !== 'undefined' && !!navigator.share;
 
   // Older groups have no code (or a short one) and no link record yet; members create them on first use.
   const { id, name, inviteCode } = group;
@@ -47,6 +53,7 @@ export const GroupInviteDialog: React.FC<GroupInviteDialogProps> = ({ group, chi
   const copyToClipboard = async (text: string) => {
     try {
       await navigator.clipboard.writeText(text);
+      track('invite_shared', { source: 'copy' });
       toast({ title: 'Link copied', description: 'Paste it into any chat to invite people.' });
     } catch {
       toast({ title: "Couldn't copy", description: 'Select the link and copy it manually.', variant: 'destructive' });
@@ -62,6 +69,7 @@ export const GroupInviteDialog: React.FC<GroupInviteDialogProps> = ({ group, chi
       return;
     }
     const subject = `Join "${group.name}" on SplitWize`;
+    track('invite_shared', { source: 'email' });
     window.location.href = `mailto:${encodeURIComponent(to)}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(message)}`;
     toast({ title: 'Opening your email app', description: `The invite to ${to} is ready to send from there.` });
     setEmail('');
@@ -71,6 +79,7 @@ export const GroupInviteDialog: React.FC<GroupInviteDialogProps> = ({ group, chi
     if (navigator.share) {
       try {
         await navigator.share({ title: `Join "${group.name}" on SplitWize`, text: message, url: inviteLink });
+        track('invite_shared', { source: 'share-sheet' });
       } catch {
         // Closing the share sheet isn't an error worth reporting.
       }
@@ -93,7 +102,7 @@ export const GroupInviteDialog: React.FC<GroupInviteDialogProps> = ({ group, chi
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger asChild>{children}</DialogTrigger>
+      {children && <DialogTrigger asChild>{children}</DialogTrigger>}
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
           <DialogTitle className="flex items-center space-x-2">
@@ -110,39 +119,43 @@ export const GroupInviteDialog: React.FC<GroupInviteDialogProps> = ({ group, chi
         {linkEnabled && !inviteLink ? (
           <p className="py-6 text-center text-sm text-muted-foreground">Preparing the invite link…</p>
         ) : linkEnabled ? (
-          <div className="space-y-6 py-2">
-            <div className="space-y-2">
-              <Label htmlFor="invite-link">Invite link</Label>
-              <div className="flex space-x-2">
-                <Input id="invite-link" value={inviteLink} readOnly className="text-sm" onFocus={(e) => e.target.select()} />
-                <Button variant="outline" onClick={() => copyToClipboard(inviteLink)} aria-label="Copy invite link">
-                  <Copy className="w-4 h-4" />
+          <div className="space-y-5 py-1">
+            {/* White behind the code so phone cameras read it in dark mode too. */}
+            <figure className="text-center">
+              <div className="mx-auto w-fit rounded-xl border bg-white p-3">
+                <QRCodeSVG value={inviteLink} size={208} marginSize={1} title={`QR code to join ${group.name}`} />
+              </div>
+              <figcaption className="mt-2 text-xs text-muted-foreground">
+                Scan with a phone camera, or with Join a group in SplitWize.
+              </figcaption>
+            </figure>
+
+            <div className="grid grid-cols-2 gap-2">
+              {canShare ? (
+                <>
+                  <Button onClick={shareNatively}>
+                    <Share aria-hidden="true" />
+                    Share link
+                  </Button>
+                  <Button variant="outline" onClick={() => copyToClipboard(inviteLink)}>
+                    <Copy aria-hidden="true" />
+                    Copy link
+                  </Button>
+                </>
+              ) : (
+                <Button className="col-span-2" onClick={() => copyToClipboard(inviteLink)}>
+                  <Copy aria-hidden="true" />
+                  Copy link
                 </Button>
-              </div>
+              )}
             </div>
 
-            <div className="grid grid-cols-2 gap-3">
-              <Button variant="outline" onClick={shareNatively} className="flex items-center justify-center space-x-2">
-                <Share className="w-4 h-4" />
-                <span>Share</span>
-              </Button>
-              <Button
-                variant="outline"
-                onClick={() => setShowQR(!showQR)}
-                aria-expanded={showQR}
-                className="flex items-center justify-center space-x-2"
-              >
-                <QrCode className="w-4 h-4" />
-                <span>{showQR ? 'Hide QR code' : 'QR code'}</span>
-              </Button>
+            <div className="space-y-1.5">
+              <Label htmlFor="invite-link" className="text-xs text-muted-foreground">
+                Invite link
+              </Label>
+              <Input id="invite-link" value={inviteLink} readOnly className="text-xs" onFocus={(e) => e.target.select()} />
             </div>
-
-            {showQR && (
-              <div className="rounded-lg border bg-card p-4 text-center">
-                <QRCodeSVG value={inviteLink} size={176} marginSize={2} className="mx-auto" title={`Invite link for ${group.name}`} />
-                <p className="mt-2 text-xs text-muted-foreground">Scan with a phone camera to open the invite.</p>
-              </div>
-            )}
 
             <div className="space-y-2">
               <Label htmlFor="invite-email">Email the link</Label>
@@ -176,7 +189,7 @@ export const GroupInviteDialog: React.FC<GroupInviteDialogProps> = ({ group, chi
               <div className="space-y-1">
                 <p className="font-medium">Joining by link is off</p>
                 <p className="text-muted-foreground">
-                  Add people by email from the Members tab. If they don't have an account yet, they join as soon as they
+                  Add people by email in the Settings tab. If they don't have an account yet, they join as soon as they
                   sign up with that email.
                 </p>
               </div>

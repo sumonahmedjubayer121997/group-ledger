@@ -112,7 +112,7 @@ export const GroupChat: React.FC<GroupChatProps> = ({ groupId }) => {
       <CardHeader className={`${isMobile ? 'p-3' : 'p-4'} border-b`}>
         <CardTitle className={`${isMobile ? 'text-lg' : 'text-xl'} flex items-center gap-2`}>
           <MessageCircle className="w-5 h-5" />
-          Group Chat
+          Group chat
           {totalMessageCount > 0 && (
             <span className="text-sm text-muted-foreground">
               ({totalMessageCount} messages)
@@ -133,7 +133,7 @@ export const GroupChat: React.FC<GroupChatProps> = ({ groupId }) => {
                   className="text-xs"
                 >
                   <ChevronUp className="w-4 h-4 mr-2" />
-                  Show Messages
+                  Show messages
                 </Button>
               </div>
             )}
@@ -146,7 +146,7 @@ export const GroupChat: React.FC<GroupChatProps> = ({ groupId }) => {
                   onClick={handleHideMessages}
                   className="text-xs"
                 >
-                  Hide Messages
+                  Hide messages
                 </Button>
               </div>
             )}

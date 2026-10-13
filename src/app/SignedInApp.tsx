@@ -4,6 +4,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { useTheme } from "@/components/theme-provider";
 import { useExpenseStore } from "@/stores/expenseStore";
 import { useBudgetFirebaseSync } from "@/hooks/useBudgetFirebaseSync";
+import { useLoanSync } from "@/stores/loanStore";
 import { PageSkeleton } from "@/components/PageSkeleton";
 import { AppActionsProvider } from "./appActions";
 import { AppShell } from "./AppShell";
@@ -12,14 +13,13 @@ import { AppShell } from "./AppShell";
 const Dashboard = lazy(() => import("@/pages/Dashboard"));
 const ExpensesPage = lazy(() => import("@/pages/ExpensesPage"));
 const GroupDetailPage = lazy(() => import("@/pages/GroupDetailPage"));
-const BudgetsPage = lazy(() => import("@/pages/BudgetsPage"));
-const CategoriesPage = lazy(() => import("@/pages/CategoriesPage"));
-const SearchPage = lazy(() => import("@/pages/SearchPage"));
+const PersonalPage = lazy(() => import("@/pages/PersonalPage"));
+const PersonPage = lazy(() => import("@/pages/PersonPage"));
 const ProfilePage = lazy(() => import("@/pages/ProfilePage"));
 const JoinPage = lazy(() => import("@/pages/JoinPage"));
 const NotFound = lazy(() => import("@/pages/NotFound"));
 
-/** Keeps groups, expenses, payments and budgets in sync with Firestore while signed in. */
+/** Keeps groups, expenses, payments, budgets and loans in sync with Firestore while signed in. */
 function useDataSync(userId: string) {
   const initializeFirebaseSync = useExpenseStore((s) => s.initializeFirebaseSync);
   const cleanup = useExpenseStore((s) => s.cleanup);
@@ -28,6 +28,7 @@ function useDataSync(userId: string) {
     return () => cleanup();
   }, [userId, initializeFirebaseSync, cleanup]);
   useBudgetFirebaseSync();
+  useLoanSync(userId);
 }
 
 /** Applies the theme saved to the profile once, when it was chosen on another device. */
@@ -58,9 +59,13 @@ export default function SignedInApp() {
             <Route path="/" element={<Dashboard />} />
             <Route path="/expenses" element={<ExpensesPage />} />
             <Route path="/groups/:groupId" element={<GroupDetailPage />} />
-            <Route path="/budgets" element={<BudgetsPage />} />
-            <Route path="/categories" element={<CategoriesPage />} />
-            <Route path="/search" element={<SearchPage />} />
+            <Route path="/personal" element={<PersonalPage />} />
+            {/* Budgets moved into Personal, next to loans. */}
+            <Route path="/budgets" element={<Navigate to="/personal?tab=group-budgets" replace />} />
+            <Route path="/people/:personId" element={<PersonPage />} />
+            {/* Search moved to the command bar (Ctrl+K) and categories into the expense form. */}
+            <Route path="/search" element={<Navigate to="/expenses" replace />} />
+            <Route path="/categories" element={<Navigate to="/expenses" replace />} />
             <Route path="/profile" element={<ProfilePage />} />
             <Route path="/join/:code" element={<JoinPage />} />
             <Route path="/signin" element={<Navigate to="/" replace />} />

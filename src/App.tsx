@@ -12,6 +12,8 @@ import { FullPageLoader } from "@/components/FullPageLoader";
 const loadPublicApp = () => import("./app/PublicApp");
 const PublicApp = lazy(loadPublicApp);
 const SignedInApp = lazy(() => import("./app/SignedInApp"));
+// Offline use, installing and "new version" prompts; loads after the page, off the critical path.
+const PwaUpdatePrompt = lazy(() => import("@/components/PwaUpdatePrompt"));
 
 // Most first visits are signed out, so start fetching the landing page while sign-in is checked.
 if (typeof window !== "undefined" && window.location.pathname === "/") void loadPublicApp();
@@ -36,6 +38,9 @@ const App = () => (
         <TooltipProvider>
           <Toaster />
           <Sonner />
+          <Suspense fallback={null}>
+            <PwaUpdatePrompt />
+          </Suspense>
           <BrowserRouter>
             <PageErrorBoundary>
               <Root />

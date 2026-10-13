@@ -513,6 +513,15 @@ export const createGroup = async (
     const docRef = await addDoc(collection(db, "groups"), firestoreGroup);
     const groupId = docRef.id;
 
+    // New groups start with their invite link working, so "Invite" can share it straight away.
+    if (firestoreGroup.groupType === "public" && isUsableCode(firestoreGroup.inviteCode)) {
+      await setDoc(doc(db, "inviteCodes", firestoreGroup.inviteCode), {
+        groupId,
+        groupName: firestoreGroup.name,
+        updatedAt: serverTimestamp(),
+      }).catch((error) => console.error("Error publishing invite link:", error));
+    }
+
     console.log("Group created with ID:", groupId);
 
     const batch = [];
@@ -909,7 +918,8 @@ export const subscribeToUserGroups = (
 
 export const subscribeToGroupExpenses = (
   groupId: string,
-  callback: (expenses: Expense[]) => void
+  callback: (expenses: Expense[]) => void,
+  onError?: (error: Error) => void
 ) => {
   console.log("Setting up expense subscription for group:", groupId);
   const expensesRef = collection(db, "groups", groupId, "expenses");
@@ -938,6 +948,7 @@ export const subscribeToGroupExpenses = (
     },
     (error) => {
       console.error("Error in expense subscription for group:", groupId, error);
+      onError?.(error);
     }
   );
 };
@@ -1328,6 +1339,11 @@ export const subscribeToUserAllBudgets = (
 };
 
 // Settlement Firebase Functions
+/** Removes a recorded payment (members of its group only, per the rules). */
+export const deleteSettlement = async (settlementId: string) => {
+  await deleteDoc(doc(db, "settlements", settlementId));
+};
+
 export const createSettlement = async (settlement: Omit<Settlement, 'id'>, groupId: string, userId: string): Promise<Settlement> => {
   try {
     console.log('Creating settlement in Firebase:', settlement);
@@ -1381,7 +1397,8 @@ export const getGroupSettlements = async (groupId: string): Promise<Settlement[]
 
 export const subscribeToGroupSettlements = (
   groupId: string,
-  callback: (settlements: Settlement[]) => void
+  callback: (settlements: Settlement[]) => void,
+  onError?: (error: Error) => void
 ): (() => void) =>
   onSnapshot(
     query(collection(db, "settlements"), where("groupId", "==", groupId)),
@@ -1390,6 +1407,7 @@ export const subscribeToGroupSettlements = (
     },
     (error) => {
       console.error("Error in settlements subscription:", error);
+      onError?.(error);
     }
   );
 
@@ -1532,7 +1550,7 @@ export const deleteMyAccount = async (user: User) => {
     }
   }
 
-  const ownCollections = ["groups", "budgets"];
+  const ownCollections = ["groups", "budgets", "loans"];
   for (const name of ownCollections) {
     const docs = await getDocs(collection(db, "users", uid, name));
     await Promise.all(docs.docs.map((d) => deleteDoc(d.ref)));

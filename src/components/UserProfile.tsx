@@ -4,19 +4,14 @@ import { CheckCircle } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { ProfileBasicInfo } from "./profile/ProfileBasicInfo";
-import { ProfileFinancialSummary } from "./profile/ProfileFinancialSummary";
 import { ProfileAccountSettings } from "./profile/ProfileAccountSettings";
 import { ProfilePreferences } from "./profile/ProfilePreferences";
 import { ProfilePrivacySecurity } from "./profile/ProfilePrivacySecurity";
-import { ProfileActivityFeed } from "./profile/ProfileActivityFeed";
 import { ProfilePictureUpload } from "./ProfilePictureUpload";
 import { PageSkeleton } from "./PageSkeleton";
 
+// Balances and spending live on the dashboard and Expenses page; Profile is only about you.
 const tabs = [
-  { value: "overview", label: "Overview" },
-  { value: "financial", label: "Money" },
-  { value: "activity", label: "Activity" },
   { value: "settings", label: "Account" },
   { value: "preferences", label: "Preferences" },
   { value: "privacy", label: "Privacy" },
@@ -62,14 +57,14 @@ export const UserProfile: React.FC = () => {
                 Verified
               </span>
             )}
-            <Link to="/budgets" className="rounded-sm underline-offset-4 hover:text-foreground hover:underline">
-              Your budgets
+            <Link to="/personal" className="rounded-sm underline-offset-4 hover:text-foreground hover:underline">
+              Loans and budgets
             </Link>
           </p>
         </div>
       </div>
 
-      <Tabs defaultValue="overview">
+      <Tabs defaultValue="settings">
         <div className="-mx-4 overflow-x-auto px-4 [scrollbar-width:none] sm:mx-0 sm:px-0 [&::-webkit-scrollbar]:hidden">
           <TabsList className="w-max">
             {tabs.map((t) => (
@@ -80,15 +75,6 @@ export const UserProfile: React.FC = () => {
           </TabsList>
         </div>
 
-        <TabsContent value="overview" className="mt-6 space-y-4">
-          <ProfileBasicInfo user={user} userProfile={userProfile} />
-        </TabsContent>
-        <TabsContent value="financial" className="mt-6 space-y-4">
-          <ProfileFinancialSummary userProfile={userProfile} />
-        </TabsContent>
-        <TabsContent value="activity" className="mt-6 space-y-4">
-          <ProfileActivityFeed userProfile={userProfile} />
-        </TabsContent>
         <TabsContent value="settings" className="mt-6 space-y-4">
           <ProfileAccountSettings user={user} userProfile={userProfile} />
         </TabsContent>

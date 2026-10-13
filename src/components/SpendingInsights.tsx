@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { format, startOfMonth, startOfYear, subDays, subMonths } from "date-fns";
+import { startOfYear, subDays, subMonths } from "date-fns";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -7,6 +7,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { useExpenseStore, type Expense } from "@/stores/expenseStore";
 import { expenseShares, formatMoney, makeResolver, toCents } from "@/lib/money";
 import { toDate } from "@/lib/dates";
+import { pctLabel, summarizeSpending, type SpendBar } from "@/lib/spendingSummary";
 
 type Period = "30d" | "3m" | "year" | "all";
 
@@ -27,9 +28,8 @@ const inPeriod = (expense: Expense, period: Period, now: Date) => {
 };
 
 /** A labelled horizontal bar per row: readable by screen readers as plain text. */
-function Bars({ rows, currency }: { rows: { label: string; cents: number }[]; currency: string }) {
+function Bars({ rows, currency }: { rows: SpendBar[]; currency: string }) {
   const max = Math.max(...rows.map((r) => r.cents), 1);
-  const total = rows.reduce((sum, r) => sum + r.cents, 0) || 1;
   return (
     <ul className="space-y-3">
       {rows.map((row) => (
@@ -37,7 +37,7 @@ function Bars({ rows, currency }: { rows: { label: string; cents: number }[]; cu
           <div className="flex items-baseline justify-between gap-3 text-sm">
             <span className="truncate">{row.label}</span>
             <span className="money shrink-0 text-muted-foreground">
-              {formatMoney(row.cents, currency)} <span className="text-xs">· {Math.round((row.cents / total) * 100)}%</span>
+              {formatMoney(row.cents, currency)} <span className="text-xs">· {pctLabel(row)}</span>
             </span>
           </div>
           <div className="mt-1.5 h-2 rounded-full bg-secondary" aria-hidden="true">
@@ -73,37 +73,23 @@ export default function SpendingInsights({ expenses, currencyOf }: { expenses: E
   const active = period ?? defaultPeriod;
   const list = useMemo(() => inCurrency.filter((e) => inPeriod(e, active, now)), [inCurrency, active, now]);
 
+  // The same numbers as the PDF report (see summarizeSpending).
   const stats = useMemo(() => {
     const byGroup = new Map(groups.map((g) => [g.id, makeResolver(g.members)]));
-    let total = 0;
-    let mine = 0;
-    let biggest: Expense | null = null;
-    const byCategory = new Map<string, number>();
-    const byPayer = new Map<string, number>();
-    const byMonth = new Map<string, number>();
-    for (const e of list) {
-      const cents = toCents(e.amount);
-      total += cents;
-      if (!biggest || cents > toCents(biggest.amount)) biggest = e;
-      const resolve = byGroup.get(e.groupId);
-      if (resolve && user) {
-        const me = resolve({ id: user.uid, email: user.email });
-        mine += (me && expenseShares(e, resolve).get(me)) || 0;
-      }
-      const category = e.category?.trim() || "Uncategorised";
-      byCategory.set(category, (byCategory.get(category) ?? 0) + cents);
-      const payer = e.paidBy?.name || "Someone";
-      byPayer.set(payer, (byPayer.get(payer) ?? 0) + cents);
-      const month = format(startOfMonth(toDate(e.date)!), "yyyy-MM");
-      byMonth.set(month, (byMonth.get(month) ?? 0) + cents);
-    }
-    const top = (m: Map<string, number>, n: number) =>
-      [...m].sort((a, b) => b[1] - a[1]).slice(0, n).map(([label, cents]) => ({ label, cents }));
-    const months = [...byMonth]
-      .sort((a, b) => b[0].localeCompare(a[0]))
-      .slice(0, 12)
-      .map(([key, cents]) => ({ label: format(new Date(`${key}-01T00:00:00`), "MMM yyyy"), cents }));
-    return { total, mine, biggest, categories: top(byCategory, 8), payers: top(byPayer, 6), months };
+    return summarizeSpending(
+      list.map((e) => {
+        const resolve = byGroup.get(e.groupId);
+        const me = resolve && user ? resolve({ id: user.uid, email: user.email }) : null;
+        return {
+          cents: toCents(e.amount),
+          shareCents: (resolve && me && expenseShares(e, resolve).get(me)) || 0,
+          category: e.category ?? "",
+          payer: e.paidBy?.name ?? "",
+          date: toDate(e.date) ?? new Date(0),
+          description: e.description,
+        };
+      })
+    );
   }, [list, groups, user]);
 
   if (expenses.length === 0) {
@@ -147,10 +133,10 @@ export default function SpendingInsights({ expenses, currencyOf }: { expenses: E
       <div className="grid gap-4 sm:grid-cols-3">
         {[
           { label: "Total spent", value: formatMoney(stats.total, currency), sub: `${list.length} ${list.length === 1 ? "expense" : "expenses"}` },
-          { label: "Your share", value: formatMoney(stats.mine, currency), sub: stats.total ? `${Math.round((stats.mine / stats.total) * 100)}% of the total` : "" },
+          { label: "Your share", value: formatMoney(stats.mine, currency), sub: stats.total ? `${stats.minePct}% of the total` : "" },
           {
             label: "Biggest expense",
-            value: stats.biggest ? formatMoney(toCents(stats.biggest.amount), currency) : "–",
+            value: stats.biggest ? formatMoney(stats.biggest.cents, currency) : "–",
             sub: stats.biggest?.description ?? "",
           },
         ].map((tile) => (

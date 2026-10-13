@@ -6,11 +6,13 @@ import { Avatar, AvatarFallback , AvatarImage} from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { Label } from '@/components/ui/label';
 import { useExpenseStore, Group, Member } from '@/stores/expenseStore';
 import { Users, Crown, Eye, User, UserPlus, UserMinus, MoreVertical, Mail } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/contexts/AuthContext';
+import { deferWithUndo, useHidden } from '@/lib/undo';
 
 import { formatDate } from "@/lib/dates";
 interface GroupMemberManagementProps {
@@ -24,6 +26,7 @@ export const GroupMemberManagement: React.FC<GroupMemberManagementProps> = ({ gr
   
   const { addMemberToGroup, removeMemberFromGroup, updateMemberRole } = useExpenseStore();
   const { user } = useAuth();
+  const hidden = useHidden((s) => s.hidden);
   const { toast } = useToast();
   // Admins manage people and roles; members can add people; viewers only look.
   const myRole = group.members.find(m => m.id === user?.uid)?.role;
@@ -48,15 +51,16 @@ export const GroupMemberManagement: React.FC<GroupMemberManagementProps> = ({ gr
     }
   };
 
-  const handleAddMember = async () => {
-    if (!newMemberName.trim() || !newMemberEmail.trim() || !user) {
-      toast({
-        title: "Missing Information",
-        description: "Please enter both name and email.",
-        variant: "destructive"
-      });
-      return;
-    }
+  const [addErrors, setAddErrors] = useState<{ name?: string; email?: string }>({});
+
+  const handleAddMember = async (e?: React.FormEvent) => {
+    e?.preventDefault();
+    const problems: typeof addErrors = {};
+    if (!newMemberName.trim()) problems.name = 'Add their name.';
+    if (!newMemberEmail.trim()) problems.email = "Add their email, or share the invite link instead.";
+    else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(newMemberEmail.trim())) problems.email = "That email doesn't look right.";
+    setAddErrors(problems);
+    if (problems.name || problems.email || !user || busy) return;
 
     const newMember: Omit<Member, 'joinedAt' | 'role'> = {
       userId: crypto.randomUUID(),
@@ -69,14 +73,14 @@ export const GroupMemberManagement: React.FC<GroupMemberManagementProps> = ({ gr
     try {
       await addMemberToGroup(group.id, newMember, user.uid);
       toast({
-        title: "Member added",
-        description: `${newMemberName.trim()} is in the group. If they don't have an account yet, they'll join when they sign up with ${newMemberEmail.trim()}.`,
+        title: `Added ${newMemberName.trim()}`,
+        description: `If they don't have an account yet, they'll join when they sign up with ${newMemberEmail.trim()}.`,
       });
       setNewMemberName('');
       setNewMemberEmail('');
       setShowAddMember(false);
     } catch {
-      toast({ title: "Couldn't add member", description: "Please try again.", variant: "destructive" });
+      toast({ title: `Couldn't add ${newMemberName.trim()}`, description: "Please try again.", variant: "destructive" });
     } finally {
       setBusy(false);
     }
@@ -85,20 +89,20 @@ export const GroupMemberManagement: React.FC<GroupMemberManagementProps> = ({ gr
   const handleRemoveMember = async (member: Member) => {
     if (group.members.filter(m => m.role === 'admin').length === 1 && member.role === 'admin') {
       toast({
-        title: "Cannot Remove Admin",
-        description: "Cannot remove the last admin. Promote another member first.",
+        title: "Make someone else an admin first",
+        description: "A group needs at least one admin.",
         variant: "destructive"
       });
       return;
     }
 
-    if (!window.confirm(`Remove ${member.name} from ${group.name}? Their past expenses stay in the group.`)) return;
-    try {
-      await removeMemberFromGroup(group.id, member.id);
-      toast({ title: "Member removed", description: `${member.name} has been removed from the group.` });
-    } catch {
-      toast({ title: "Couldn't remove member", description: "Only group admins can remove people.", variant: "destructive" });
-    }
+    // Removed from view at once, with Undo; the real removal happens 8 seconds later.
+    deferWithUndo({
+      id: `member-${group.id}-${member.id}`,
+      title: `Removed ${member.name}`,
+      description: "Their past expenses stay in the group.",
+      run: () => removeMemberFromGroup(group.id, member.id),
+    });
   };
 
   const handleRoleChange = async (member: Member, newRole: Member['role']) => {
@@ -125,49 +129,71 @@ export const GroupMemberManagement: React.FC<GroupMemberManagementProps> = ({ gr
           <CardTitle className="flex flex-col sm:flex-row sm:items-center sm:justify-between space-y-3 sm:space-y-0">
             <div className="flex items-center space-x-2">
               <Users className="w-4 h-4 sm:w-5 sm:h-5" />
-              <span className="text-lg sm:text-2xl">Group Members ({group.members.length})</span>
+              <span className="text-lg sm:text-2xl">{group.members.length} {group.members.length === 1 ? "person" : "people"}</span>
             </div>
             {canAdd && (
             <Dialog open={showAddMember} onOpenChange={setShowAddMember}>
               <DialogTrigger asChild>
                 <Button className="w-full sm:w-auto">
                   <UserPlus className="w-4 h-4 mr-2" />
-                  Add Member
+                  Add person
                 </Button>
               </DialogTrigger>
-              <DialogContent className="w-[95vw] max-w-md mx-auto">
+              <DialogContent className="sm:max-w-md">
                 <DialogHeader>
-                  <DialogTitle>Add New Member</DialogTitle>
+                  <DialogTitle>Add a person</DialogTitle>
+                  <DialogDescription>They'll see the group when they sign in with this email.</DialogDescription>
                 </DialogHeader>
-                <div className="space-y-4 py-4">
-                  <div>
-                    <label className="text-sm font-medium">Name</label>
+                <form onSubmit={handleAddMember} className="space-y-4" noValidate>
+                  <div className="grid gap-1.5">
+                    <Label htmlFor="add-person-name">Name</Label>
                     <Input
+                      id="add-person-name"
                       value={newMemberName}
-                      onChange={(e) => setNewMemberName(e.target.value)}
-                      placeholder="Enter member's name"
-                      className="mt-1"
+                      onChange={(e) => {
+                        setNewMemberName(e.target.value);
+                        setAddErrors((er) => ({ ...er, name: undefined }));
+                      }}
+                      autoComplete="off"
+                      aria-invalid={!!addErrors.name}
+                      aria-describedby={addErrors.name ? 'add-person-name-error' : undefined}
                     />
+                    {addErrors.name && (
+                      <p id="add-person-name-error" className="text-sm text-destructive">
+                        {addErrors.name}
+                      </p>
+                    )}
                   </div>
-                  <div>
-                    <label className="text-sm font-medium">Email</label>
+                  <div className="grid gap-1.5">
+                    <Label htmlFor="add-person-email">Email</Label>
                     <Input
+                      id="add-person-email"
                       type="email"
+                      inputMode="email"
                       value={newMemberEmail}
-                      onChange={(e) => setNewMemberEmail(e.target.value)}
-                      placeholder="Enter member's email"
-                      className="mt-1"
+                      onChange={(e) => {
+                        setNewMemberEmail(e.target.value);
+                        setAddErrors((er) => ({ ...er, email: undefined }));
+                      }}
+                      autoComplete="off"
+                      aria-invalid={!!addErrors.email}
+                      aria-describedby={addErrors.email ? 'add-person-email-error' : undefined}
                     />
+                    {addErrors.email && (
+                      <p id="add-person-email-error" className="text-sm text-destructive">
+                        {addErrors.email}
+                      </p>
+                    )}
                   </div>
-                  <div className="flex space-x-3 pt-4">
-                    <Button variant="outline" onClick={() => setShowAddMember(false)} className="flex-1">
+                  <DialogFooter className="gap-2 sm:gap-0">
+                    <Button type="button" variant="outline" onClick={() => setShowAddMember(false)}>
                       Cancel
                     </Button>
-                    <Button onClick={handleAddMember} className="flex-1" disabled={busy}>
-                      {busy ? 'Adding…' : 'Add Member'}
+                    <Button type="submit" disabled={busy}>
+                      {busy ? 'Adding…' : 'Add person'}
                     </Button>
-                  </div>
-                </div>
+                  </DialogFooter>
+                </form>
               </DialogContent>
             </Dialog>
             )}
@@ -175,7 +201,7 @@ export const GroupMemberManagement: React.FC<GroupMemberManagementProps> = ({ gr
         </CardHeader>
         <CardContent className="px-4 py-0 pb-4 sm:px-6 sm:pb-6">
           <div className="space-y-3 sm:space-y-4">
-            {group.members.map((member) => (
+            {group.members.filter((m) => !hidden.has(`member-${group.id}-${m.id}`)).map((member) => (
               <div key={member.id} className="flex flex-col sm:flex-row sm:items-center sm:justify-between p-3 sm:p-4 border rounded-lg space-y-3 sm:space-y-0">
                 <div className="flex items-center space-x-3 sm:space-x-4 min-w-0 flex-1">
                  <Avatar

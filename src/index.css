@@ -127,6 +127,9 @@ All colors MUST be HSL.
 
   body {
     @apply bg-background font-inter text-foreground antialiased;
+    /* Installed on a notched phone held sideways: keep content clear of the notch. */
+    padding-left: env(safe-area-inset-left);
+    padding-right: env(safe-area-inset-right);
   }
 }
 

@@ -76,8 +76,8 @@ export const ImportDialog: React.FC<ImportDialogProps> = ({ children }) => {
       },
       error: (error) => {
         toast({
-          title: "Import Error",
-          description: "Failed to parse CSV file. Please check the format.",
+          title: "Couldn't read that file",
+          description: "Check that it's a CSV file with a header row.",
           variant: "destructive"
         });
       }
@@ -91,8 +91,8 @@ export const ImportDialog: React.FC<ImportDialogProps> = ({ children }) => {
   const validateAndPreview = () => {
     if (!selectedGroup) {
       toast({
-        title: "Group Required",
-        description: "Please select a group for importing expenses.",
+        title: "Choose a group first",
+        description: "Imported expenses go into one group.",
         variant: "destructive"
       });
       return;
@@ -211,8 +211,8 @@ export const ImportDialog: React.FC<ImportDialogProps> = ({ children }) => {
     setImportSummary({ success: successCount, errors: errorCount });
     
     toast({
-      title: "Import Complete",
-      description: `${successCount} expenses imported successfully. ${errorCount} errors.`,
+      title: `Imported ${successCount} ${successCount === 1 ? "expense" : "expenses"}`,
+      description: errorCount ? `${errorCount} rows couldn't be imported.` : undefined,
     });
   };
 
@@ -272,7 +272,7 @@ export const ImportDialog: React.FC<ImportDialogProps> = ({ children }) => {
                   className="hidden"
                 />
                 <Button onClick={() => fileInputRef.current?.click()}>
-                  Choose File
+                  Choose file
                 </Button>
                 {file && (
                   <p className="mt-2 text-sm text-muted-foreground">
@@ -356,7 +356,7 @@ export const ImportDialog: React.FC<ImportDialogProps> = ({ children }) => {
                     Back
                   </Button>
                   <Button onClick={validateAndPreview} disabled={!selectedGroup}>
-                    Preview Import
+                    Preview import
                   </Button>
                 </div>
               </div>
@@ -381,7 +381,7 @@ export const ImportDialog: React.FC<ImportDialogProps> = ({ children }) => {
                         <TableHead>Date</TableHead>
                         <TableHead>Description</TableHead>
                         <TableHead>Amount</TableHead>
-                        <TableHead>Paid By</TableHead>
+                        <TableHead>Paid by</TableHead>
                         <TableHead>Category</TableHead>
                         <TableHead>Errors</TableHead>
                       </TableRow>
@@ -436,7 +436,7 @@ export const ImportDialog: React.FC<ImportDialogProps> = ({ children }) => {
             <Alert>
               <CheckCircle className="h-4 w-4" />
               <AlertDescription>
-                Import completed! {importSummary.success} expenses added successfully.
+                Done: {importSummary.success} expenses added.
                 {importSummary.errors > 0 && ` ${importSummary.errors} rows had errors and were skipped.`}
               </AlertDescription>
             </Alert>
