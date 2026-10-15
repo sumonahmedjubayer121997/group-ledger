@@ -1,259 +1,90 @@
 import React, { useState } from "react";
+import { Link } from "react-router-dom";
+import { CheckCircle } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
-import { ScrollArea } from "@/components/ui/scroll-area";
-import {
-  User,
-  Settings,
-  CreditCard,
-  Bell,
-  Shield,
-  Activity,
-  Download,
-  Edit,
-  ArrowLeft,
-  Target,
-} from "lucide-react";
-import { ProfileBasicInfo } from "./profile/ProfileBasicInfo";
-import { ProfileFinancialSummary } from "./profile/ProfileFinancialSummary";
 import { ProfileAccountSettings } from "./profile/ProfileAccountSettings";
 import { ProfilePreferences } from "./profile/ProfilePreferences";
 import { ProfilePrivacySecurity } from "./profile/ProfilePrivacySecurity";
-import { ProfileActivityFeed } from "./profile/ProfileActivityFeed";
 import { ProfilePictureUpload } from "./ProfilePictureUpload";
-import { ProfileOverallBudget } from "./profile/ProfileOverallBudget";
-import { ComprehensiveBudgetManagement } from "./ComprehensiveBudgetManagement";
-import { useIsMobile } from "@/hooks/use-mobile";
+import { PageSkeleton } from "./PageSkeleton";
 
-interface UserProfileProps {
-  onClose?: () => void;
-}
+// Balances and spending live on the dashboard and Expenses page; Profile is only about you.
+const tabs = [
+  { value: "settings", label: "Account" },
+  { value: "preferences", label: "Preferences" },
+  { value: "privacy", label: "Privacy" },
+];
 
-export const UserProfile: React.FC<UserProfileProps> = ({ onClose }) => {
-  const { user, userProfile, loading } = useAuth();
-  const [activeTab, setActiveTab] = useState("overview");
-  const [profilePhotoURL, setProfilePhotoURL] = useState(
-    userProfile?.photoURL || ""
-  );
-  const isMobile = useIsMobile();
+const initials = (name: string) =>
+  name
+    .split(/\s+/)
+    .filter(Boolean)
+    .map((n) => n[0])
+    .join("")
+    .slice(0, 2)
+    .toUpperCase() || "U";
 
-  console.log(
-    "UserProfile render - user:",
-    user?.uid,
-    "userProfile:",
-    userProfile?.displayName,
-    "loading:",
-    loading
-  );
+export const UserProfile: React.FC = () => {
+  const { user, userProfile } = useAuth();
+  const [photoURL, setPhotoURL] = useState(userProfile?.photoURL || "");
 
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center p-8">
-        <div className="text-center">
-          <p className="text-muted-foreground">Loading profile...</p>
-        </div>
-      </div>
-    );
-  }
+  // The profile document arrives a moment after sign-in.
+  if (!user || !userProfile) return <PageSkeleton />;
 
-  if (!user) {
-    return (
-      <div className="flex items-center justify-center p-8">
-        <div className="text-center">
-          <p className="text-muted-foreground">No user found. Please log in.</p>
-        </div>
-      </div>
-    );
-  }
-
-  // Create a fallback userProfile if it doesn't exist
-  const profileData = userProfile || {
-    uid: user.uid,
-    email: user.email || "",
-    displayName: user.displayName || "User",
-    photoURL: profilePhotoURL || user.photoURL,
-    phoneNumber: user.phoneNumber,
-    emailVerified: user.emailVerified,
-    role: "user" as const,
-    createdAt: new Date(),
-    lastLoginAt: new Date(),
-    preferences: {
-      currency: "$",
-      notifications: true,
-      theme: "light" as const,
-    },
-  };
-
-  const getInitials = (name: string) => {
-    return name
-      .split(" ")
-      .map((n) => n[0])
-      .join("")
-      .toUpperCase();
-  };
-
-  const handlePhotoChange = (url: string) => {
-    setProfilePhotoURL(url);
-  };
-
-  const tabItems = [
-    { value: "overview", label: "Overview", icon: User },
-    { value: "financial", label: "Financial", icon: CreditCard },
-    { value: "budgets", label: "Budgets", icon: Target },
-    { value: "settings", label: "Settings", icon: Settings },
-    { value: "preferences", label: "Preferences", icon: Bell },
-    { value: "privacy", label: "Privacy", icon: Shield },
-    { value: "activity", label: "Activity", icon: Activity },
-  ];
+  const name = userProfile.name || userProfile.displayName || user.displayName || "You";
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-background via-muted/20 to-primary/5 dark:from-background dark:via-muted/10 dark:to-primary/5">
-      <div className="max-w-4xl mx-auto p-3 sm:p-6 space-y-4 sm:space-y-6">
-        {/* Mobile Header */}
-        {isMobile && (
-          <div className="flex items-center justify-between mb-4">
-            {onClose && (
-              <Button variant="ghost" size="sm" onClick={onClose}>
-                <ArrowLeft className="h-4 w-4 mr-2" />
-                Back
-              </Button>
+    <>
+      <div className="mb-8 flex flex-col gap-5 sm:flex-row sm:items-center">
+        <div className="relative w-fit">
+          <Avatar className="h-20 w-20 border">
+            <AvatarImage src={photoURL || userProfile.photoURL || undefined} alt="" className="object-cover" />
+            <AvatarFallback className="bg-secondary text-lg font-medium">{initials(name)}</AvatarFallback>
+          </Avatar>
+          <div className="absolute -bottom-1 -right-1">
+            <ProfilePictureUpload currentPhotoURL={photoURL || userProfile.photoURL || undefined} onPhotoChange={setPhotoURL} />
+          </div>
+        </div>
+        <div className="min-w-0">
+          <h1 className="truncate font-display text-[34px] leading-[38px] tracking-[-0.01em] sm:text-[44px] sm:leading-[48px]">{name}</h1>
+          <p className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-muted-foreground">
+            <span className="truncate">{user.email}</span>
+            {user.emailVerified && (
+              <span className="inline-flex items-center gap-1 text-settled">
+                <CheckCircle className="h-3.5 w-3.5" aria-hidden="true" />
+                Verified
+              </span>
             )}
-            <h1 className="text-lg font-semibold text-foreground">Profile</h1>
-            <div className="w-16" /> {/* Spacer */}
-          </div>
-        )}
+            <Link to="/personal" className="rounded-sm underline-offset-4 hover:text-foreground hover:underline">
+              Loans and budgets
+            </Link>
+          </p>
+        </div>
+      </div>
 
-        {/* Header */}
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-          <div className="flex items-center space-x-4">
-            <div className="relative">
-              <Avatar className="h-16 w-16 sm:h-20 sm:w-20 border-2 border-border">
-                <AvatarImage
-                  src={profilePhotoURL || profileData.photoURL || undefined}
-                />
-                <AvatarFallback className="text-sm sm:text-lg font-semibold bg-primary/10 text-primary">
-                  {getInitials(profileData.displayName || "User")}
-                </AvatarFallback>
-              </Avatar>
-              <div className="absolute -bottom-1 -right-1 sm:-bottom-2 sm:-right-2">
-                <ProfilePictureUpload
-                  currentPhotoURL={
-                    profilePhotoURL || profileData.photoURL || undefined
-                  }
-                  onPhotoChange={handlePhotoChange}
-                />
-              </div>
-            </div>
-            <div className="flex-1 min-w-0">
-              <h1 className="text-lg sm:text-2xl font-bold truncate text-foreground">
-                {(profileData as any).name || (profileData as any).displayName}
-              </h1>
-              <p className="text-muted-foreground text-sm sm:text-base truncate">
-                {profileData.email}
-              </p>
-              <div className="flex flex-wrap items-center gap-2 mt-2">
-                <Badge variant="secondary" className="text-xs">
-                  👤 {profileData.role === "admin" ? "Admin" : "User"}
-                </Badge>
-                {((profileData as any).verified ||
-                  (profileData as any).emailVerified) && (
-                  <Badge
-                    variant="outline"
-                    className="text-green-500 border-green-500/30 text-xs dark:text-green-400 dark:border-green-400/30"
-                  >
-                    ✅ Verified
-                  </Badge>
-                )}
-              </div>
-            </div>
-          </div>
-          {onClose && !isMobile && (
-            <Button variant="outline" onClick={onClose}>
-              Close
-            </Button>
-          )}
+      <Tabs defaultValue="settings">
+        <div className="-mx-4 overflow-x-auto px-4 [scrollbar-width:none] sm:mx-0 sm:px-0 [&::-webkit-scrollbar]:hidden">
+          <TabsList className="w-max">
+            {tabs.map((t) => (
+              <TabsTrigger key={t.value} value={t.value}>
+                {t.label}
+              </TabsTrigger>
+            ))}
+          </TabsList>
         </div>
 
-        {/* Profile Tabs */}
-        <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-          <div className="w-full">
-            <ScrollArea className="w-full">
-              <TabsList className="grid w-full grid-cols-3 sm:grid-cols-6 gap-1 p-1 h-auto bg-muted/50 backdrop-blur-sm border border-border/50">
-                {tabItems.map((item) => (
-                  <TabsTrigger
-                    key={item.value}
-                    value={item.value}
-                    className="flex flex-col sm:flex-row items-center gap-1 sm:gap-2 p-2 sm:p-3 text-xs sm:text-sm min-h-[60px] sm:min-h-auto
-                    data-[state=active]:bg-background data-[state=active]:text-foreground data-[state=active]:shadow-sm
-                    hover:bg-background/50 hover:text-foreground/80 transition-all duration-200
-                    data-[state=active]:scale-[1.02] transform"
-                  >
-                    <item.icon className="h-3 w-3 sm:h-4 sm:w-4" />
-                    <span className="hidden sm:inline">{item.label}</span>
-                    <span className="sm:hidden text-[10px] leading-tight">
-                      {item.label}
-                    </span>
-                  </TabsTrigger>
-                ))}
-              </TabsList>
-            </ScrollArea>
-          </div>
-
-          <div className="mt-4 sm:mt-6">
-            <TabsContent value="overview" className="space-y-4">
-              <ProfileBasicInfo user={user} userProfile={profileData as any} />
-            </TabsContent>
-
-            <TabsContent value="financial" className="space-y-4">
-              <ProfileFinancialSummary userProfile={profileData as any} />
-            </TabsContent>
-
-            <TabsContent value="budgets" className="space-y-4">
-              <div className="space-y-6">
-                <ProfileOverallBudget />
-                <div className="pt-6 border-t border-border">
-                  <h3 className="text-lg font-semibold mb-4 text-foreground">
-                    All Budget Management
-                  </h3>
-                  <ComprehensiveBudgetManagement />
-                </div>
-              </div>
-            </TabsContent>
-
-            <TabsContent value="settings" className="space-y-4">
-              <ProfileAccountSettings
-                user={user}
-                userProfile={profileData as any}
-              />
-            </TabsContent>
-
-            <TabsContent value="preferences" className="space-y-4">
-              <ProfilePreferences userProfile={profileData as any} />
-            </TabsContent>
-
-            <TabsContent value="privacy" className="space-y-4">
-              <ProfilePrivacySecurity
-                user={user}
-                userProfile={profileData as any}
-              />
-            </TabsContent>
-
-            <TabsContent value="activity" className="space-y-4">
-              <ProfileActivityFeed userProfile={profileData as any} />
-            </TabsContent>
-          </div>
-        </Tabs>
-      </div>
-    </div>
+        <TabsContent value="settings" className="mt-6 space-y-4">
+          <ProfileAccountSettings user={user} userProfile={userProfile} />
+        </TabsContent>
+        <TabsContent value="preferences" className="mt-6 space-y-4">
+          <ProfilePreferences userProfile={userProfile} />
+        </TabsContent>
+        <TabsContent value="privacy" className="mt-6 space-y-4">
+          <ProfilePrivacySecurity user={user} userProfile={userProfile} />
+        </TabsContent>
+      </Tabs>
+    </>
   );
 };

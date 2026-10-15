@@ -20,6 +20,7 @@ import {
 } from '@/services/groupCommunicationService';
 import { Member } from '@/stores/expenseStore';
 
+import { formatCalendarDate } from "@/lib/dates";
 interface GroupTasksProps {
   groupId: string;
   members: Member[];
@@ -150,7 +151,7 @@ export const GroupTasks: React.FC<GroupTasksProps> = ({ groupId, members }) => {
     onCancel: () => void;
     submitLabel: string;
   }) => (
-    <div className="space-y-3 p-3 bg-blue-50 rounded-lg">
+    <div className="space-y-3 p-3 bg-secondary rounded-lg">
       <Input
         value={formData.title}
         onChange={(e) => setFormData({ ...formData, title: e.target.value })}
@@ -219,7 +220,7 @@ export const GroupTasks: React.FC<GroupTasksProps> = ({ groupId, members }) => {
             onClick={() => setShowAddForm(!showAddForm)}
           >
             <Plus className="w-4 h-4 mr-1" />
-            Add Task
+            Add task
           </Button>
         </div>
       </CardHeader>
@@ -232,13 +233,13 @@ export const GroupTasks: React.FC<GroupTasksProps> = ({ groupId, members }) => {
               setShowAddForm(false);
               resetForm();
             }}
-            submitLabel="Create Task"
+            submitLabel="Create task"
           />
         )}
 
         {tasks.length === 0 ? (
-          <div className="text-center text-gray-500 py-8">
-            <CheckSquare className="w-12 h-12 mx-auto mb-4 text-gray-300" />
+          <div className="text-center text-muted-foreground py-8">
+            <CheckSquare className="w-12 h-12 mx-auto mb-4 text-muted-foreground" />
             <p>No tasks yet.</p>
             <p className="text-sm">Create your first task to get organized!</p>
           </div>
@@ -246,13 +247,13 @@ export const GroupTasks: React.FC<GroupTasksProps> = ({ groupId, members }) => {
           <div className="space-y-3">
             {tasks.map((task) => (
               <div key={task.id} className={`p-4 rounded-lg border ${
-                task.completed ? 'bg-green-50 border-green-200' : 'bg-white border-gray-200'
-              }`}>
+ task.completed ? 'bg-settled/10 border-settled/40' : 'bg-card border-border'
+ }`}>
                 {editingTask === task.id ? (
                   <TaskForm
                     onSubmit={() => handleUpdateTask(task.id)}
                     onCancel={cancelEditing}
-                    submitLabel="Update Task"
+                    submitLabel="Save task"
                   />
                 ) : (
                   <>
@@ -263,11 +264,11 @@ export const GroupTasks: React.FC<GroupTasksProps> = ({ groupId, members }) => {
                           onCheckedChange={(checked) => handleToggleComplete(task.id, checked as boolean)}
                         />
                         <div className="flex-1">
-                          <h3 className={`font-medium ${task.completed ? 'line-through text-gray-500' : ''}`}>
+                          <h3 className={`font-medium ${task.completed ? 'line-through text-muted-foreground' : ''}`}>
                             {task.title}
                           </h3>
                           {task.description && (
-                            <p className={`text-sm text-gray-600 mt-1 ${task.completed ? 'line-through' : ''}`}>
+                            <p className={`text-sm text-muted-foreground mt-1 ${task.completed ? 'line-through' : ''}`}>
                               {task.description}
                             </p>
                           )}
@@ -290,7 +291,7 @@ export const GroupTasks: React.FC<GroupTasksProps> = ({ groupId, members }) => {
                         </Button>
                       </div>
                     </div>
-                    <div className="flex items-center gap-4 text-sm text-gray-500">
+                    <div className="flex items-center gap-4 text-sm text-muted-foreground">
                       <div className="flex items-center gap-1">
                         <User className="w-4 h-4" />
                         Created by {task.createdByName}
@@ -303,7 +304,7 @@ export const GroupTasks: React.FC<GroupTasksProps> = ({ groupId, members }) => {
                       {task.dueDate && (
                         <div className="flex items-center gap-1">
                           <Calendar className="w-4 h-4" />
-                          Due {format(task.dueDate, 'MMM d, yyyy')}
+                          Due {formatCalendarDate(task.dueDate)}
                         </div>
                       )}
                     </div>

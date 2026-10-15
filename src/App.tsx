@@ -1,72 +1,55 @@
+import { lazy, Suspense, type ReactNode } from "react";
+import { BrowserRouter, useLocation } from "react-router-dom";
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { AuthProvider, useAuth } from "@/contexts/AuthContext";
-import { useExpenseStore } from "@/stores/expenseStore";
-import { useEffect } from "react";
-import Index from "./pages/Index";
-import NotFound from "./pages/NotFound";
 import { ThemeProvider } from "@/components/theme-provider";
+import { ErrorBoundary } from "@/components/ErrorBoundary";
+import { FullPageLoader } from "@/components/FullPageLoader";
 
-const queryClient = new QueryClient();
+// Signed-out visitors download the landing page; signed-in people download the app. Never both.
+const loadPublicApp = () => import("./app/PublicApp");
+const PublicApp = lazy(loadPublicApp);
+const SignedInApp = lazy(() => import("./app/SignedInApp"));
+// Offline use, installing and "new version" prompts; loads after the page, off the critical path.
+const PwaUpdatePrompt = lazy(() => import("@/components/PwaUpdatePrompt"));
 
-const AppContent = () => {
-  const { user, loading } = useAuth();
-  const { initializeFirebaseSync, cleanup } = useExpenseStore();
+// Most first visits are signed out, so start fetching the landing page while sign-in is checked.
+if (typeof window !== "undefined" && window.location.pathname === "/") void loadPublicApp();
 
-  // Initialize Firebase sync when user is authenticated properly
-  useEffect(() => {
-    if (user) {
-      console.log("Initializing Firebase sync for user:", user.uid);
-      initializeFirebaseSync(user.uid);
-    } else {
-      console.log("User logged out, cleaning up Firebase sync");
-      cleanup();
-    }
+/** A crash on one page shows a recovery screen instead of a blank app; moving to another page clears it. */
+const PageErrorBoundary = ({ children }: { children: ReactNode }) => {
+  const location = useLocation();
+  return <ErrorBoundary resetKey={location.pathname}>{children}</ErrorBoundary>;
+};
 
-    // Cleanup on unmount
-    return () => {
-      cleanup();
-    };
-  }, [user, initializeFirebaseSync, cleanup]);
-
-  console.log("App loading state:", loading);
-  console.log("User state:", user ? "authenticated" : "not authenticated");
-
-  // Loader removed as requested
-
-  // Always show the Index component, which will handle showing landing page vs main app
-  return (
-    <BrowserRouter>
-      <Routes>
-        <Route path="/" element={<Index />} />
-        <Route path="/profile" element={<Index />} />
-        <Route path="/search" element={<Index />} />
-        <Route path="/categories" element={<Index />} />
-        <Route path="/budgets" element={<Index />} />
-        <Route path="/ai-assistant" element={<Index />} />
-        <Route path="/groups/:groupId" element={<Index />} />
-        {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
-        <Route path="*" element={<NotFound />} />
-      </Routes>
-    </BrowserRouter>
-  );
+const Root = () => {
+  const { user, initializing } = useAuth();
+  // Wait for Firebase to restore a saved sign-in instead of flashing the landing page.
+  if (initializing) return <FullPageLoader />;
+  return <Suspense fallback={<FullPageLoader />}>{user ? <SignedInApp /> : <PublicApp />}</Suspense>;
 };
 
 const App = () => (
-  <QueryClientProvider client={queryClient}>
+  <ErrorBoundary>
     <ThemeProvider defaultTheme="system" storageKey="splitwize-ui-theme">
       <AuthProvider>
         <TooltipProvider>
           <Toaster />
           <Sonner />
-          <AppContent />
+          <Suspense fallback={null}>
+            <PwaUpdatePrompt />
+          </Suspense>
+          <BrowserRouter>
+            <PageErrorBoundary>
+              <Root />
+            </PageErrorBoundary>
+          </BrowserRouter>
         </TooltipProvider>
       </AuthProvider>
     </ThemeProvider>
-  </QueryClientProvider>
+  </ErrorBoundary>
 );
 
 export default App;

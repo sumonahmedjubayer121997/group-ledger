@@ -18,6 +18,7 @@ import {
   getMessageCount
 } from '@/services/groupCommunicationService';
 
+import { formatDateTime } from "@/lib/dates";
 interface GroupChatProps {
   groupId: string;
 }
@@ -111,7 +112,7 @@ export const GroupChat: React.FC<GroupChatProps> = ({ groupId }) => {
       <CardHeader className={`${isMobile ? 'p-3' : 'p-4'} border-b`}>
         <CardTitle className={`${isMobile ? 'text-lg' : 'text-xl'} flex items-center gap-2`}>
           <MessageCircle className="w-5 h-5" />
-          Group Chat
+          Group chat
           {totalMessageCount > 0 && (
             <span className="text-sm text-muted-foreground">
               ({totalMessageCount} messages)
@@ -132,7 +133,7 @@ export const GroupChat: React.FC<GroupChatProps> = ({ groupId }) => {
                   className="text-xs"
                 >
                   <ChevronUp className="w-4 h-4 mr-2" />
-                  Show Messages
+                  Show messages
                 </Button>
               </div>
             )}
@@ -145,7 +146,7 @@ export const GroupChat: React.FC<GroupChatProps> = ({ groupId }) => {
                   onClick={handleHideMessages}
                   className="text-xs"
                 >
-                  Hide Messages
+                  Hide messages
                 </Button>
               </div>
             )}
@@ -165,8 +166,8 @@ export const GroupChat: React.FC<GroupChatProps> = ({ groupId }) => {
                     exit={{ opacity: 0, y: -10 }}
                     transition={{ duration: 0.2, delay: index * 0.02 }}
                     className={`flex gap-3 ${
-                      message.senderId === user?.uid ? 'justify-end' : 'justify-start'
-                    }`}
+ message.senderId === user?.uid ? 'justify-end' : 'justify-start'
+ }`}
                     onMouseEnter={() => setHoveredMessage(message.id)}
                     onMouseLeave={() => setHoveredMessage(null)}
                   >
@@ -185,10 +186,10 @@ export const GroupChat: React.FC<GroupChatProps> = ({ groupId }) => {
                     <div className="relative max-w-[70%] group">
                       <div
                         className={`${
-                          message.senderId === user?.uid
-                            ? 'bg-primary text-primary-foreground'
-                            : 'bg-muted text-foreground'
-                        } rounded-lg p-3 relative`}
+ message.senderId === user?.uid
+ ? 'bg-primary text-primary-foreground'
+ : 'bg-muted text-foreground'
+ } rounded-lg p-3 relative`}
                       >
                         {message.senderId !== user?.uid && (
                           <div className="text-xs font-medium mb-1 opacity-70">
@@ -207,13 +208,13 @@ export const GroupChat: React.FC<GroupChatProps> = ({ groupId }) => {
                             initial={{ opacity: 0, scale: 0.8 }}
                             animate={{ opacity: 1, scale: 1 }}
                             exit={{ opacity: 0, scale: 0.8 }}
-                            className={`absolute z-10 px-2 py-1 bg-popover text-popover-foreground text-xs rounded shadow-md border ${
-                              message.senderId === user?.uid
-                                ? 'right-0 -top-8'
-                                : 'left-0 -top-8'
-                            }`}
+                            className={`absolute z-10 px-2 py-1 bg-popover text-popover-foreground text-xs rounded border ${
+ message.senderId === user?.uid
+ ? 'right-0 -top-8'
+ : 'left-0 -top-8'
+ }`}
                           >
-                            {format(message.createdAt, 'MMM d, HH:mm')}
+                            {formatDateTime(message.createdAt)}
                           </motion.div>
                         )}
                       </AnimatePresence>
@@ -245,6 +246,7 @@ export const GroupChat: React.FC<GroupChatProps> = ({ groupId }) => {
               onChange={(e) => setNewMessage(e.target.value)}
               onKeyPress={handleKeyPress}
               placeholder="Type a message..."
+              aria-label="Message"
               className="flex-1"
               disabled={sending}
             />
@@ -253,8 +255,9 @@ export const GroupChat: React.FC<GroupChatProps> = ({ groupId }) => {
               disabled={!newMessage.trim() || sending}
               size={isMobile ? "sm" : "default"}
               className="flex-shrink-0"
+              aria-label="Send message"
             >
-              <Send className="w-4 h-4" />
+              <Send className="w-4 h-4" aria-hidden="true" />
             </Button>
           </div>
         </div>

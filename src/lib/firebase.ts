@@ -1,32 +1,33 @@
+import {
+  clearIndexedDbPersistence,
+  connectFirestoreEmulator,
+  initializeFirestore,
+  persistentLocalCache,
+  persistentMultipleTabManager,
+  terminate,
+} from "firebase/firestore";
+import { connectStorageEmulator, getStorage } from "firebase/storage";
+import { app, auth, usingEmulators } from "./firebaseApp";
 
-// Import the functions you need from the SDKs you need
-import { initializeApp } from "firebase/app";
-import { getAuth } from "firebase/auth";
-import { getFirestore } from "firebase/firestore";
-import { getStorage } from "firebase/storage";
+// Firestore and Storage, for the signed-in app. Sign-in alone lives in ./firebaseApp.
+export { auth };
 
-// Your web app's Firebase configuration
-const firebaseConfig = {
-  apiKey: "AIzaSyDkzFz-W2l7pbbxB8LmvyXjmxG6EVpra48",
-  authDomain: "spiltwize.firebaseapp.com",
-  projectId: "spiltwize",
-  storageBucket: "spiltwize.firebasestorage.app",
-  messagingSenderId: "610043393454",
-  appId: "1:610043393454:web:42003676522e6f3945443f",
-  measurementId: "G-XQ8QSKL2HX"
-};
-
-// Initialize Firebase
-const app = initializeApp(firebaseConfig);
-
-// Initialize Firebase services
-export const auth = getAuth(app);
-export const db = getFirestore(app);
+// Keeps what you last saw (groups, expenses, loans) on the device, so the app opens with it even
+// offline, and changes made offline are sent when the connection is back. Works across open tabs.
+export const db = initializeFirestore(app, {
+  localCache: persistentLocalCache({ tabManager: persistentMultipleTabManager() }),
+});
 export const storage = getStorage(app);
 
-// Add error handling and logging
-auth.onAuthStateChanged((user) => {
-  console.log('Firebase auth state changed:', user ? 'User logged in' : 'User logged out');
-});
+if (usingEmulators) {
+  connectFirestoreEmulator(db, "127.0.0.1", 8085);
+  connectStorageEmulator(storage, "127.0.0.1", 9199);
+}
+
+/** After signing out: remove that account's saved data from this device (think shared computers). */
+export async function clearLocalData() {
+  await terminate(db);
+  await clearIndexedDbPersistence(db);
+}
 
 export default app;

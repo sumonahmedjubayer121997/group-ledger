@@ -5,15 +5,15 @@ import { Textarea } from '@/components/ui/textarea';
 import { Card, CardContent } from '@/components/ui/card';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
-import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
+import { deferWithUndo, useHidden } from '@/lib/undo';
 import { MessageCircle, Send, Reply, Edit, Trash2, MoreVertical } from 'lucide-react';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { useCommentStore, ExpenseComment } from '@/stores/commentStore';
 import { useAuth } from '@/contexts/AuthContext';
 import { Expense } from '@/stores/expenseStore';
 import { useToast } from '@/hooks/use-toast';
-import { formatDistanceToNow } from 'date-fns';
 
+import { formatDateTime } from "@/lib/dates";
 interface ExpenseCommentsProps {
   expense: Expense;
   isOpen: boolean;
@@ -37,7 +37,9 @@ export const ExpenseComments: React.FC<ExpenseCommentsProps> = ({ expense, isOpe
   const [editingComment, setEditingComment] = useState<string | null>(null);
   const [editContent, setEditContent] = useState('');
 
-  const comments = getThreadedComments(expense.id);
+  const hidden = useHidden((s) => s.hidden);
+  const shown = (c: ExpenseComment) => !hidden.has(`comment-${c.id}`);
+  const comments = getThreadedComments(expense.id).filter(shown);
 
   const handleAddComment = () => {
     if (!newComment.trim() || !user) return;
@@ -53,7 +55,6 @@ export const ExpenseComments: React.FC<ExpenseCommentsProps> = ({ expense, isOpe
     setNewComment('');
     toast({
       title: "Comment added",
-      description: "Your comment has been added successfully",
     });
   };
 
@@ -73,7 +74,6 @@ export const ExpenseComments: React.FC<ExpenseCommentsProps> = ({ expense, isOpe
     setReplyingTo(null);
     toast({
       title: "Reply added",
-      description: "Your reply has been added successfully",
     });
   };
 
@@ -89,24 +89,19 @@ export const ExpenseComments: React.FC<ExpenseCommentsProps> = ({ expense, isOpe
     setEditingComment(null);
     setEditContent('');
     toast({
-      title: "Comment updated",
-      description: "Your comment has been updated successfully",
+      title: "Comment saved",
     });
   };
 
   const handleDeleteComment = (commentId: string) => {
-    deleteComment(commentId);
-    toast({
-      title: "Comment deleted",
-      description: "Comment has been deleted successfully",
-    });
+    deferWithUndo({ id: `comment-${commentId}`, title: "Comment deleted", run: async () => deleteComment(commentId) });
   };
 
   const renderComment = (comment: ExpenseComment & { replies?: ExpenseComment[] }, isReply = false) => {
     const isOwner = user?.uid === comment.userId;
 
     return (
-      <div key={comment.id} className={`${isReply ? 'ml-8 border-l-2 border-gray-200 pl-4' : ''}`}>
+      <div key={comment.id} className={`${isReply ? 'ml-8 border-l-2 border-border pl-4' : ''}`}>
         <Card className="mb-3">
           <CardContent className="p-4">
             <div className="flex items-start justify-between">
@@ -127,7 +122,7 @@ export const ExpenseComments: React.FC<ExpenseCommentsProps> = ({ expense, isOpe
                       </Badge>
                     )}
                     <span className="text-xs text-muted-foreground">
-                      {formatDistanceToNow(new Date(comment.createdAt), { addSuffix: true })}
+                      {formatDateTime(comment.createdAt)}
                     </span>
                   </div>
                   
@@ -153,7 +148,7 @@ export const ExpenseComments: React.FC<ExpenseCommentsProps> = ({ expense, isOpe
                       </div>
                     </div>
                   ) : (
-                    <p className="text-sm text-gray-700 mb-2">{comment.content}</p>
+                    <p className="text-sm text-foreground mb-2">{comment.content}</p>
                   )}
                   
                   {editingComment !== comment.id && (
@@ -161,7 +156,7 @@ export const ExpenseComments: React.FC<ExpenseCommentsProps> = ({ expense, isOpe
                       variant="ghost"
                       size="sm"
                       onClick={() => setReplyingTo(comment.id)}
-                      className="text-xs text-blue-600 h-6 px-2"
+                      className="text-xs text-muted-foreground h-6 px-2"
                     >
                       <Reply className="h-3 w-3 mr-1" />
                       Reply
@@ -177,36 +172,15 @@ export const ExpenseComments: React.FC<ExpenseCommentsProps> = ({ expense, isOpe
                       <MoreVertical className="h-3 w-3" />
                     </Button>
                   </DropdownMenuTrigger>
-                  <DropdownMenuContent align="end" className="bg-white z-50">
+                  <DropdownMenuContent align="end" className="bg-card z-50">
                     <DropdownMenuItem onClick={() => handleEditComment(comment.id, comment.content)}>
                       <Edit className="h-3 w-3 mr-2" />
                       Edit
                     </DropdownMenuItem>
-                    <AlertDialog>
-                      <AlertDialogTrigger asChild>
-                        <DropdownMenuItem onSelect={(e) => e.preventDefault()}>
-                          <Trash2 className="h-3 w-3 mr-2" />
-                          Delete
-                        </DropdownMenuItem>
-                      </AlertDialogTrigger>
-                      <AlertDialogContent className="bg-white">
-                        <AlertDialogHeader>
-                          <AlertDialogTitle>Delete Comment</AlertDialogTitle>
-                          <AlertDialogDescription>
-                            Are you sure you want to delete this comment? This action cannot be undone.
-                          </AlertDialogDescription>
-                        </AlertDialogHeader>
-                        <AlertDialogFooter>
-                          <AlertDialogCancel>Cancel</AlertDialogCancel>
-                          <AlertDialogAction
-                            onClick={() => handleDeleteComment(comment.id)}
-                            className="bg-red-600 hover:bg-red-700"
-                          >
-                            Delete
-                          </AlertDialogAction>
-                        </AlertDialogFooter>
-                      </AlertDialogContent>
-                    </AlertDialog>
+                    <DropdownMenuItem onClick={() => handleDeleteComment(comment.id)}>
+                      <Trash2 className="h-3 w-3 mr-2" aria-hidden="true" />
+                      Delete
+                    </DropdownMenuItem>
                   </DropdownMenuContent>
                 </DropdownMenu>
               )}
@@ -239,14 +213,14 @@ export const ExpenseComments: React.FC<ExpenseCommentsProps> = ({ expense, isOpe
         </Card>
 
         {/* Render replies */}
-        {comment.replies && comment.replies.map(reply => renderComment(reply, true))}
+        {comment.replies && comment.replies.filter(shown).map(reply => renderComment(reply, true))}
       </div>
     );
   };
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="max-w-2xl max-h-[80vh] overflow-hidden bg-white">
+      <DialogContent className="max-w-2xl max-h-[80vh] overflow-hidden bg-card">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <MessageCircle className="h-5 w-5" />
@@ -270,7 +244,7 @@ export const ExpenseComments: React.FC<ExpenseCommentsProps> = ({ expense, isOpe
             )}
           </div>
 
-          {/* Add Comment */}
+          {/* Add comment */}
           <div className="border-t pt-4 mt-4">
             <div className="space-y-3">
               <Textarea
@@ -290,7 +264,7 @@ export const ExpenseComments: React.FC<ExpenseCommentsProps> = ({ expense, isOpe
                 </span>
                 <Button onClick={handleAddComment} disabled={!newComment.trim()}>
                   <Send className="h-4 w-4 mr-2" />
-                  Add Comment
+                  Add comment
                 </Button>
               </div>
             </div>

@@ -1,49 +1,42 @@
-import { useParams, useNavigate } from "react-router-dom";
-import { useExpenseStore } from "@/stores/expenseStore";
-import { GroupDetailView } from "@/components/GroupDetailView";
 import { useEffect } from "react";
+import { Link, useParams } from "react-router-dom";
+import { Button } from "@/components/ui/button";
+import { GroupDetailView } from "@/components/GroupDetailView";
+import { PageHeader } from "@/components/PageHeader";
+import { PageSkeleton } from "@/components/PageSkeleton";
+import { useExpenseStore } from "@/stores/expenseStore";
 
 const GroupDetailPage = () => {
   const { groupId } = useParams<{ groupId: string }>();
-  const navigate = useNavigate();
-  const { groups, setSelectedGroup, selectedGroup } = useExpenseStore();
+  const group = useExpenseStore((s) => s.groups.find((g) => g.id === groupId));
+  const groupsLoaded = useExpenseStore((s) => s.groupsLoaded);
+  const setSelectedGroup = useExpenseStore((s) => s.setSelectedGroup);
 
+  // Some older components still read the open group from the store.
   useEffect(() => {
-    if (groupId && groups.length > 0) {
-      const group = groups.find(g => g.id === groupId);
-      if (group) {
-        setSelectedGroup(group);
-      } else {
-        // Group not found, redirect to dashboard
-        navigate('/');
-      }
-    }
-  }, [groupId, groups, setSelectedGroup, navigate]);
+    if (group) setSelectedGroup(group);
+    return () => setSelectedGroup(null);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [group?.id, setSelectedGroup]);
 
-  const handleBack = () => {
-    setSelectedGroup(null);
-    navigate('/');
-  };
+  if (!groupsLoaded) return <PageSkeleton />;
 
-  if (!selectedGroup) {
+  if (!group) {
     return (
-      <div className="min-h-screen bg-background flex items-center justify-center">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto"></div>
-          <p className="mt-4 text-muted-foreground">Loading group...</p>
-        </div>
-      </div>
+      <>
+        <PageHeader
+          back={{ to: "/", label: "Overview" }}
+          title="Group not found"
+          description="It may have been deleted, or you're no longer a member."
+        />
+        <Button asChild>
+          <Link to="/">Back to your groups</Link>
+        </Button>
+      </>
     );
   }
 
-  return (
-    <div className="min-h-screen bg-background">
-      <GroupDetailView 
-        group={selectedGroup} 
-        onBack={handleBack} 
-      />
-    </div>
-  );
+  return <GroupDetailView group={group} />;
 };
 
 export default GroupDetailPage;

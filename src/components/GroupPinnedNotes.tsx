@@ -15,6 +15,7 @@ import {
   subscribeToGroupNotes 
 } from '@/services/groupCommunicationService';
 
+import { formatDate } from "@/lib/dates";
 interface GroupPinnedNotesProps {
   groupId: string;
   isAdmin: boolean;
@@ -99,7 +100,7 @@ export const GroupPinnedNotes: React.FC<GroupPinnedNotesProps> = ({ groupId, isA
         <div className="flex items-center justify-between">
           <CardTitle className={`${isMobile ? 'text-lg' : 'text-xl'} flex items-center gap-2`}>
             <Pin className="w-5 h-5" />
-            Pinned Notes
+            Pinned notes
           </CardTitle>
           {isAdmin && (
             <Button
@@ -108,7 +109,7 @@ export const GroupPinnedNotes: React.FC<GroupPinnedNotesProps> = ({ groupId, isA
               onClick={() => setShowAddForm(!showAddForm)}
             >
               <Plus className="w-4 h-4 mr-1" />
-              Add Note
+              Add note
             </Button>
           )}
         </div>
@@ -116,7 +117,7 @@ export const GroupPinnedNotes: React.FC<GroupPinnedNotesProps> = ({ groupId, isA
       
       <CardContent className={`${isMobile ? 'p-3' : 'p-4'} space-y-4`}>
         {showAddForm && (
-          <div className="space-y-3 p-3 bg-blue-50 rounded-lg">
+          <div className="space-y-3 p-3 bg-secondary rounded-lg">
             <Textarea
               value={newNoteContent}
               onChange={(e) => setNewNoteContent(e.target.value)}
@@ -148,14 +149,14 @@ export const GroupPinnedNotes: React.FC<GroupPinnedNotesProps> = ({ groupId, isA
         )}
 
         {notes.length === 0 ? (
-          <div className="text-center text-gray-500 py-8">
-            <Pin className="w-12 h-12 mx-auto mb-4 text-gray-300" />
+          <div className="text-center text-muted-foreground py-8">
+            <Pin className="w-12 h-12 mx-auto mb-4 text-muted-foreground" />
             <p>No pinned notes yet.</p>
             {isAdmin && <p className="text-sm">Add your first note to keep important information visible.</p>}
           </div>
         ) : (
           notes.map((note) => (
-            <div key={note.id} className="p-4 bg-yellow-50 border-l-4 border-yellow-400 rounded-lg">
+            <div key={note.id} className="p-4 bg-owes/10 border-l-4 border-owes/40 rounded-lg">
               {editingNote === note.id ? (
                 <div className="space-y-3">
                   <Textarea
@@ -185,8 +186,8 @@ export const GroupPinnedNotes: React.FC<GroupPinnedNotesProps> = ({ groupId, isA
               ) : (
                 <>
                   <div className="flex items-start justify-between mb-2">
-                    <div className="text-sm text-gray-600">
-                      By {note.createdByName} • {format(note.createdAt, 'MMM d, yyyy')}
+                    <div className="text-sm text-muted-foreground">
+                      By {note.createdByName} • {formatDate(note.createdAt)}
                     </div>
                     {isAdmin && (
                       <div className="flex gap-1">
@@ -207,7 +208,7 @@ export const GroupPinnedNotes: React.FC<GroupPinnedNotesProps> = ({ groupId, isA
                       </div>
                     )}
                   </div>
-                  <div className="whitespace-pre-wrap text-gray-800">
+                  <div className="whitespace-pre-wrap text-foreground">
                     {note.content}
                   </div>
                 </>

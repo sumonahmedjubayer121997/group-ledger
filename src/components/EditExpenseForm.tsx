@@ -1,14 +1,17 @@
-import React, { useState, useEffect } from 'react';
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import React, { useMemo, useState } from 'react';
+import { checkSplit, formatMoney, splitFieldsToSave, toCents, toCurrencyCode } from '@/lib/money';
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
-import { Slider } from '@/components/ui/slider';
-import { useExpenseStore, Expense, Member } from '@/stores/expenseStore';
-import { Pencil, Users, Tag, Calculator, Percent } from 'lucide-react';
+import { useExpenseStore, Expense } from '@/stores/expenseStore';
+import { useCategoryStore } from '@/stores/categoryStore';
+import { useOfflineStore } from '@/stores/offlineStore';
+import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
+import { CategoryManagement } from '@/components/CategoryManagement';
+import { cn } from '@/lib/utils';
 
 interface EditExpenseFormProps {
   expense: Expense;
@@ -16,169 +19,193 @@ interface EditExpenseFormProps {
   onClose: () => void;
 }
 
-const categories = [
-  'Food & Dining',
-  'Transportation',
-  'Entertainment',
-  'Shopping',
-  'Bills & Utilities',
-  'Travel',
-  'Other',
-];
+type SplitType = 'equal' | 'exact' | 'percentage';
+type Errors = { amount?: string; description?: string; split?: string };
 
+const splitLabels: Record<SplitType, string> = { equal: 'Equally', exact: 'Exact amounts', percentage: 'Percentages' };
+
+const isoDay = (value: Date | string) => {
+  const d = new Date(value);
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+};
+
+/** Edit an expense. Problems show under the field they're about; nothing typed is lost. */
 export const EditExpenseForm: React.FC<EditExpenseFormProps> = ({ expense, isOpen, onClose }) => {
-  const { updateExpense, groups, loading } = useExpenseStore();
+  const updateExpense = useExpenseStore((s) => s.updateExpense);
+  const groups = useExpenseStore((s) => s.groups);
+  const getAllAvailableCategories = useCategoryStore((s) => s.getAllAvailableCategories);
+  const { user } = useAuth();
   const { toast } = useToast();
-  
-  const [formData, setFormData] = useState({
-    description: expense.description,
-    amount: expense.amount.toString(),
-    paidBy: expense.paidBy.id,
-    category: expense.category,
-    date: new Date(expense.date).toISOString().split('T')[0],
-    splitType: expense.splitType || 'equal' as 'equal' | 'exact' | 'percentage',
-  });
-  
-  const [splitData, setSplitData] = useState<{ [memberId: string]: number }>(expense.splitData || {});
 
-  const selectedGroup = groups.find(g => g.id === expense.groupId);
-  const selectedPayer = selectedGroup?.members.find(m => m.id === formData.paidBy);
-  const splitAmong = expense.splitAmong || selectedGroup?.members || [];
+  const group = groups.find((g) => g.id === expense.groupId);
+  const currency = toCurrencyCode(group?.settings?.currency);
+  const members = group?.members ?? [];
+  const splitAmong = expense.splitAmong?.length ? expense.splitAmong : members;
+  const categories = useMemo(
+    () => [...new Set([...(user ? getAllAvailableCategories(user.uid) : []), expense.category].filter(Boolean))],
+    [user, getAllAvailableCategories, expense.category]
+  );
 
-  useEffect(() => {
-    // Initialize form with expense data
-    setFormData({
-      description: expense.description,
-      amount: expense.amount.toString(),
-      paidBy: expense.paidBy.id,
-      category: expense.category,
-      date: new Date(expense.date).toISOString().split('T')[0],
-      splitType: expense.splitType || 'equal',
-    });
-    setSplitData(expense.splitData || {});
-  }, [expense]);
+  const [description, setDescription] = useState(expense.description);
+  const [amount, setAmount] = useState(String(expense.amount));
+  const [paidBy, setPaidBy] = useState(expense.paidBy?.id ?? '');
+  const [category, setCategory] = useState(expense.category || 'Other');
+  const [date, setDate] = useState(isoDay(expense.date));
+  const [splitType, setSplitType] = useState<SplitType>((expense.splitType as SplitType) || 'equal');
+  // Percent splits saved since splitVersion 2 keep the percentages separately from the amounts.
+  const [splitData, setSplitData] = useState<Record<string, number>>(
+    () => (expense.splitType === 'percentage' && expense.splitPercentages ? expense.splitPercentages : expense.splitData) || {}
+  );
+  const [errors, setErrors] = useState<Errors>({});
+  const [saving, setSaving] = useState(false);
+  const [manageCategories, setManageCategories] = useState(false);
 
-  const updateSplitAmount = (memberId: string, value: number) => {
-    setSplitData(prev => ({ ...prev, [memberId]: value }));
-  };
-
-  const getTotalSplit = () => {
-    return Object.values(splitData).reduce((sum, val) => sum + val, 0);
-  };
-
-  const getRemainingAmount = () => {
-    const total = parseFloat(formData.amount) || 0;
-    if (formData.splitType === 'percentage') {
-      return 100 - getTotalSplit();
-    }
-    return total - getTotalSplit();
-  };
+  const nameOf = (id: string, name: string) => (id === user?.uid ? 'You' : name);
+  const amountCents = toCents(amount);
+  const assigned =
+    splitType === 'percentage'
+      ? splitAmong.reduce((sum, m) => sum + (Number(splitData[m.id]) || 0), 0)
+      : splitAmong.reduce((sum, m) => sum + toCents(splitData[m.id] ?? 0), 0);
+  const leftText =
+    splitType === 'percentage'
+      ? assigned === 100
+        ? 'Shared out exactly.'
+        : assigned < 100
+          ? `${Number((100 - assigned).toFixed(2))}% still to share out`
+          : `${Number((assigned - 100).toFixed(2))}% too much`
+      : assigned === amountCents
+        ? 'Shared out exactly.'
+        : assigned < amountCents
+          ? `${formatMoney(amountCents - assigned, currency)} still to share out`
+          : `${formatMoney(assigned - amountCents, currency)} more than the bill`;
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
-    if (!selectedGroup || !selectedPayer) {
-      toast({
-        title: "Error",
-        description: "Please fill in all required fields",
-        variant: "destructive",
-      });
-      return;
-    }
-    
+    if (saving || !group) return;
+    const payer = members.find((m) => m.id === paidBy) ?? expense.paidBy;
+    const value = amountCents / 100;
+    const participantIds = splitAmong.map((m) => m.id);
+    const problems: Errors = {};
+    if (!(amountCents > 0)) problems.amount = 'Add an amount.';
+    if (!description.trim()) problems.description = 'Say what it was for.';
+    const check = checkSplit(splitType, value, splitData, participantIds);
+    if (!problems.amount && !check.ok) problems.split = check.message;
+    setErrors(problems);
+    if (Object.keys(problems).length > 0) return;
+
+    const split = splitFieldsToSave(splitType, value, splitData, participantIds, payer.id);
+    setSaving(true);
     try {
       await updateExpense(expense.id, {
-        description: formData.description,
-        amount: parseFloat(formData.amount),
-        paidBy: selectedPayer,
-        category: formData.category,
-        date: new Date(formData.date),
-        splitType: formData.splitType,
-        splitData: formData.splitType !== 'equal' ? splitData : undefined,
+        description: description.trim(),
+        amount: value,
+        paidBy: payer,
+        category,
+        date: new Date(`${date}T12:00:00`),
+        splitType,
+        // undefined removes a field, so switching back to "equal" clears old split details
+        splitData: split.splitData,
+        splitPercentages: split.splitPercentages,
+        splitVersion: split.splitVersion,
       });
-      
+      const offline = !useOfflineStore.getState().isOnline;
       toast({
-        title: "Success",
-        description: "Expense updated successfully",
+        title: `Saved "${description.trim()}"`,
+        description: offline ? "Will sync when you're back online." : undefined,
       });
-      
       onClose();
-    } catch (error) {
-      toast({
-        title: "Error",
-        description: "Failed to update expense",
-        variant: "destructive",
-      });
+    } catch {
+      toast({ title: "Couldn't save your changes", description: 'Please try again.', variant: 'destructive' });
+    } finally {
+      setSaving(false);
     }
   };
 
   return (
-    <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="w-[95vw] max-w-2xl mx-auto max-h-[90vh] overflow-y-auto">
-        <DialogHeader className="px-1 sm:px-0">
-          <DialogTitle className="flex items-center space-x-2 text-lg sm:text-xl">
-            <Pencil className="w-5 h-5 text-blue-500" />
-            <span>Edit Expense</span>
-          </DialogTitle>
+    <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
+      <DialogContent className="sm:max-w-lg">
+        <DialogHeader className="text-left">
+          <DialogTitle>Edit expense</DialogTitle>
+          <DialogDescription>{group ? `In ${group.name}` : 'Change what was spent and how it is split.'}</DialogDescription>
         </DialogHeader>
-        
-        <form onSubmit={handleSubmit} className="space-y-4 sm:space-y-6 px-1 sm:px-0">
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <div>
-              <Label htmlFor="description" className="text-sm font-medium">Description</Label>
+
+        <form onSubmit={handleSubmit} className="space-y-4" noValidate>
+          <div className="grid gap-4 sm:grid-cols-[1fr_9rem]">
+            <div className="grid gap-1.5">
+              <Label htmlFor="edit-description">What was it for?</Label>
               <Input
-                id="description"
-                value={formData.description}
-                onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                placeholder="What was this expense for?"
-                required
-                className="mt-1"
+                id="edit-description"
+                value={description}
+                onChange={(e) => {
+                  setDescription(e.target.value);
+                  setErrors((er) => ({ ...er, description: undefined }));
+                }}
+                aria-invalid={!!errors.description}
+                aria-describedby={errors.description ? 'edit-description-error' : undefined}
               />
+              {errors.description && (
+                <p id="edit-description-error" className="text-sm text-destructive">
+                  {errors.description}
+                </p>
+              )}
             </div>
-            <div>
-              <Label htmlFor="amount" className="text-sm font-medium">Amount ($)</Label>
+            <div className="grid gap-1.5">
+              <Label htmlFor="edit-amount">Amount ({currency})</Label>
               <Input
-                id="amount"
-                type="number"
-                step="0.01"
-                value={formData.amount}
-                onChange={(e) => setFormData({ ...formData, amount: e.target.value })}
-                placeholder="0.00"
-                required
-                className="mt-1"
+                id="edit-amount"
+                inputMode="decimal"
+                className="money"
+                value={amount}
+                onChange={(e) => {
+                  setAmount(e.target.value.replace(/[^\d.,]/g, '').replace(',', '.'));
+                  setErrors((er) => ({ ...er, amount: undefined }));
+                }}
+                aria-invalid={!!errors.amount}
+                aria-describedby={errors.amount ? 'edit-amount-error' : undefined}
               />
+              {errors.amount && (
+                <p id="edit-amount-error" className="text-sm text-destructive">
+                  {errors.amount}
+                </p>
+              )}
             </div>
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <div>
-              <Label htmlFor="paidBy" className="text-sm font-medium">Paid by</Label>
-              <Select value={formData.paidBy} onValueChange={(value) => setFormData({ ...formData, paidBy: value })}>
-                <SelectTrigger className="mt-1">
-                  <SelectValue placeholder="Who paid?" />
+          <div className="grid gap-4 sm:grid-cols-2">
+            <div className="grid gap-1.5">
+              <Label htmlFor="edit-paid-by">Paid by</Label>
+              <Select value={paidBy} onValueChange={(v) => v && setPaidBy(v)}>
+                <SelectTrigger id="edit-paid-by">
+                  <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  {selectedGroup?.members.map((member) => (
-                    <SelectItem key={member.id} value={member.id}>
-                      {member.name}
+                  {members.map((m) => (
+                    <SelectItem key={m.id} value={m.id}>
+                      {nameOf(m.id, m.name)}
                     </SelectItem>
                   ))}
                 </SelectContent>
               </Select>
             </div>
-            <div>
-              <Label htmlFor="category" className="text-sm font-medium">Category</Label>
-              <Select value={formData.category} onValueChange={(value) => setFormData({ ...formData, category: value })}>
-                <SelectTrigger className="mt-1">
-                  <SelectValue placeholder="Select category" />
+            <div className="grid gap-1.5">
+              <div className="flex items-center justify-between">
+                <Label htmlFor="edit-category">Category</Label>
+                <button
+                  type="button"
+                  onClick={() => setManageCategories(true)}
+                  className="rounded-sm text-xs text-muted-foreground underline-offset-4 hover:text-foreground hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                >
+                  Manage
+                </button>
+              </div>
+              <Select value={category} onValueChange={(v) => v && setCategory(v)}>
+                <SelectTrigger id="edit-category">
+                  <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  {categories.map((category) => (
-                    <SelectItem key={category} value={category}>
-                      <div className="flex items-center space-x-2">
-                        <Tag className="w-4 h-4" />
-                        <span>{category}</span>
-                      </div>
+                  {categories.map((c) => (
+                    <SelectItem key={c} value={c}>
+                      {c}
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -186,126 +213,77 @@ export const EditExpenseForm: React.FC<EditExpenseFormProps> = ({ expense, isOpe
             </div>
           </div>
 
-          <div>
-            <Label htmlFor="date" className="text-sm font-medium">Date</Label>
-            <Input
-              id="date"
-              type="date"
-              value={formData.date}
-              onChange={(e) => setFormData({ ...formData, date: e.target.value })}
-              required
-              className="mt-1"
-            />
+          <div className="grid gap-1.5">
+            <Label htmlFor="edit-date">Date</Label>
+            <Input id="edit-date" type="date" value={date} onChange={(e) => e.target.value && setDate(e.target.value)} />
           </div>
 
-          <div className="space-y-4">
-            <Label className="text-sm font-medium">How should this be split?</Label>
-            <RadioGroup 
-              value={formData.splitType} 
-              onValueChange={(value: 'equal' | 'exact' | 'percentage') => 
-                setFormData({ ...formData, splitType: value })
-              }
-              className="grid grid-cols-1 sm:grid-cols-3 gap-4"
-            >
-              <div className="flex items-center space-x-2">
-                <RadioGroupItem value="equal" id="equal" />
-                <Label htmlFor="equal" className="flex items-center space-x-2 cursor-pointer">
-                  <Users className="w-4 h-4" />
-                  <span>Equal Split</span>
-                </Label>
-              </div>
-              <div className="flex items-center space-x-2">
-                <RadioGroupItem value="exact" id="exact" />
-                <Label htmlFor="exact" className="flex items-center space-x-2 cursor-pointer">
-                  <Calculator className="w-4 h-4" />
-                  <span>Exact Amounts</span>
-                </Label>
-              </div>
-              <div className="flex items-center space-x-2">
-                <RadioGroupItem value="percentage" id="percentage" />
-                <Label htmlFor="percentage" className="flex items-center space-x-2 cursor-pointer">
-                  <Percent className="w-4 h-4" />
-                  <span>Percentages</span>
-                </Label>
-              </div>
-            </RadioGroup>
-
-            {formData.splitType !== 'equal' && splitAmong.length > 0 && formData.amount && (
-              <div className="space-y-4 border rounded-lg p-3 sm:p-4 bg-secondary/20">
-                <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center space-y-2 sm:space-y-0">
-                  <h4 className="font-medium text-sm sm:text-base">Split Details</h4>
-                  {formData.splitType === 'percentage' && (
-                    <span className={`text-sm ${getRemainingAmount() === 0 ? 'text-green-600' : 'text-orange-600'}`}>
-                      Remaining: {getRemainingAmount()}%
-                    </span>
+          <fieldset className="space-y-3">
+            <legend className="mb-2 text-sm font-medium">Split</legend>
+            <div className="flex flex-wrap gap-2" role="radiogroup" aria-label="How to split">
+              {(Object.keys(splitLabels) as SplitType[]).map((type) => (
+                <button
+                  key={type}
+                  type="button"
+                  role="radio"
+                  aria-checked={splitType === type}
+                  onClick={() => {
+                    setSplitType(type);
+                    setErrors((er) => ({ ...er, split: undefined }));
+                  }}
+                  className={cn(
+                    'h-8 rounded-full border px-3 text-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
+                    splitType === type ? 'border-foreground bg-foreground text-background' : 'hover:bg-secondary'
                   )}
-                  {formData.splitType === 'exact' && (
-                    <span className={`text-sm ${Math.abs(getRemainingAmount()) < 0.01 ? 'text-green-600' : 'text-orange-600'}`}>
-                      Remaining: ${getRemainingAmount().toFixed(2)}
-                    </span>
-                  )}
-                </div>
+                >
+                  {splitLabels[type]}
+                </button>
+              ))}
+            </div>
 
-                <div className="space-y-4">
-                  {splitAmong.map((member) => (
-                    <div key={member.id} className="space-y-2">
-                      <div className="flex justify-between items-center">
-                        <Label className="text-sm font-medium">{member.name}</Label>
-                        <span className="text-sm text-muted-foreground">
-                          {formData.splitType === 'percentage' 
-                            ? `${splitData[member.id] || 0}%` 
-                            : `$${(splitData[member.id] || 0).toFixed(2)}`
-                          }
-                        </span>
-                      </div>
-                      
-                      {formData.splitType === 'percentage' ? (
-                        <Slider
-                          value={[splitData[member.id] || 0]}
-                          onValueChange={([value]) => updateSplitAmount(member.id, value)}
-                          max={100}
-                          step={1}
-                          className="w-full"
-                        />
-                      ) : (
-                        <div className="flex flex-col sm:flex-row items-stretch sm:items-center space-y-2 sm:space-y-0 sm:space-x-2">
-                          <Slider
-                            value={[splitData[member.id] || 0]}
-                            onValueChange={([value]) => updateSplitAmount(member.id, value)}
-                            max={parseFloat(formData.amount) || 100}
-                            step={0.01}
-                            className="flex-1"
-                          />
-                          <Input
-                            type="number"
-                            step="0.01"
-                            value={splitData[member.id] || 0}
-                            onChange={(e) => updateSplitAmount(member.id, parseFloat(e.target.value) || 0)}
-                            className="w-full sm:w-20 text-xs"
-                          />
-                        </div>
-                      )}
+            {splitType === 'equal' ? (
+              <p className="text-sm text-muted-foreground">
+                Between {splitAmong.map((m) => nameOf(m.id, m.name.trim().split(/\s+/)[0] || m.name)).join(', ')}.
+              </p>
+            ) : (
+              <div className="space-y-2 rounded-lg border p-3">
+                {splitAmong.map((m) => (
+                  <div key={m.id} className="flex items-center justify-between gap-3">
+                    <Label htmlFor={`edit-split-${m.id}`} className="min-w-0 truncate font-normal">
+                      {nameOf(m.id, m.name)}
+                    </Label>
+                    <div className="flex items-center gap-1">
+                      <Input
+                        id={`edit-split-${m.id}`}
+                        inputMode="decimal"
+                        className="money h-8 w-24 text-right"
+                        value={splitData[m.id] ?? ''}
+                        onChange={(e) => {
+                          setSplitData((v) => ({ ...v, [m.id]: Number(e.target.value.replace(',', '.')) || 0 }));
+                          setErrors((er) => ({ ...er, split: undefined }));
+                        }}
+                      />
+                      <span className="w-8 text-sm text-muted-foreground">{splitType === 'percentage' ? '%' : currency}</span>
                     </div>
-                  ))}
-                </div>
+                  </div>
+                ))}
+                {amountCents > 0 && <p className="money pt-1 text-sm text-muted-foreground">{leftText}</p>}
               </div>
             )}
-          </div>
+            {errors.split && <p className="text-sm text-destructive">{errors.split}</p>}
+          </fieldset>
 
-          <div className="flex flex-col sm:flex-row space-y-3 sm:space-y-0 sm:space-x-3 pt-4">
-            <Button type="button" variant="outline" onClick={onClose} className="w-full sm:w-auto">
+          <div className="flex flex-col-reverse gap-2 pt-2 sm:flex-row sm:justify-end">
+            <Button type="button" variant="outline" onClick={onClose}>
               Cancel
             </Button>
-            <Button 
-              type="submit" 
-              disabled={loading}
-              className="w-full sm:w-auto bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700"
-            >
-              {loading ? 'Updating...' : 'Update Expense'}
+            <Button type="submit" disabled={saving}>
+              {saving ? 'Saving…' : 'Save changes'}
             </Button>
           </div>
         </form>
       </DialogContent>
+      <CategoryManagement isOpen={manageCategories} onClose={() => setManageCategories(false)} />
     </Dialog>
   );
 };

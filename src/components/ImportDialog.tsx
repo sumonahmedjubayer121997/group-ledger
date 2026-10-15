@@ -76,8 +76,8 @@ export const ImportDialog: React.FC<ImportDialogProps> = ({ children }) => {
       },
       error: (error) => {
         toast({
-          title: "Import Error",
-          description: "Failed to parse CSV file. Please check the format.",
+          title: "Couldn't read that file",
+          description: "Check that it's a CSV file with a header row.",
           variant: "destructive"
         });
       }
@@ -91,8 +91,8 @@ export const ImportDialog: React.FC<ImportDialogProps> = ({ children }) => {
   const validateAndPreview = () => {
     if (!selectedGroup) {
       toast({
-        title: "Group Required",
-        description: "Please select a group for importing expenses.",
+        title: "Choose a group first",
+        description: "Imported expenses go into one group.",
         variant: "destructive"
       });
       return;
@@ -211,8 +211,8 @@ export const ImportDialog: React.FC<ImportDialogProps> = ({ children }) => {
     setImportSummary({ success: successCount, errors: errorCount });
     
     toast({
-      title: "Import Complete",
-      description: `${successCount} expenses imported successfully. ${errorCount} errors.`,
+      title: `Imported ${successCount} ${successCount === 1 ? "expense" : "expenses"}`,
+      description: errorCount ? `${errorCount} rows couldn't be imported.` : undefined,
     });
   };
 
@@ -258,10 +258,10 @@ export const ImportDialog: React.FC<ImportDialogProps> = ({ children }) => {
         <div className="space-y-6 py-4">
           {step === 'upload' && (
             <>
-              <div className="text-center border-2 border-dashed border-gray-300 rounded-lg p-8">
-                <FileText className="w-12 h-12 mx-auto text-gray-400 mb-4" />
+              <div className="text-center border-2 border-dashed border-border rounded-lg p-8">
+                <FileText className="w-12 h-12 mx-auto text-muted-foreground mb-4" />
                 <p className="text-lg font-medium mb-2">Upload CSV File</p>
-                <p className="text-sm text-gray-600 mb-4">
+                <p className="text-sm text-muted-foreground mb-4">
                   Select a CSV file with your expense data
                 </p>
                 <input
@@ -272,10 +272,10 @@ export const ImportDialog: React.FC<ImportDialogProps> = ({ children }) => {
                   className="hidden"
                 />
                 <Button onClick={() => fileInputRef.current?.click()}>
-                  Choose File
+                  Choose file
                 </Button>
                 {file && (
-                  <p className="mt-2 text-sm text-gray-600">
+                  <p className="mt-2 text-sm text-muted-foreground">
                     Selected: {file.name}
                   </p>
                 )}
@@ -287,7 +287,7 @@ export const ImportDialog: React.FC<ImportDialogProps> = ({ children }) => {
                   <div className="space-y-3">
                     <div>
                       <p className="font-semibold text-sm">Required Fields (Mandatory):</p>
-                      <ul className="text-sm text-gray-600 ml-4 list-disc">
+                      <ul className="text-sm text-muted-foreground ml-4 list-disc">
                         <li><strong>Date</strong> - Format: YYYY-MM-DD or MM/DD/YYYY</li>
                         <li><strong>Description</strong> - Expense description</li>
                         <li><strong>Amount</strong> - Numeric value (e.g., 25.50)</li>
@@ -296,12 +296,12 @@ export const ImportDialog: React.FC<ImportDialogProps> = ({ children }) => {
                     </div>
                     <div>
                       <p className="font-semibold text-sm">Optional Fields:</p>
-                      <ul className="text-sm text-gray-600 ml-4 list-disc">
+                      <ul className="text-sm text-muted-foreground ml-4 list-disc">
                         <li><strong>Shared With</strong> - Semicolon-separated names/emails (e.g., "Jane;Bob")</li>
                         <li><strong>Category</strong> - One of: food, travel, entertainment, utilities, shopping, rent, healthcare, other</li>
                       </ul>
                     </div>
-                    <div className="bg-gray-50 p-2 rounded text-xs">
+                    <div className="bg-muted/50 p-2 rounded text-xs">
                       <p className="font-medium">Example CSV row:</p>
                       <code>2024-01-15, "Dinner at restaurant", 45.50, "john@email.com", "jane@email.com;bob@email.com", "food"</code>
                     </div>
@@ -356,7 +356,7 @@ export const ImportDialog: React.FC<ImportDialogProps> = ({ children }) => {
                     Back
                   </Button>
                   <Button onClick={validateAndPreview} disabled={!selectedGroup}>
-                    Preview Import
+                    Preview import
                   </Button>
                 </div>
               </div>
@@ -368,7 +368,7 @@ export const ImportDialog: React.FC<ImportDialogProps> = ({ children }) => {
               <div className="space-y-4">
                 <div className="flex items-center justify-between">
                   <h3 className="text-lg font-medium">Import Preview</h3>
-                  <div className="text-sm text-gray-600">
+                  <div className="text-sm text-muted-foreground">
                     {previewData.filter(row => row.errors.length === 0).length} valid, {previewData.filter(row => row.errors.length > 0).length} errors
                   </div>
                 </div>
@@ -381,7 +381,7 @@ export const ImportDialog: React.FC<ImportDialogProps> = ({ children }) => {
                         <TableHead>Date</TableHead>
                         <TableHead>Description</TableHead>
                         <TableHead>Amount</TableHead>
-                        <TableHead>Paid By</TableHead>
+                        <TableHead>Paid by</TableHead>
                         <TableHead>Category</TableHead>
                         <TableHead>Errors</TableHead>
                       </TableRow>
@@ -391,9 +391,9 @@ export const ImportDialog: React.FC<ImportDialogProps> = ({ children }) => {
                         <TableRow key={index}>
                           <TableCell>
                             {row.errors.length === 0 ? (
-                              <CheckCircle className="w-4 h-4 text-green-500" />
+                              <CheckCircle className="w-4 h-4 text-settled" />
                             ) : (
-                              <X className="w-4 h-4 text-red-500" />
+                              <X className="w-4 h-4 text-destructive" />
                             )}
                           </TableCell>
                           <TableCell>{row.date}</TableCell>
@@ -403,7 +403,7 @@ export const ImportDialog: React.FC<ImportDialogProps> = ({ children }) => {
                           <TableCell className="capitalize">{row.category}</TableCell>
                           <TableCell>
                             {row.errors.length > 0 && (
-                              <span className="text-red-600 text-xs">
+                              <span className="text-destructive text-xs">
                                 {row.errors.join(', ')}
                               </span>
                             )}
@@ -436,7 +436,7 @@ export const ImportDialog: React.FC<ImportDialogProps> = ({ children }) => {
             <Alert>
               <CheckCircle className="h-4 w-4" />
               <AlertDescription>
-                Import completed! {importSummary.success} expenses added successfully.
+                Done: {importSummary.success} expenses added.
                 {importSummary.errors > 0 && ` ${importSummary.errors} rows had errors and were skipped.`}
               </AlertDescription>
             </Alert>

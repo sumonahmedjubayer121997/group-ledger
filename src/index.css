@@ -7,90 +7,116 @@ All colors MUST be HSL.
 */
 
 @layer base {
+  /* The app uses the landing page's "ledger" palette (paper, ink, settled green, owes amber) through
+     the shadcn variable names, so every shared component picks it up. All contrast pairs pass WCAG AA. */
   :root {
-    --background: 0 0% 100%;
-    --foreground: 222.2 84% 4.9%;
+    --background: 60 23.1% 97.5%;        /* paper  #FAFAF7 */
+    --foreground: 0 0% 6.7%;             /* ink    #111111 */
 
-    --card: 0 0% 100%;
-    --card-foreground: 222.2 84% 4.9%;
+    --card: 0 0% 100%;                   /* surface */
+    --card-foreground: 0 0% 6.7%;
 
     --popover: 0 0% 100%;
-    --popover-foreground: 222.2 84% 4.9%;
+    --popover-foreground: 0 0% 6.7%;
 
-    --primary: 222.2 47.4% 11.2%;
-    --primary-foreground: 210 40% 98%;
+    --primary: 0 0% 6.7%;                /* ink buttons, like the landing page */
+    --primary-foreground: 60 23.1% 97.5%;
 
-    --secondary: 210 40% 96.1%;
-    --secondary-foreground: 222.2 47.4% 11.2%;
+    --secondary: 50 18.7% 93.7%;         /* wash   #F2F1EC */
+    --secondary-foreground: 0 0% 6.7%;
 
-    --muted: 210 40% 96.1%;
-    --muted-foreground: 215.4 16.3% 46.9%;
+    --muted: 50 18.7% 93.7%;
+    --muted-foreground: 51 3.4% 40.6%;   /* muted  #6B6A64 */
 
-    --accent: 210 40% 96.1%;
-    --accent-foreground: 222.2 47.4% 11.2%;
+    --accent: 50 18.7% 93.7%;
+    --accent-foreground: 0 0% 6.7%;
 
-    --destructive: 0 84.2% 60.2%;
-    --destructive-foreground: 210 40% 98%;
+    --destructive: 4 76.5% 40%;          /* #B42318 */
+    --destructive-foreground: 0 0% 100%;
 
-    --border: 214.3 31.8% 91.4%;
-    --input: 214.3 31.8% 91.4%;
-    --ring: 222.2 84% 4.9%;
+    --settled: 159 59.5% 30%;            /* #1F7A5A */
+    --owes: 22 91.5% 37.1%;              /* #B54708 */
 
-    --radius: 0.5rem;
+    --border: 47 15.3% 88.4%;            /* rule   #E6E4DD */
+    --input: 45 12.8% 81.6%;             /* a step darker, so fields are visible */
+    --ring: 159 59.5% 30%;               /* focus rings use the settled green */
 
-    --sidebar-background: 0 0% 98%;
+    --radius: 0.625rem;
 
-    --sidebar-foreground: 240 5.3% 26.1%;
-
-    --sidebar-primary: 240 5.9% 10%;
-
-    --sidebar-primary-foreground: 0 0% 98%;
-
-    --sidebar-accent: 240 4.8% 95.9%;
-
-    --sidebar-accent-foreground: 240 5.9% 10%;
-
-    --sidebar-border: 220 13% 91%;
-
-    --sidebar-ring: 217.2 91.2% 59.8%;
+    --sidebar-background: 60 23.1% 97.5%;
+    --sidebar-foreground: 0 0% 6.7%;
+    --sidebar-primary: 0 0% 6.7%;
+    --sidebar-primary-foreground: 60 23.1% 97.5%;
+    --sidebar-accent: 50 18.7% 93.7%;
+    --sidebar-accent-foreground: 0 0% 6.7%;
+    --sidebar-border: 47 15.3% 88.4%;
+    --sidebar-ring: 159 59.5% 30%;
   }
 
   .dark {
-    --background: 222.2 84% 4.9%;
-    --foreground: 210 40% 98%;
+    --background: 60 7.1% 5.5%;          /* #0F0F0D */
+    --foreground: 50 18.7% 93.7%;        /* #F2F1EC */
 
-    --card: 222.2 84% 4.9%;
-    --card-foreground: 210 40% 98%;
+    --card: 60 7% 8.4%;                  /* #171714 */
+    --card-foreground: 50 18.7% 93.7%;
 
-    --popover: 222.2 84% 4.9%;
-    --popover-foreground: 210 40% 98%;
+    --popover: 60 7% 8.4%;
+    --popover-foreground: 50 18.7% 93.7%;
 
-    --primary: 210 40% 98%;
-    --primary-foreground: 222.2 47.4% 11.2%;
+    --primary: 50 18.7% 93.7%;
+    --primary-foreground: 60 7.1% 5.5%;
 
-    --secondary: 217.2 32.6% 17.5%;
-    --secondary-foreground: 210 40% 98%;
+    --secondary: 60 6.9% 11.4%;          /* #1F1F1B */
+    --secondary-foreground: 50 18.7% 93.7%;
 
-    --muted: 217.2 32.6% 17.5%;
-    --muted-foreground: 215 20.2% 65.1%;
+    --muted: 60 6.9% 11.4%;
+    --muted-foreground: 53 4.2% 62.4%;   /* #A3A29B */
 
-    --accent: 217.2 32.6% 17.5%;
-    --accent-foreground: 210 40% 98%;
+    --accent: 60 6.9% 11.4%;
+    --accent-foreground: 50 18.7% 93.7%;
 
-    --destructive: 0 62.8% 30.6%;
-    --destructive-foreground: 210 40% 98%;
+    --destructive: 4 92.5% 68.8%;        /* #F97066 */
+    --destructive-foreground: 60 7.1% 5.5%;
 
-    --border: 217.2 32.6% 17.5%;
-    --input: 217.2 32.6% 17.5%;
-    --ring: 212.7 26.8% 83.9%;
-    --sidebar-background: 240 5.9% 10%;
-    --sidebar-foreground: 240 4.8% 95.9%;
-    --sidebar-primary: 224.3 76.3% 48%;
-    --sidebar-primary-foreground: 0 0% 100%;
-    --sidebar-accent: 240 3.7% 15.9%;
-    --sidebar-accent-foreground: 240 4.8% 95.9%;
-    --sidebar-border: 240 3.7% 15.9%;
-    --sidebar-ring: 217.2 91.2% 59.8%;
+    --settled: 151 49.8% 53.1%;          /* #4CC38A */
+    --owes: 34 93.7% 50.2%;              /* #F79009 */
+
+    --border: 60 6.3% 15.5%;             /* #2A2A25 */
+    --input: 60 6.4% 21.4%;
+    --ring: 151 49.8% 53.1%;
+
+    --sidebar-background: 60 7.1% 5.5%;
+    --sidebar-foreground: 50 18.7% 93.7%;
+    --sidebar-primary: 50 18.7% 93.7%;
+    --sidebar-primary-foreground: 60 7.1% 5.5%;
+    --sidebar-accent: 60 6.9% 11.4%;
+    --sidebar-accent-foreground: 50 18.7% 93.7%;
+    --sidebar-border: 60 6.3% 15.5%;
+    --sidebar-ring: 151 49.8% 53.1%;
+  }
+}
+
+/* Landing page "ledger" tokens. Hex on purpose: used as plain CSS colours and
+   read by the three.js hero scene, so they are kept separate from the HSL shadcn set. */
+@layer base {
+  :root {
+    --lp-paper: #FAFAF7;
+    --lp-surface: #FFFFFF;
+    --lp-ink: #111111;
+    --lp-muted: #6B6A64;
+    --lp-rule: #E6E4DD;
+    --lp-settled: #1F7A5A;
+    --lp-owes: #B54708;
+  }
+
+  .dark {
+    --lp-paper: #0F0F0D;
+    --lp-surface: #171714;
+    --lp-ink: #F2F1EC;
+    --lp-muted: #A3A29B;
+    --lp-rule: #2A2A25;
+    --lp-settled: #4CC38A;
+    --lp-owes: #F79009;
   }
 }
 
@@ -100,6 +126,17 @@ All colors MUST be HSL.
   }
 
   body {
-    @apply bg-background text-foreground;
+    @apply bg-background font-inter text-foreground antialiased;
+    /* Installed on a notched phone held sideways: keep content clear of the notch. */
+    padding-left: env(safe-area-inset-left);
+    padding-right: env(safe-area-inset-right);
+  }
+}
+
+@layer utilities {
+  /* Money and other figures line up in columns. */
+  .money {
+    font-variant-numeric: tabular-nums;
+    font-feature-settings: "tnum" 1;
   }
 }

@@ -17,6 +17,7 @@ import {
   subscribeToGroupPolls 
 } from '@/services/groupCommunicationService';
 
+import { formatDate, formatCalendarDate } from "@/lib/dates";
 interface GroupPollsProps {
   groupId: string;
 }
@@ -151,14 +152,14 @@ export const GroupPolls: React.FC<GroupPollsProps> = ({ groupId }) => {
             onClick={() => setShowAddForm(!showAddForm)}
           >
             <Plus className="w-4 h-4 mr-1" />
-            Create Poll
+            Create poll
           </Button>
         </div>
       </CardHeader>
       
       <CardContent className={`${isMobile ? 'p-3' : 'p-4'} space-y-4`}>
         {showAddForm && (
-          <div className="space-y-3 p-3 bg-blue-50 rounded-lg">
+          <div className="space-y-3 p-3 bg-secondary rounded-lg">
             <Input
               value={newPoll.question}
               onChange={(e) => setNewPoll({ ...newPoll, question: e.target.value })}
@@ -195,7 +196,7 @@ export const GroupPolls: React.FC<GroupPollsProps> = ({ groupId }) => {
                   className="w-full"
                 >
                   <Plus className="w-4 h-4 mr-1" />
-                  Add Option
+                  Add option
                 </Button>
               )}
             </div>
@@ -214,7 +215,7 @@ export const GroupPolls: React.FC<GroupPollsProps> = ({ groupId }) => {
                 size={isMobile ? "sm" : "default"}
               >
                 <Save className="w-4 h-4 mr-1" />
-                Create Poll
+                Create poll
               </Button>
               <Button
                 variant="outline"
@@ -232,8 +233,8 @@ export const GroupPolls: React.FC<GroupPollsProps> = ({ groupId }) => {
         )}
 
         {polls.length === 0 ? (
-          <div className="text-center text-gray-500 py-8">
-            <Vote className="w-12 h-12 mx-auto mb-4 text-gray-300" />
+          <div className="text-center text-muted-foreground py-8">
+            <Vote className="w-12 h-12 mx-auto mb-4 text-muted-foreground" />
             <p>No polls yet.</p>
             <p className="text-sm">Create your first poll to gather opinions!</p>
           </div>
@@ -250,15 +251,15 @@ export const GroupPolls: React.FC<GroupPollsProps> = ({ groupId }) => {
                   <div className="flex items-start justify-between mb-3">
                     <div className="flex-1">
                       <h3 className="font-medium mb-1">{poll.question}</h3>
-                      <div className="flex items-center gap-2 text-sm text-gray-500">
+                      <div className="flex items-center gap-2 text-sm text-muted-foreground">
                         <span>By {poll.createdByName}</span>
                         <span>•</span>
-                        <span>{format(poll.createdAt, 'MMM d, yyyy')}</span>
+                        <span>{formatDate(poll.createdAt)}</span>
                         {poll.expiresAt && (
                           <>
                             <span>•</span>
-                            <span className={isExpired ? 'text-red-500' : ''}>
-                              {isExpired ? 'Expired' : `Expires ${format(poll.expiresAt, 'MMM d, yyyy')}`}
+                            <span className={isExpired ? 'text-destructive' : ''}>
+                              {isExpired ? 'Expired' : `Expires ${formatCalendarDate(poll.expiresAt)}`}
                             </span>
                           </>
                         )}
@@ -297,12 +298,12 @@ export const GroupPolls: React.FC<GroupPollsProps> = ({ groupId }) => {
                             >
                               {option.text}
                             </Button>
-                            <span className="text-sm text-gray-500 ml-2">
+                            <span className="text-sm text-muted-foreground ml-2">
                               {option.votes.length} vote{option.votes.length !== 1 ? 's' : ''}
                             </span>
                           </div>
                           <Progress value={percentage} className="h-2" />
-                          <div className="text-xs text-gray-500 text-right">
+                          <div className="text-xs text-muted-foreground text-right">
                             {percentage.toFixed(1)}%
                           </div>
                         </div>
@@ -310,7 +311,7 @@ export const GroupPolls: React.FC<GroupPollsProps> = ({ groupId }) => {
                     })}
                   </div>
 
-                  <div className="text-sm text-gray-500">
+                  <div className="text-sm text-muted-foreground">
                     Total votes: {totalVotes}
                   </div>
                 </div>

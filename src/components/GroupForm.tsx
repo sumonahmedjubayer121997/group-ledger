@@ -1,15 +1,17 @@
 import { useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { SUPPORTED_CURRENCIES, toCurrencyCode } from "@/lib/money";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { useAuth } from "@/contexts/AuthContext";
 import { useExpenseStore } from "@/stores/expenseStore";
 import { getUserByEmail } from "@/services/firebaseService";
 import { toast } from "sonner";
-import { Plus, X, Users } from "lucide-react";
+import { Plus, X } from "lucide-react";
 import type { Member } from "@/types/index";
 
 interface GroupFormProps {
@@ -22,199 +24,231 @@ interface MemberInput {
   email: string;
 }
 
+type Errors = { name?: string; people?: Record<number, string> };
+
+const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+/** A new group: a name and a currency. People can be added by name now, or invited by link afterwards. */
 export const GroupForm = ({ isOpen, onClose }: GroupFormProps) => {
-  const { user } = useAuth();
-  const { addGroup } = useExpenseStore();
+  const { user, userProfile } = useAuth();
+  const addGroup = useExpenseStore((s) => s.addGroup);
+  const navigate = useNavigate();
   const [groupName, setGroupName] = useState("");
+  // New groups start in your default currency (Profile → Preferences).
+  const [currency, setCurrency] = useState(() => toCurrencyCode(userProfile?.preferences?.currency));
   const [description, setDescription] = useState("");
-  const [memberInputs, setMemberInputs] = useState<MemberInput[]>([{ name: "", email: "" }]);
+  const [descriptionOpen, setDescriptionOpen] = useState(false);
+  const [people, setPeople] = useState<MemberInput[]>([{ name: "", email: "" }]);
+  const [errors, setErrors] = useState<Errors>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const addMemberField = () => {
-    setMemberInputs([...memberInputs, { name: "", email: "" }]);
-  };
-
-  const removeMemberField = (index: number) => {
-    setMemberInputs(memberInputs.filter((_, i) => i !== index));
-  };
-
-  const updateMemberInput = (index: number, field: 'name' | 'email', value: string) => {
-    const updated = [...memberInputs];
-    updated[index][field] = value;
-    setMemberInputs(updated);
+  const updatePerson = (index: number, field: keyof MemberInput, value: string) => {
+    setPeople((list) => list.map((p, i) => (i === index ? { ...p, [field]: value } : p)));
+    setErrors((e) => ({ ...e, people: { ...e.people, [index]: undefined } }));
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!user) return;
+    if (!user || isSubmitting) return;
+
+    const problems: Errors = {};
+    if (!groupName.trim()) problems.name = "Give the group a name.";
+    people.forEach((p, i) => {
+      const email = p.email.trim();
+      if (email && !EMAIL.test(email)) problems.people = { ...problems.people, [i]: "That email doesn't look right." };
+      else if (email && email.toLowerCase() === user.email?.toLowerCase())
+        problems.people = { ...problems.people, [i]: "That's you; you're already in the group." };
+    });
+    setErrors(problems);
+    if (problems.name || Object.values(problems.people ?? {}).some(Boolean)) return;
 
     setIsSubmitting(true);
-
     try {
-      // Look up existing users by email first
-      const memberPromises = memberInputs
-        .filter(member => member.email.trim() !== "")
-        .map(async (member) => {
-          const existingUser = await getUserByEmail(member.email.trim());
-          const id = existingUser ? existingUser.uid : `temp-${Date.now()}-${Math.random()}`;
-          return {
-            userId: id,
-            id: id,
-            email: member.email.trim(),
-            name: member.name.trim() || existingUser?.name || member.email.trim(),
-            role: "member" as const,
-          };
-        });
-
-      const resolvedMembers = await Promise.all(memberPromises);
+      // People with an email that has an account join straight away; everyone else is a placeholder
+      // until they open the invite link.
+      const resolvedMembers = await Promise.all(
+        people
+          .filter((p) => p.name.trim() || p.email.trim())
+          .map(async (p) => {
+            const email = p.email.trim();
+            const existingUser = email ? await getUserByEmail(email) : null;
+            const id = existingUser ? existingUser.uid : `temp-${crypto.randomUUID()}`;
+            return { userId: id, id, email, name: p.name.trim() || existingUser?.name || email, role: "member" as const };
+          })
+      );
 
       const members: Member[] = [
         {
           userId: user.uid,
           id: user.uid,
           email: user.email || "",
-          name: user.displayName || "You",
+          name: userProfile?.name || user.displayName || "You",
           role: "admin" as const,
         },
         ...resolvedMembers,
       ];
 
-      console.log('Creating group with members:', members);
-      console.log('Current user:', user.uid, user.email, user.displayName);
-      
-      await addGroup({
-        name: groupName,
-        description: description,
-        members,
-        createdAt: new Date(),
-        createdBy: user.uid,
-        photo: "",
-        coverImage: "",
-        groupType: "private" as const,
-        inviteCode: crypto.randomUUID(),
-        settings: {
-          currency: "USD",
-          simplifyDebts: true,
-          notifications: true,
-          recurringBills: false,
+      const groupId = await addGroup(
+        {
+          name: groupName.trim(),
+          description: description.trim(),
+          members,
+          createdAt: new Date(),
+          createdBy: user.uid,
+          photo: "",
+          coverImage: "",
+          // The invite link is on from the start; admins can turn it off in Settings.
+          groupType: "public" as const,
+          inviteCode: crypto.randomUUID(),
+          settings: {
+            currency,
+            simplifyDebts: true,
+            notifications: true,
+            recurringBills: false,
+          },
+          tags: [],
+          location: "",
+          isArchived: false,
         },
-        tags: [],
-        location: "",
-        isArchived: false,
-      }, user.uid);
+        user.uid
+      );
 
-      toast.success("Group created successfully!");
+      toast.success(`Created ${groupName.trim()}`, { description: "Next: invite people or add the first expense." });
       setGroupName("");
       setDescription("");
-      setMemberInputs([{ name: "", email: "" }]);
+      setPeople([{ name: "", email: "" }]);
       onClose();
+      if (groupId) navigate(`/groups/${groupId}`);
     } catch (error) {
       console.error("Error creating group:", error);
-      toast.error("Failed to create group. Please try again.");
+      toast.error("Couldn't create the group", { description: "Please try again." });
     } finally {
       setIsSubmitting(false);
     }
   };
 
   return (
-    <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="sm:max-w-[425px]">
+    <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
+      <DialogContent className="sm:max-w-[460px]">
         <DialogHeader>
-          <DialogTitle>Create New Group</DialogTitle>
+          <DialogTitle>New group</DialogTitle>
+          <DialogDescription>You can invite people with a link once it's made.</DialogDescription>
         </DialogHeader>
-        <form onSubmit={handleSubmit} className="space-y-6">
-          <div className="space-y-2">
-            <Label htmlFor="groupName">Group Name</Label>
-            <Input
-              id="groupName"
-              value={groupName}
-              onChange={(e) => setGroupName(e.target.value)}
-              placeholder="e.g., Trip to Paris, Flatmates, Office Lunch"
-              required
-            />
+        <form onSubmit={handleSubmit} className="space-y-5" noValidate>
+          <div className="grid gap-4 sm:grid-cols-[1fr_9rem]">
+            <div className="grid gap-1.5">
+              <Label htmlFor="groupName">Name</Label>
+              <Input
+                id="groupName"
+                value={groupName}
+                onChange={(e) => {
+                  setGroupName(e.target.value);
+                  setErrors((er) => ({ ...er, name: undefined }));
+                }}
+                placeholder="e.g. Flatmates, Lisbon trip"
+                autoComplete="off"
+                aria-invalid={!!errors.name}
+                aria-describedby={errors.name ? "group-name-error" : undefined}
+              />
+              {errors.name && (
+                <p id="group-name-error" className="text-sm text-destructive">
+                  {errors.name}
+                </p>
+              )}
+            </div>
+            <div className="grid gap-1.5">
+              <Label htmlFor="groupCurrency">Currency</Label>
+              <Select value={currency} onValueChange={(v) => v && setCurrency(v)}>
+                <SelectTrigger id="groupCurrency">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {SUPPORTED_CURRENCIES.map(({ code, label }) => (
+                    <SelectItem key={code} value={code}>
+                      {label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
           </div>
 
-          <div className="space-y-2">
-            <Label htmlFor="description">Description</Label>
-            <Textarea
-              id="description"
-              value={description}
-              onChange={(e) => setDescription(e.target.value)}
-              placeholder="What's this group for?"
-              className="min-h-[80px]"
-            />
-          </div>
-
-          <div className="space-y-4">
-            <div className="flex items-center justify-between">
-              <Label>Group Members</Label>
-              <Button
-                type="button"
-                variant="ghost"
-                size="sm"
-                onClick={addMemberField}
-                className="text-primary hover:text-primary/80"
-              >
-                <Plus className="h-4 w-4 mr-1" />
-                Add Member
-              </Button>
+          {descriptionOpen ? (
+            <div className="grid gap-1.5">
+              <Label htmlFor="groupDescription">Description</Label>
+              <Textarea id="groupDescription" value={description} onChange={(e) => setDescription(e.target.value)} rows={2} placeholder="What's this group for?" />
             </div>
+          ) : (
+            <button
+              type="button"
+              onClick={() => setDescriptionOpen(true)}
+              className="rounded-sm text-sm text-muted-foreground underline-offset-4 hover:text-foreground hover:underline"
+            >
+              Add a description
+            </button>
+          )}
 
-            {/* Current User (Admin) */}
-            <div className="flex items-center gap-3 p-3 bg-primary/5 rounded-lg border">
-              <Avatar className="h-8 w-8">
-                <AvatarFallback className="bg-primary/10 text-primary text-sm">
-                  <Users className="h-4 w-4" />
-                </AvatarFallback>
-              </Avatar>
-              <div className="flex-1">
-                <div className="font-medium text-sm">{user?.displayName || "You"}</div>
-                <div className="text-xs text-muted-foreground">{user?.email}</div>
-              </div>
-              <div className="text-xs font-medium text-primary bg-primary/10 px-2 py-1 rounded">
-                Admin
-              </div>
-            </div>
-
-            {/* Member Input Fields */}
-            {memberInputs.map((member, index) => (
-              <div key={index} className="space-y-2">
-                <div className="flex gap-2">
-                  <Input
-                    value={member.name}
-                    onChange={(e) => updateMemberInput(index, 'name', e.target.value)}
-                    placeholder="Name"
-                    className="flex-1"
-                  />
-                  <Input
-                    value={member.email}
-                    onChange={(e) => updateMemberInput(index, 'email', e.target.value)}
-                    placeholder="Email"
-                    type="email"
-                    className="flex-1"
-                  />
-                  {memberInputs.length > 1 && (
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => removeMemberField(index)}
-                      className="text-destructive hover:text-destructive/80"
-                    >
-                      <X className="h-4 w-4" />
-                    </Button>
+          <fieldset className="space-y-2">
+            <legend className="text-sm font-medium">People</legend>
+            <p className="text-xs text-muted-foreground">You're in it already. Add others by name; an email is optional.</p>
+            {people.map((person, index) => {
+              const error = errors.people?.[index];
+              return (
+                <div key={index} className="space-y-1">
+                  <div className="flex gap-2">
+                    <Input
+                      value={person.name}
+                      onChange={(e) => updatePerson(index, "name", e.target.value)}
+                      placeholder="Name"
+                      aria-label={`Person ${index + 1} name`}
+                      autoComplete="off"
+                      className="flex-1"
+                    />
+                    <Input
+                      value={person.email}
+                      onChange={(e) => updatePerson(index, "email", e.target.value)}
+                      placeholder="Email (optional)"
+                      aria-label={`Person ${index + 1} email`}
+                      type="email"
+                      inputMode="email"
+                      autoComplete="off"
+                      className="flex-1"
+                      aria-invalid={!!error}
+                      aria-describedby={error ? `person-${index}-error` : undefined}
+                    />
+                    {people.length > 1 && (
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => setPeople((list) => list.filter((_, i) => i !== index))}
+                        aria-label={`Remove person ${index + 1}`}
+                        className="shrink-0 text-muted-foreground"
+                      >
+                        <X aria-hidden="true" />
+                      </Button>
+                    )}
+                  </div>
+                  {error && (
+                    <p id={`person-${index}-error`} className="text-sm text-destructive">
+                      {error}
+                    </p>
                   )}
                 </div>
-              </div>
-            ))}
-          </div>
+              );
+            })}
+            <Button type="button" variant="ghost" size="sm" onClick={() => setPeople((list) => [...list, { name: "", email: "" }])}>
+              <Plus aria-hidden="true" />
+              Add another person
+            </Button>
+          </fieldset>
 
-          <div className="flex justify-end space-x-2 pt-4">
+          <div className="flex flex-col-reverse gap-2 pt-2 sm:flex-row sm:justify-end">
             <Button type="button" variant="outline" onClick={onClose}>
               Cancel
             </Button>
-            <Button type="submit" disabled={isSubmitting} className="bg-primary hover:bg-primary/90">
-              {isSubmitting ? "Creating..." : "Create Group"}
+            <Button type="submit" disabled={isSubmitting}>
+              {isSubmitting ? "Creating…" : "Create group"}
             </Button>
           </div>
         </form>

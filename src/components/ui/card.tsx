@@ -9,7 +9,7 @@ const Card = React.forwardRef<
   <div
     ref={ref}
     className={cn(
-      "rounded-lg border bg-card text-card-foreground shadow-sm",
+      "rounded-xl border bg-card text-card-foreground",
       className
     )}
     {...props}
@@ -29,14 +29,16 @@ const CardHeader = React.forwardRef<
 ))
 CardHeader.displayName = "CardHeader"
 
+// Card titles sit directly under the page's h1, so they're h2s.
 const CardTitle = React.forwardRef<
   HTMLParagraphElement,
   React.HTMLAttributes<HTMLHeadingElement>
 >(({ className, ...props }, ref) => (
-  <h3
+  <h2
     ref={ref}
     className={cn(
-      "text-2xl font-semibold leading-none tracking-tight",
+      // Card titles use the display serif, which only has a regular weight.
+      "font-display text-2xl !font-normal leading-tight tracking-[-0.01em]",
       className
     )}
     {...props}

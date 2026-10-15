@@ -1,384 +1,276 @@
-import { useState, useEffect, useMemo, useCallback } from "react";
-import { Plus, Users, Receipt, TrendingUp, BarChart3 } from "lucide-react";
+import { useMemo } from "react";
+import { Link } from "react-router-dom";
+import { Archive, ChevronRight, HandCoins, Plus, QrCode, Receipt, Users } from "lucide-react";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { useAuth } from "@/contexts/AuthContext";
-import { useExpenseStore } from "@/stores/expenseStore";
-import { GroupForm } from "@/components/GroupForm";
-import { GroupList } from "@/components/GroupList";
-import { ExpenseForm } from "@/components/ExpenseForm";
-import { RecentExpenses } from "@/components/RecentExpenses";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { BalanceCard } from "@/components/BalanceCard";
-import { ExpenseChart } from "@/components/ExpenseChart";
-import SpendingTrends from "@/components/SpendingTrends";
-import { useIsMobile } from "@/hooks/use-mobile";
-import { motion, AnimatePresence } from "framer-motion";
-import { GroupDetailMobileNav } from "@/components/GroupDetailMobileNav";
-import { fetchGroupMembersWithPhotos } from "@/components/firebaseComponents/FetchGroupMembersWithPhotos";
-import { useNavigate } from "react-router-dom";
-import { useBudgetFirebaseSync } from "@/hooks/useBudgetFirebaseSync";
-import { getGroupName } from "@/components/firebaseComponents/FetchGroupNameUsingId";
+import { FirstRunChecklist } from "@/components/FirstRunChecklist";
+import { LoansSummary } from "@/components/loans/LoansSummary";
+import { InstallBanner } from "@/components/InstallBanner";
+import { PageHeader } from "@/components/PageHeader";
+import { PageSkeleton } from "@/components/PageSkeleton";
+import { useAuth } from "@/contexts/AuthContext";
+import { useAppActions } from "@/app/appActions";
+import { useExpenseStore, type Group } from "@/stores/expenseStore";
+import { useCurrencyOf, useUserBalances } from "@/stores/useLedger";
+import { formatAmount, formatMoney, formatTotals } from "@/lib/money";
+import { formatDate, toDate } from "@/lib/dates";
 
-// Define types for better type safety
-type TabItem = {
-  value: string;
-  id: string;
-  label: string;
-  icon: React.ComponentType<{ className?: string }>;
-};
+const greeting = (hour: number) => (hour < 12 ? "Good morning" : hour < 18 ? "Good afternoon" : "Good evening");
 
-type GroupWithMembers = any & { members?: any[] };
+const initials = (name: string) =>
+  name
+    .split(/\s+/)
+    .filter(Boolean)
+    .map((part) => part[0])
+    .join("")
+    .slice(0, 2)
+    .toUpperCase();
+
+/** "You're owed" / "You owe": one line per currency, never added together. */
+function BalanceStrip({ owedToYou, youOwe }: { owedToYou: Map<string, number>; youOwe: Map<string, number> }) {
+  const tile = (label: string, totals: Map<string, number>, tone: "settled" | "owes", empty: string) => (
+    <Card>
+      <CardContent className="p-5 sm:p-6">
+        <p className="text-sm text-muted-foreground">{label}</p>
+        {totals.size === 0 ? (
+          <p className="mt-2 font-display text-[28px] leading-tight text-muted-foreground">{empty}</p>
+        ) : (
+          <ul className="mt-2 space-y-1">
+            {[...totals].map(([currency, cents]) => (
+              <li key={currency} className={`money font-display text-[32px] leading-tight sm:text-[36px] ${tone === "settled" ? "text-settled" : "text-owes"}`}>
+                {formatMoney(cents, currency)}
+              </li>
+            ))}
+          </ul>
+        )}
+      </CardContent>
+    </Card>
+  );
+  return (
+    <section aria-label="Your balance" className="grid gap-4 sm:grid-cols-2">
+      {tile("You're owed", owedToYou, "settled", "Nothing")}
+      {tile("You owe", youOwe, "owes", "Nothing")}
+    </section>
+  );
+}
+
+function GroupRow({ group, net, currency }: { group: Group; net: number; currency: string }) {
+  const expenseCount = useExpenseStore((s) => s.expenses.filter((e) => e.groupId === group.id).length);
+  const status =
+    net > 0 ? (
+      <span className="money text-settled">you're owed {formatMoney(net, currency)}</span>
+    ) : net < 0 ? (
+      <span className="money text-owes">you owe {formatMoney(-net, currency)}</span>
+    ) : (
+      <span className="text-muted-foreground">settled up</span>
+    );
+  return (
+    <li>
+      <Link
+        to={`/groups/${group.id}`}
+        className="flex items-center gap-3 rounded-lg px-2 py-3 transition-colors hover:bg-secondary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+      >
+        <Avatar className="h-10 w-10 rounded-lg">
+          <AvatarImage src={group.photo || undefined} alt="" className="object-cover" />
+          <AvatarFallback className="rounded-lg bg-secondary text-sm font-medium">{initials(group.name)}</AvatarFallback>
+        </Avatar>
+        <div className="min-w-0 flex-1">
+          <p className="truncate font-medium">{group.name}</p>
+          <p className="truncate text-xs text-muted-foreground">
+            {group.members.length} {group.members.length === 1 ? "person" : "people"} · {expenseCount}{" "}
+            {expenseCount === 1 ? "expense" : "expenses"}
+          </p>
+        </div>
+        <p className="hidden shrink-0 text-right text-sm sm:block">{status}</p>
+        <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground" aria-hidden="true" />
+      </Link>
+      <p className="-mt-2 pb-2 pl-[3.75rem] text-sm sm:hidden">{status}</p>
+    </li>
+  );
+}
+
+type ActivityItem = { id: string; kind: "expense" | "payment"; title: string; detail: string; amount: string; at: Date };
+
+function RecentActivity({ items }: { items: ActivityItem[] }) {
+  return (
+    <Card>
+      <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+        <CardTitle className="text-xl">Recent activity</CardTitle>
+        <Button variant="link" size="sm" asChild className="px-0">
+          <Link to="/expenses">All expenses</Link>
+        </Button>
+      </CardHeader>
+      <CardContent>
+        {items.length === 0 ? (
+          <p className="py-6 text-sm text-muted-foreground">Expenses and payments will show up here.</p>
+        ) : (
+          <ul className="divide-y">
+            {items.map((item) => (
+              <li key={item.id} className="flex items-center gap-3 py-3">
+                <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-secondary text-muted-foreground" aria-hidden="true">
+                  {item.kind === "expense" ? <Receipt className="h-4 w-4" /> : <HandCoins className="h-4 w-4" />}
+                </span>
+                <div className="min-w-0 flex-1">
+                  <p className="truncate text-sm font-medium">{item.title}</p>
+                  <p className="truncate text-xs text-muted-foreground">
+                    {item.detail} · {formatDate(item.at)}
+                  </p>
+                </div>
+                <span className="money shrink-0 text-sm">{item.amount}</span>
+              </li>
+            ))}
+          </ul>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
 
 const Dashboard = () => {
-  // Authentication state
   const { user, userProfile } = useAuth();
+  const { openAddExpense, openNewGroup, openJoinGroup } = useAppActions();
+  const groups = useExpenseStore((s) => s.groups);
+  const groupsLoaded = useExpenseStore((s) => s.groupsLoaded);
+  const expenses = useExpenseStore((s) => s.expenses);
+  const groupSettlements = useExpenseStore((s) => s.groupSettlements);
+  const currencyOf = useCurrencyOf();
+  const balances = useUserBalances(user?.uid);
 
-  // Expense store state
-  const {
-    groups,
-    expenses,
-    setSelectedGroup,
-    getBalances,
-    initializeFirebaseSync,
-  } = useExpenseStore();
+  const netByGroup = useMemo(() => new Map(balances.perGroup.map((p) => [p.group.id, p])), [balances.perGroup]);
+  const active = groups.filter((g) => !g.isArchived);
+  const archived = groups.filter((g) => g.isArchived);
 
-  // Local component state
-  const [showGroupForm, setShowGroupForm] = useState(false);
-  const [showExpenseForm, setShowExpenseForm] = useState(false);
-  const [activeTab, setActiveTab] = useState("overview");
-  const isMobile = useIsMobile();
-  const [enrichedGroups, setEnrichedGroups] = useState<GroupWithMembers[]>([]);
-  const navigate = useNavigate();
-
-  // Initialize Firebase sync
-  useBudgetFirebaseSync();
-
-  // Initialize Firebase sync when user is authenticated
-  useEffect(() => {
-    if (user?.uid) {
-      initializeFirebaseSync(user.uid);
-    }
-  }, [user?.uid, initializeFirebaseSync]);
-
-  // Load group members with photos
-  useEffect(() => {
-    const loadGroupsWithMembers = async () => {
-      if (!user?.uid || groups.length === 0) return;
-
-      try {
-        // Filter groups that need enrichment
-        const unenrichedGroups = groups.filter((group) => !group.members);
-        if (unenrichedGroups.length === 0 && enrichedGroups.length > 0) return;
-
-        // Enrich groups with member data
-        const enriched = await Promise.all(
-          unenrichedGroups.map(async (group) => {
-            const members = await fetchGroupMembersWithPhotos(group.id);
-            return { ...group, members };
-          })
-        );
-
-        // Merge with existing enriched groups
-        const allEnriched = groups.map((group) => {
-          return (
-            enriched.find((e) => e.id === group.id) ||
-            enrichedGroups.find((eg) => eg.id === group.id) ||
-            group
-          );
+  const activity = useMemo<ActivityItem[]>(() => {
+    const groupName = new Map(groups.map((g) => [g.id, g.name]));
+    const first = (name: string) => name.trim().split(/\s+/)[0] || name;
+    const nameIn = (groupId: string, memberId: string) =>
+      memberId === user?.uid
+        ? "you"
+        : first(groups.find((g) => g.id === groupId)?.members.find((m) => m.id === memberId)?.name ?? "Someone");
+    const cap = (text: string) => text.charAt(0).toUpperCase() + text.slice(1);
+    const items: ActivityItem[] = expenses.map((e) => ({
+      id: `e-${e.id}`,
+      kind: "expense",
+      title: e.description || "Expense",
+      detail: `${groupName.get(e.groupId) ?? "A group"} · ${e.paidBy?.id === user?.uid ? "you paid" : `${first(e.paidBy?.name ?? "someone")} paid`}`,
+      amount: formatAmount(e.amount, currencyOf(e.groupId)),
+      at: toDate(e.date) ?? new Date(0),
+    }));
+    for (const [groupId, list] of Object.entries(groupSettlements)) {
+      for (const s of list ?? []) {
+        items.push({
+          id: `s-${s.id}`,
+          kind: "payment",
+          title: `${cap(nameIn(groupId, s.fromMemberId))} paid ${nameIn(groupId, s.toMemberId)}`,
+          detail: groupName.get(groupId) ?? "A group",
+          amount: formatAmount(s.amount, currencyOf(groupId)),
+          at: toDate(s.date) ?? new Date(0),
         });
-
-        setEnrichedGroups(allEnriched);
-      } catch (error) {
-        console.error("Error loading group members:", error);
-        setEnrichedGroups(groups);
       }
-    };
+    }
+    return items.sort((a, b) => b.at.getTime() - a.at.getTime()).slice(0, 8);
+  }, [expenses, groups, groupSettlements, currencyOf, user?.uid]);
 
-    loadGroupsWithMembers();
-  }, [groups, user?.uid, enrichedGroups]);
+  if (!groupsLoaded) return <PageSkeleton />;
 
-  // Handle group click with memoization
-  const handleGroupClick = useCallback(
-    (group: GroupWithMembers) => {
-      setSelectedGroup(group);
-      navigate(`/groups/${group.id}`);
-    },
-    [setSelectedGroup, navigate]
-  );
-
-  // Memoize balances calculation
-  const balances = useMemo(() => getBalances(), [getBalances]);
-
-  // Tab configuration
-  const tabItems: TabItem[] = [
-    { value: "overview", id: "overview", label: "Overview", icon: BarChart3 },
-    { value: "groups", id: "groups", label: "Groups", icon: Users },
-    { value: "expenses", id: "expenses", label: "Expenses", icon: Receipt },
-    {
-      value: "analytics",
-      id: "analytics",
-      label: "Analytics",
-      icon: TrendingUp,
-    },
-  ];
-
-  // Content animation variants
-  const contentVariants = {
-    initial: { opacity: 0, y: 20 },
-    animate: { opacity: 1, y: 0 },
-    exit: { opacity: 0, y: -20 },
-  };
+  const firstName = (userProfile?.name || user?.displayName || "").trim().split(/\s+/)[0];
+  const hasDebts = balances.debts.length > 0;
+  const owedText = balances.owedToYou.size ? formatTotals(balances.owedToYou) : null;
+  const openBalances = balances.perGroup.filter((p) => p.net !== 0).length;
 
   return (
-    <div className="container mx-auto px-4 py-6">
-      {/* Welcome Message */}
-      <motion.div
-        className="mb-4 sm:mb-6"
-        initial={{ opacity: 0, y: -20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.5 }}
-      >
-        <Card className="bg-card/80 backdrop-blur-sm border-border">
-          <CardHeader className="pb-3 sm:pb-6">
-            <CardTitle className="text-base sm:text-lg md:text-xl text-card-foreground">
-              Welcome back, {userProfile?.displayName || "User"}! 👋
-            </CardTitle>
-            <CardDescription className="text-xs sm:text-sm text-muted-foreground">
-              Here's your expense overview
-            </CardDescription>
-          </CardHeader>
-        </Card>
-      </motion.div>
+    <>
+      <PageHeader
+        title={`${greeting(new Date().getHours())}${firstName ? `, ${firstName}` : ""}`}
+        description={
+          active.length === 0
+            ? "Three quick steps and you're splitting."
+            : owedText
+              ? `You're owed ${owedText} in ${openBalances} ${openBalances === 1 ? "group" : "groups"}.`
+              : `Here's where things stand across your ${active.length} ${active.length === 1 ? "group" : "groups"}.`
+        }
+      />
 
-      {/* Debug info - Hidden on mobile */}
-      {!isMobile && (
-        <div className="mb-4 text-sm text-muted-foreground">
-          Groups: {groups.length} | Expenses: {expenses.length} | User:{" "}
-          {user?.displayName}
-        </div>
-      )}
+      <div className="space-y-6">
+        <InstallBanner />
+        <FirstRunChecklist />
+        {groups.length > 0 && (
+        <>
+        <BalanceStrip owedToYou={balances.owedToYou} youOwe={balances.youOwe} />
 
-      {/* Tabs */}
-      <Tabs
-        value={activeTab}
-        onValueChange={setActiveTab}
-        className="space-y-4 sm:space-y-6"
-      >
-        {/* Desktop Tabs */}
-        {!isMobile && (
-          <div className="relative w-full">
-            <TabsList className="inline-flex h-12 items-center justify-center rounded-xl bg-muted/50 p-1 text-muted-foreground w-full backdrop-blur-sm border border-border/50">
-              {tabItems.map((item) => {
-                const Icon = item.icon;
-                const isActive = activeTab === item.value;
+        <section aria-label="Quick actions" className="flex flex-wrap gap-2">
+          <Button onClick={() => openAddExpense(undefined, "dashboard")}>
+            <Plus aria-hidden="true" />
+            Add expense
+          </Button>
+          <Button variant="outline" onClick={openNewGroup}>
+            <Users aria-hidden="true" />
+            New group
+          </Button>
+          <Button variant="outline" onClick={openJoinGroup}>
+            <QrCode aria-hidden="true" />
+            Join a group
+          </Button>
+        </section>
 
-                return (
-                  <TabsTrigger
-                    key={item.value}
-                    value={item.value}
-                    className="relative inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-lg px-4 py-2 text-sm font-medium ring-offset-background transition-all duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 
-                    data-[state=active]:bg-background data-[state=active]:text-foreground data-[state=active]:shadow-md 
-                    hover:bg-background/50 hover:text-foreground/80 flex-1 min-h-[40px]
-                    data-[state=active]:scale-[1.02] transform"
-                  >
-                    <Icon
-                      className={`h-4 w-4 transition-colors duration-200 ${
-                        isActive ? "text-primary" : ""
-                      }`}
-                    />
-                    <span className="truncate font-medium">{item.label}</span>
-                    {isActive && (
-                      <motion.div
-                        layoutId="activeTab"
-                        className="absolute inset-0 rounded-lg bg-gradient-to-r from-primary/10 to-primary/5 border border-primary/20"
-                        initial={false}
-                        transition={{
-                          type: "spring",
-                          stiffness: 500,
-                          damping: 30,
-                        }}
-                      />
-                    )}
-                  </TabsTrigger>
-                );
-              })}
-            </TabsList>
+        {hasDebts && <BalanceCard debts={balances.debts} showGroupName title="To settle" />}
+
+        <LoansSummary />
+
+        <div className="grid gap-6 lg:grid-cols-5">
+          <Card className="min-w-0 lg:col-span-3">
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-xl">Your groups</CardTitle>
+              <span className="text-sm text-muted-foreground">{active.length}</span>
+            </CardHeader>
+            <CardContent>
+              {active.length === 0 ? (
+                <div className="py-6">
+                  <p className="text-sm text-muted-foreground">No groups yet. Groups keep a running tab for a trip, a flat or a team.</p>
+                  <Button className="mt-4" onClick={openNewGroup}>
+                    <Plus aria-hidden="true" />
+                    New group
+                  </Button>
+                </div>
+              ) : (
+                <ul className="-mx-2">
+                  {active.map((group) => {
+                    const entry = netByGroup.get(group.id);
+                    return <GroupRow key={group.id} group={group} net={entry?.net ?? 0} currency={entry?.currency ?? currencyOf(group.id)} />;
+                  })}
+                </ul>
+              )}
+              {archived.length > 0 && (
+                <Collapsible className="mt-2 border-t pt-2">
+                  <CollapsibleTrigger className="flex w-full items-center gap-2 rounded-lg px-2 py-2 text-sm text-muted-foreground hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+                    <Archive className="h-4 w-4" aria-hidden="true" />
+                    Archived ({archived.length})
+                  </CollapsibleTrigger>
+                  <CollapsibleContent>
+                    <ul className="-mx-2">
+                      {archived.map((group) => {
+                        const entry = netByGroup.get(group.id);
+                        return <GroupRow key={group.id} group={group} net={entry?.net ?? 0} currency={entry?.currency ?? currencyOf(group.id)} />;
+                      })}
+                    </ul>
+                  </CollapsibleContent>
+                </Collapsible>
+              )}
+            </CardContent>
+          </Card>
+
+          <div className="min-w-0 lg:col-span-2">
+            <RecentActivity items={activity} />
           </div>
-        )}
-
-        {/* Tab Content */}
-        <AnimatePresence mode="wait">
-          {/* Overview Tab */}
-          <TabsContent value="overview" className="space-y-4 sm:space-y-6">
-            <motion.div
-              key="overview"
-              variants={contentVariants}
-              initial="initial"
-              animate="animate"
-              exit="exit"
-              transition={{ duration: 0.3 }}
-            >
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
-                <BalanceCard balances={balances} />
-                <Card>
-                  <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                    <CardTitle className="text-xs sm:text-sm font-medium">
-                      Total Groups
-                    </CardTitle>
-                    <Users className="h-3 w-3 sm:h-4 sm:w-4 text-muted-foreground" />
-                  </CardHeader>
-                  <CardContent>
-                    <div className="text-lg sm:text-2xl font-bold">
-                      {groups.length}
-                    </div>
-                    <p className="text-xs text-muted-foreground">
-                      Active groups
-                    </p>
-                  </CardContent>
-                </Card>
-                <Card>
-                  <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                    <CardTitle className="text-xs sm:text-sm font-medium">
-                      Total Expenses
-                    </CardTitle>
-                    <Receipt className="h-3 w-3 sm:h-4 sm:w-4 text-muted-foreground" />
-                  </CardHeader>
-                  <CardContent>
-                    <div className="text-lg sm:text-2xl font-bold">
-                      {expenses.length}
-                    </div>
-                    <p className="text-xs text-muted-foreground">All time</p>
-                  </CardContent>
-                </Card>
-              </div>
-              <RecentExpenses expenses={expenses} />
-            </motion.div>
-          </TabsContent>
-
-          {/* Groups Tab */}
-          <TabsContent value="groups" className="space-y-4 sm:space-y-6">
-            <motion.div
-              key="groups"
-              variants={contentVariants}
-              initial="initial"
-              animate="animate"
-              exit="exit"
-              transition={{ duration: 0.3 }}
-            >
-              <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3 sm:gap-4 mb-4">
-                <h2 className="text-lg sm:text-xl font-bold text-foreground">
-                  Your Groups
-                </h2>
-                <Button
-                  onClick={() => setShowGroupForm(true)}
-                  className="bg-primary hover:bg-primary/90 text-primary-foreground text-xs sm:text-sm"
-                  size="sm"
-                >
-                  <Plus className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-2" />
-                  New Group
-                </Button>
-              </div>
-              <GroupList
-                groups={enrichedGroups}
-                onGroupClick={handleGroupClick}
-              />
-            </motion.div>
-          </TabsContent>
-
-          {/* Expenses Tab */}
-          <TabsContent value="expenses" className="space-y-4 sm:space-y-6">
-            <motion.div
-              key="expenses"
-              variants={contentVariants}
-              initial="initial"
-              animate="animate"
-              exit="exit"
-              transition={{ duration: 0.3 }}
-            >
-              <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3 sm:gap-4">
-                <h2 className="text-lg sm:text-xl font-bold text-foreground">
-                  All Expenses
-                </h2>
-                <Button
-                  onClick={() => setShowExpenseForm(true)}
-                  className="bg-secondary hover:bg-secondary/90 text-secondary-foreground text-xs sm:text-sm"
-                  size="sm"
-                >
-                  <Plus className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-2" />
-                  Add Expense
-                </Button>
-              </div>
-              <RecentExpenses expenses={expenses} />
-            </motion.div>
-          </TabsContent>
-
-          {/* Analytics Tab */}
-          <TabsContent value="analytics" className="space-y-4 sm:space-y-6">
-            <motion.div
-              key="analytics"
-              variants={contentVariants}
-              initial="initial"
-              animate="animate"
-              exit="exit"
-              transition={{ duration: 0.3 }}
-            >
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6">
-                <ExpenseChart expenses={expenses} />
-                <SpendingTrends expenses={expenses} />
-              </div>
-            </motion.div>
-          </TabsContent>
-        </AnimatePresence>
-      </Tabs>
-
-      {/* Mobile Bottom Tab Bar */}
-      {isMobile && (
-        <div className="fixed bottom-0 inset-x-0 z-50 bg-card border-t border-border shadow-sm px-4 py-2 max-w-[100%] w-full sm:max-w-md mx-auto overflow-x-hidden">
-          <GroupDetailMobileNav
-            tabs={tabItems}
-            activeTab={activeTab}
-            onTabChange={(tabId) => setActiveTab(tabId)}
-          />
         </div>
-      )}
+        </>
+        )}
+      </div>
 
-      {/* Modals */}
-      <AnimatePresence>
-        {showGroupForm && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            transition={{ duration: 0.2 }}
-          >
-            <GroupForm
-              isOpen={showGroupForm}
-              onClose={() => setShowGroupForm(false)}
-            />
-          </motion.div>
-        )}
-        {showExpenseForm && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            transition={{ duration: 0.2 }}
-          >
-            <ExpenseForm
-              isOpen={showExpenseForm}
-              onClose={() => setShowExpenseForm(false)}
-            />
-          </motion.div>
-        )}
-      </AnimatePresence>
-    </div>
+    </>
   );
 };
 

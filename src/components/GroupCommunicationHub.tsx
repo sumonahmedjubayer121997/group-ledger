@@ -44,22 +44,20 @@ export const GroupCommunicationHub: React.FC<GroupCommunicationHubProps> = ({ gr
   return (
     <Card className="h-full">
       <CardHeader className={`${isMobile ? 'p-3' : 'p-4'} border-b`}>
-        <CardTitle className={`${isMobile ? 'text-lg' : 'text-xl'}`}>
-          Communication & Notes
-        </CardTitle>
-        <div className={`flex ${isMobile ? 'flex-wrap gap-1' : 'gap-2'} mt-3`}>
+        <CardTitle className="sr-only">Chat and notes</CardTitle>
+        <div className="flex flex-wrap gap-2" role="group" aria-label="Show">
           {tabs.map((tab) => {
             const Icon = tab.icon;
             return (
               <Button
                 key={tab.id}
                 variant={activeTab === tab.id ? "default" : "outline"}
-                size={isMobile ? "sm" : "default"}
-                onClick={() => setActiveTab(tab.id as any)}
-                className="flex items-center gap-2"
+                size="sm"
+                aria-pressed={activeTab === tab.id}
+                onClick={() => setActiveTab(tab.id as typeof activeTab)}
               >
-                <Icon className="w-4 h-4" />
-                {!isMobile && tab.label}
+                <Icon aria-hidden="true" />
+                {tab.label}
               </Button>
             );
           })}

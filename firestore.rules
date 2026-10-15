@@ -1,0 +1,256 @@
+rules_version = '2';
+
+// SplitWize Firestore security rules.
+// Principle: you can only see and change data for groups you belong to, plus your own profile.
+// Tested in tests/rules/firestore.test.ts (run with `npm run test:rules`).
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function signedIn() {
+      return request.auth != null;
+    }
+
+    function myEmail() {
+      return request.auth.token.email.lower();
+    }
+
+    function verified() {
+      return signedIn() && request.auth.token.email_verified == true;
+    }
+
+    // A member has a non-null entry in the group's `users` map: { uid: { name, email, role, ... } }.
+    function isMemberOf(group) {
+      return signedIn()
+        && request.auth.uid in group.users
+        && group.users[request.auth.uid] != null;
+    }
+
+    // Viewers can read but not write.
+    function canWriteIn(group) {
+      return isMemberOf(group) && group.users[request.auth.uid].role in ['admin', 'member'];
+    }
+
+    function groupData(groupId) {
+      return get(/databases/$(database)/documents/groups/$(groupId)).data;
+    }
+
+    function isMember(groupId) {
+      return isMemberOf(groupData(groupId));
+    }
+
+    function canWrite(groupId) {
+      return canWriteIn(groupData(groupId));
+    }
+
+    // A personal loan (users/{uid}/loans): who, which way, how much, and any repayments.
+    function validLoan(d) {
+      return d.keys().hasOnly(['direction', 'person', 'personId', 'amountCents', 'currency', 'date', 'dueDate',
+                               'note', 'repayments', 'createdAt', 'updatedAt'])
+        && d.direction in ['lent', 'borrowed']
+        && d.person is string && d.person.size() > 0 && d.person.size() <= 80
+        && (d.personId == null || (d.personId is string && d.personId.size() <= 128))
+        && d.amountCents is int && d.amountCents > 0 && d.amountCents <= 100000000000
+        && d.currency is string && d.currency.size() == 3
+        && d.date is timestamp
+        && (d.dueDate == null || d.dueDate is timestamp)
+        && d.note is string && d.note.size() <= 500
+        && d.repayments is list && d.repayments.size() <= 200;
+    }
+
+    // ---------- user profiles ----------
+    match /users/{uid} {
+      // Members' names and photos are shown inside groups.
+      allow get: if signedIn();
+      // Only a lookup of your own email (finding an old profile with the same address).
+      allow list: if signedIn() && resource.data.email == request.auth.token.email;
+      allow create, update: if signedIn() && request.auth.uid == uid;
+      // Your own profile, or an old placeholder profile created for your verified email.
+      allow delete: if signedIn()
+        && (request.auth.uid == uid || (verified() && resource.data.email.lower() == myEmail()));
+
+      match /groups/{groupId} {
+        allow read: if signedIn() && request.auth.uid == uid;
+        // Group members file the group under a new member's account when adding them.
+        allow write: if signedIn() && (request.auth.uid == uid || canWrite(groupId));
+      }
+
+      match /budgets/{budgetId} {
+        allow read, write: if signedIn() && request.auth.uid == uid;
+      }
+
+      // Personal loans are private: only their owner can see or change them.
+      match /loans/{loanId} {
+        allow read, delete: if signedIn() && request.auth.uid == uid;
+        allow create: if signedIn() && request.auth.uid == uid && validLoan(request.resource.data);
+        allow update: if signedIn() && request.auth.uid == uid && validLoan(request.resource.data)
+          && request.resource.data.createdAt == resource.data.createdAt;
+      }
+    }
+
+    // ---------- exact-email lookup ----------
+    // emailIndex/{email} -> { uid }. Lets people add a friend by exact email without listing every user.
+    match /emailIndex/{email} {
+      allow get: if signedIn();
+      allow create, update: if verified()
+        && email == myEmail()
+        && request.resource.data.uid == request.auth.uid;
+      allow delete: if signedIn() && resource.data.uid == request.auth.uid;
+    }
+
+    // ---------- invites for people who don't have an account yet ----------
+    // invites/{groupId}_{email} -> { groupId, email, tempId, role, name, invitedBy }
+    match /invites/{inviteId} {
+      function isInvitee() {
+        return verified() && resource.data.email == myEmail();
+      }
+
+      allow get, list: if isInvitee() || (signedIn() && isMember(resource.data.groupId));
+      allow create, update: if signedIn()
+        && inviteId == request.resource.data.groupId + '_' + request.resource.data.email
+        && request.resource.data.email == request.resource.data.email.lower()
+        && canWrite(request.resource.data.groupId);
+      allow delete: if isInvitee() || (signedIn() && canWrite(resource.data.groupId));
+    }
+
+    // ---------- invite links ----------
+    // inviteCodes/{code} -> { groupId, groupName }. Codes are random UUIDs, so only people who were
+    // sent the link can look one up. It only exists while the group allows joining by link.
+    match /inviteCodes/{code} {
+      allow get: if signedIn();
+      allow create, update: if signedIn()
+        && code.size() >= 16
+        && request.resource.data.keys().hasOnly(['groupId', 'groupName', 'updatedAt'])
+        && groupData(request.resource.data.groupId).inviteCode == code
+        && canWrite(request.resource.data.groupId);
+      allow delete: if signedIn() && canWrite(resource.data.groupId);
+    }
+
+    // ---------- groups ----------
+    match /groups/{groupId} {
+      // An invited person with a verified email may swap their placeholder entry for themselves,
+      // keeping the placeholder's role, and change nothing else.
+      function isJoiningByInvite() {
+        let invitePath = /databases/$(database)/documents/invites/$(groupId + '_' + myEmail());
+        return verified()
+          && exists(invitePath)
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['users'])
+          && request.resource.data.users.diff(resource.data.users).affectedKeys()
+               .hasOnly([request.auth.uid, get(invitePath).data.tempId])
+          && request.resource.data.users[request.auth.uid].role
+               == resource.data.users[get(invitePath).data.tempId].role;
+      }
+
+      // Someone with the group's invite link may add themselves as a plain member, if the group
+      // allows joining by link, and change nothing else.
+      function isJoiningByCode() {
+        let entry = request.resource.data.users[request.auth.uid];
+        return signedIn()
+          && resource.data.get('groupType', 'private') == 'public'
+          && resource.data.get('inviteCode', '').size() >= 16
+          && !(request.auth.uid in resource.data.users && resource.data.users[request.auth.uid] != null)
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['users'])
+          && request.resource.data.users.diff(resource.data.users).affectedKeys().hasOnly([request.auth.uid])
+          && entry.keys().hasOnly(['name', 'email', 'role', 'joinedAt', 'isTemporary', 'inviteCode'])
+          && entry.role == 'member'
+          && entry.email == myEmail()
+          && entry.inviteCode == resource.data.inviteCode;
+      }
+
+      // Someone deleting their account (including viewers, who can't otherwise edit the group) may turn
+      // their own entry into a "(left)" placeholder, keeping its role, so balances stay intact.
+      function isLeaving() {
+        let entry = request.resource.data.users[request.auth.uid];
+        return isMemberOf(resource.data)
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['users'])
+          && request.resource.data.users.diff(resource.data.users).affectedKeys().hasOnly([request.auth.uid])
+          && entry.isTemporary == true
+          && entry.email == ''
+          && entry.role == resource.data.users[request.auth.uid].role;
+      }
+
+      function isAdminOf(group) {
+        return isMemberOf(group) && group.users[request.auth.uid].role == 'admin';
+      }
+
+      // Members (not just admins) can edit the group, but the member list only grows: they may add
+      // one new person at a time as a member or viewer, and can't change or remove anyone.
+      function isMemberEdit() {
+        let before = resource.data.users;
+        let after = request.resource.data.users;
+        let changes = after.diff(before);
+        let added = after.keys().removeAll(before.keys());
+        return canWriteIn(resource.data)
+          && changes.changedKeys().size() == 0
+          && changes.removedKeys().size() == 0
+          && added.size() <= 1
+          && (added.size() == 0 || after[added[0]].role in ['member', 'viewer']);
+      }
+
+      // An invited person who is already a member (e.g. added twice) may drop their own placeholder.
+      function isDroppingOwnPlaceholder() {
+        let invitePath = /databases/$(database)/documents/invites/$(groupId + '_' + myEmail());
+        return verified()
+          && isMemberOf(resource.data)
+          && exists(invitePath)
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['users'])
+          && request.resource.data.users.diff(resource.data.users).affectedKeys().hasOnly([get(invitePath).data.tempId])
+          && !(get(invitePath).data.tempId in request.resource.data.users);
+      }
+
+      allow get: if isMemberOf(resource.data);
+      // The app queries `where users.<uid>.role in [...]`.
+      allow list: if signedIn() && resource.data.users[request.auth.uid].role in ['admin', 'member', 'viewer'];
+      allow create: if signedIn()
+        && request.resource.data.createdBy == request.auth.uid
+        && request.resource.data.users[request.auth.uid].role == 'admin';
+      allow update: if isAdminOf(resource.data)
+        || isMemberEdit()
+        || isJoiningByInvite()
+        || isDroppingOwnPlaceholder()
+        || isJoiningByCode()
+        || isLeaving();
+      allow delete: if isMemberOf(resource.data) && resource.data.users[request.auth.uid].role == 'admin';
+
+      // expenses, budgets, members, messages, pinnedNotes, tasks, polls
+      match /{collection}/{docId} {
+        allow read: if isMember(groupId);
+        allow write: if canWrite(groupId);
+      }
+    }
+
+    // ---------- settlements (top level, tagged with groupId) ----------
+    match /settlements/{settlementId} {
+      allow read: if signedIn() && isMember(resource.data.groupId);
+      allow create: if signedIn()
+        && request.resource.data.createdBy == request.auth.uid
+        && canWrite(request.resource.data.groupId);
+      allow update, delete: if signedIn() && canWrite(resource.data.groupId);
+    }
+
+    // ---------- notifications (top level, addressed with `to`) ----------
+    match /notifications/{notificationId} {
+      allow read: if signedIn() && resource.data.to == request.auth.uid;
+      allow create: if signedIn();
+      allow update: if signedIn()
+        && resource.data.to == request.auth.uid
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['isRead']);
+      allow delete: if signedIn() && resource.data.to == request.auth.uid;
+    }
+
+    // ---------- anonymous usage events (counts and timings only) ----------
+    // Written by the app to measure whether core jobs got faster; nobody can read them from the app.
+    match /usageEvents/{eventId} {
+      allow create: if signedIn()
+        && request.resource.data.keys().hasOnly(['event', 'at', 'v', 'durationMs', 'guessesChanged', 'source'])
+        && request.resource.data.event is string
+        && request.resource.data.event.size() <= 40
+        && request.resource.data.at == request.time
+        && (!('durationMs' in request.resource.data) || request.resource.data.durationMs is int)
+        && (!('guessesChanged' in request.resource.data) || request.resource.data.guessesChanged is int)
+        && (!('source' in request.resource.data) || (request.resource.data.source is string && request.resource.data.source.size() <= 30));
+      allow read, update, delete: if false;
+    }
+
+    // Everything else is closed.
+  }
+}
