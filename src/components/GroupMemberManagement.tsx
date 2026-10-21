@@ -1,6 +1,9 @@
 
 import React, { useState } from 'react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { LitPanel } from '@/components/fx/LitPanel';
+import { glassRow } from '@/components/fx/glass';
+import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback , AvatarImage} from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
@@ -158,13 +161,13 @@ export const GroupMemberManagement: React.FC<GroupMemberManagementProps> = ({ gr
 
   return (
     <div className="space-y-4 sm:space-y-6">
-      <Card>
+      <LitPanel light="top-left">
         <CardHeader className="px-4 py-4 sm:px-6 sm:py-6">
-          <CardTitle className="flex flex-col sm:flex-row sm:items-center sm:justify-between space-y-3 sm:space-y-0">
-            <div className="flex items-center space-x-2">
-              <Users className="w-4 h-4 sm:w-5 sm:h-5" />
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between space-y-3 sm:space-y-0">
+            <CardTitle className="flex items-center space-x-2">
+              <Users className="w-4 h-4 sm:w-5 sm:h-5" aria-hidden="true" />
               <span className="text-lg sm:text-2xl">{group.members.length} {group.members.length === 1 ? "person" : "people"}</span>
-            </div>
+            </CardTitle>
             {canAdd && (
             <Dialog open={showAddMember} onOpenChange={setShowAddMember}>
               <DialogTrigger asChild>
@@ -231,16 +234,16 @@ export const GroupMemberManagement: React.FC<GroupMemberManagementProps> = ({ gr
               </DialogContent>
             </Dialog>
             )}
-          </CardTitle>
+          </div>
         </CardHeader>
         <CardContent className="px-4 py-0 pb-4 sm:px-6 sm:pb-6">
           <div className="space-y-3 sm:space-y-4">
             {group.members.filter((m) => !hidden.has(`member-${group.id}-${m.id}`)).map((member) => (
-              <div key={member.id} className="flex flex-col sm:flex-row sm:items-center sm:justify-between p-3 sm:p-4 border rounded-lg space-y-3 sm:space-y-0">
+              <div key={member.id} className={cn("flex flex-col space-y-3 p-3 sm:flex-row sm:items-center sm:justify-between sm:space-y-0 sm:p-4", glassRow)}>
                 <div className="flex items-center space-x-3 sm:space-x-4 min-w-0 flex-1">
                  <Avatar
   key={member.id}
-  className="relative flex shrink-0 overflow-hidden rounded-full border-2 border-card w-12 h-12 sm:w-10 sm:h-10"
+  className="relative flex shrink-0 overflow-hidden rounded-full border border-[color:var(--fx-rim)] w-12 h-12 sm:w-10 sm:h-10"
 >
   {member.photoURL ? (
     <AvatarImage
@@ -249,7 +252,7 @@ export const GroupMemberManagement: React.FC<GroupMemberManagementProps> = ({ gr
       className="object-cover w-full h-full"
     />
   ) : (
-    <AvatarFallback className="text-xs bg-primary/10 text-primary w-full h-full flex items-center justify-center">
+    <AvatarFallback className="text-xs bg-[var(--fx-surface)] font-medium text-foreground w-full h-full flex items-center justify-center">
       {member.name?.charAt(0)?.toUpperCase()}
     </AvatarFallback>
   )}
@@ -349,7 +352,7 @@ export const GroupMemberManagement: React.FC<GroupMemberManagementProps> = ({ gr
             </PopoverContent>
           </Popover>
         </CardContent>
-      </Card>
+      </LitPanel>
     </div>
   );
 };

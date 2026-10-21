@@ -1,4 +1,6 @@
+import { motion, useReducedMotion } from "framer-motion";
 import { Pencil, Trash2 } from "lucide-react";
+import { glassRow } from "@/components/fx/glass";
 import { Button } from "@/components/ui/button";
 import { formatMoney, toCents } from "@/lib/money";
 import { cn } from "@/lib/utils";
@@ -37,9 +39,10 @@ export function BudgetCard({ budget, spentCents, currency, detail, onEdit, onDel
   const status = budgetStatus(spentCents, budget);
   const percent = limit > 0 ? Math.round((spentCents / limit) * 100) : 0;
   const left = limit - spentCents;
+  const reduce = useReducedMotion();
 
   return (
-    <li className="rounded-xl border bg-card p-4">
+    <li className={cn("p-4", glassRow)}>
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
           <p className="truncate font-medium">{budget.name}</p>
@@ -77,7 +80,13 @@ export function BudgetCard({ budget, spentCents, currency, detail, onEdit, onDel
         aria-valuemax={100}
         aria-valuenow={Math.min(percent, 100)}
       >
-        <div className={cn("h-2 rounded-full", barTone[status])} style={{ width: `${Math.min(100, Math.max(percent, 2))}%` }} />
+        {/* Fills to the amount spent when it first shows. */}
+        <motion.div
+          className={cn("h-2 rounded-full", barTone[status])}
+          initial={reduce ? false : { width: 0 }}
+          animate={{ width: `${Math.min(100, Math.max(percent, 2))}%` }}
+          transition={{ duration: 0.7, ease: [0.22, 1, 0.36, 1], delay: 0.1 }}
+        />
       </div>
     </li>
   );

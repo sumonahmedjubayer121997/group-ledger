@@ -108,7 +108,7 @@ export const GroupChat: React.FC<GroupChatProps> = ({ groupId }) => {
   const canShowMore = totalMessageCount > 6 && !showMore;
 
   return (
-    <Card className="h-full flex flex-col">
+    <Card className="rounded-none border-0 bg-transparent shadow-none h-full flex flex-col">
       <CardHeader className={`${isMobile ? 'p-3' : 'p-4'} border-b`}>
         <CardTitle className={`${isMobile ? 'text-lg' : 'text-xl'} flex items-center gap-2`}>
           <MessageCircle className="w-5 h-5" />
@@ -239,7 +239,7 @@ export const GroupChat: React.FC<GroupChatProps> = ({ groupId }) => {
           </div>
         </ScrollArea>
         
-        <div className="p-4 border-t bg-background">
+        <div className="p-4 border-t border-[color:var(--fx-rim)]">
           <div className="flex gap-2">
             <Input
               value={newMessage}

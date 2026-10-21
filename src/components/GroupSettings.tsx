@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { SUPPORTED_CURRENCIES, toCurrencyCode } from '@/lib/money';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { LitPanel } from '@/components/fx/LitPanel';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -128,7 +129,7 @@ export const GroupSettings: React.FC<GroupSettingsProps> = ({ group }) => {
 
   return (
     <div className="space-y-6">
-      <Card>
+      <LitPanel light="top-right">
         <CardHeader>
           <CardTitle className="text-xl">Group details</CardTitle>
         </CardHeader>
@@ -257,7 +258,7 @@ export const GroupSettings: React.FC<GroupSettingsProps> = ({ group }) => {
             </Button>
           </div>
         </CardContent>
-      </Card>
+      </LitPanel>
     </div>
   );
 };

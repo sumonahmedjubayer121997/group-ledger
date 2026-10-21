@@ -1,13 +1,15 @@
 import { lazy, Suspense, useEffect, useMemo, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
-import { Archive, BarChart3, Bell, BellOff, Download, Image as ImageIcon, MoreHorizontal, Plus, UserPlus, X } from "lucide-react";
+import { Archive, BarChart3, Bell, BellOff, Check, Download, Flag, Image as ImageIcon, MoreHorizontal, Plus, UserPlus, X } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { PageHeader } from "@/components/PageHeader";
+import { LitPanel } from "@/components/fx/LitPanel";
+import { glass } from "@/components/fx/glass";
 import { BalanceCard } from "./BalanceCard";
 import { ExpenseList, type ListEvent } from "./ExpenseList";
 import { ExportDialog } from "./ExportDialog";
@@ -32,6 +34,7 @@ import { expenseMoment, toDate } from "@/lib/dates";
 import { doneWithUndo } from "@/lib/undo";
 import { differenceInCalendarDays } from "date-fns";
 import { useHidden } from "@/lib/undo";
+import { cn } from "@/lib/utils";
 
 // Charts and chat are the heaviest parts; they load when opened.
 const SpendingInsights = lazy(() => import("./SpendingInsights"));
@@ -75,42 +78,65 @@ function YourBalance({ debts, userId, currency, onSettleAll }: { debts: DebtView
   const { openSettle } = useAppActions();
   const mine = debts.filter((d) => d.from === userId || d.to === userId);
   if (mine.length === 0) {
-    return <p className="mb-6 text-sm text-muted-foreground">You're all square in this group.</p>;
+    return (
+      <LitPanel tone="settled" light="top-left" className="mb-6" aria-label="Your balance">
+        <p className="flex items-center gap-3 px-4 py-3 text-sm text-muted-foreground">
+          <span className="grid h-8 w-8 shrink-0 place-items-center rounded-full bg-settled/10 text-settled" aria-hidden="true">
+            <Check className="h-4 w-4" />
+          </span>
+          You're all square in this group.
+        </p>
+      </LitPanel>
+    );
   }
   const owedToYou = mine.filter((d) => d.to === userId);
   const youOwe = mine.filter((d) => d.from === userId);
   const total = (list: DebtView[]) => formatMoney(list.reduce((sum, d) => sum + d.cents, 0), currency);
   const only = mine.length === 1 && !(mine[0].to === userId ? mine[0].fromPerson : mine[0].toPerson).isFormer ? mine[0] : null;
+  // Who it's about, ringed green (they owe you) or amber (you owe them); the sentence says the same.
+  const faces = [...owedToYou.map((d) => ({ person: d.fromPerson, owed: true })), ...youOwe.map((d) => ({ person: d.toPerson, owed: false }))];
   return (
-    <section
-      aria-label="Your balance"
-      className={`mb-6 flex flex-wrap items-center justify-between gap-3 rounded-xl border px-4 py-3 ${youOwe.length ? "border-owes/30 bg-owes/5" : "border-settled/30 bg-settled/5"}`}
-    >
-      <p className="text-[15px]">
-        {owedToYou.length > 0 && (
-          <>
-            <span className="font-medium">{nameList(owedToYou.map((d) => firstName(d.fromPerson.name)))}</span>{" "}
-            {owedToYou.length === 1 ? "owes" : "owe"} you <span className="money font-medium text-settled">{total(owedToYou)}</span>
-          </>
+    <LitPanel tone={youOwe.length ? "owes" : "settled"} light="top-left" className="mb-6" aria-label="Your balance">
+      <div className="flex flex-wrap items-center gap-x-4 gap-y-3 px-4 py-3.5 sm:px-5">
+        <span className="flex shrink-0 -space-x-2" aria-hidden="true">
+          {faces.slice(0, 3).map(({ person, owed }) => (
+            <span
+              key={person.id}
+              className={cn(
+                "grid h-9 w-9 place-items-center rounded-full border-2 bg-[var(--fx-surface)] text-sm font-medium ring-2 ring-[var(--fx-surface)]",
+                owed ? "border-settled" : "border-owes"
+              )}
+            >
+              {initials(person.name).charAt(0)}
+            </span>
+          ))}
+        </span>
+        <p className="min-w-0 flex-1 text-[15px]">
+          {owedToYou.length > 0 && (
+            <>
+              <span className="font-medium">{nameList(owedToYou.map((d) => firstName(d.fromPerson.name)))}</span>{" "}
+              {owedToYou.length === 1 ? "owes" : "owe"} you <span className="money font-medium text-settled">{total(owedToYou)}</span>
+            </>
+          )}
+          {owedToYou.length > 0 && youOwe.length > 0 && <span className="text-muted-foreground"> · </span>}
+          {youOwe.length > 0 && (
+            <>
+              You owe <span className="font-medium">{nameList(youOwe.map((d) => firstName(d.toPerson.name)))}</span>{" "}
+              <span className="money font-medium text-owes">{total(youOwe)}</span>
+            </>
+          )}
+        </p>
+        {only ? (
+          <Button size="sm" variant="outline" className="h-8 rounded-full px-3.5" onClick={() => openSettle(only)}>
+            Mark as paid
+          </Button>
+        ) : (
+          <Button size="sm" variant="outline" className="h-8 rounded-full px-3.5" onClick={onSettleAll}>
+            Settle
+          </Button>
         )}
-        {owedToYou.length > 0 && youOwe.length > 0 && <span className="text-muted-foreground"> · </span>}
-        {youOwe.length > 0 && (
-          <>
-            You owe <span className="font-medium">{nameList(youOwe.map((d) => firstName(d.toPerson.name)))}</span>{" "}
-            <span className="money font-medium text-owes">{total(youOwe)}</span>
-          </>
-        )}
-      </p>
-      {only ? (
-        <Button size="sm" variant="outline" onClick={() => openSettle(only)}>
-          Mark as paid
-        </Button>
-      ) : (
-        <Button size="sm" variant="outline" onClick={onSettleAll}>
-          Settle
-        </Button>
-      )}
-    </section>
+      </div>
+    </LitPanel>
   );
 }
 
@@ -148,28 +174,33 @@ function TripFinished({ group, expenses, hasDebts, canWrite, onSettle }: { group
   };
 
   return (
-    <section aria-label="Trip finished?" className="mb-6 flex flex-wrap items-center gap-x-3 gap-y-2 rounded-xl border px-4 py-3 text-sm">
-      <p className="min-w-0 flex-1">
-        <span className="font-medium">Trip finished?</span>{" "}
-        <span className="text-muted-foreground">
-          Nothing new for {days} days. {hasDebts ? "Settle up, then archive the group." : "Everyone's settled, so you can archive it."}
+    <LitPanel light="top-left" className="mb-6" aria-label="Trip finished?">
+      <div className="flex flex-wrap items-center gap-x-3 gap-y-2 px-4 py-3 text-sm">
+        <span className={cn("grid h-9 w-9 shrink-0 place-items-center rounded-xl text-muted-foreground", glass)} aria-hidden="true">
+          <Flag className="h-4 w-4" />
         </span>
-      </p>
-      <div className="flex items-center gap-1">
-        {hasDebts && (
-          <Button size="sm" onClick={onSettle}>
-            Settle up
+        <p className="min-w-0 flex-1">
+          <span className="font-medium">Trip finished?</span>{" "}
+          <span className="text-muted-foreground">
+            Nothing new for {days} days. {hasDebts ? "Settle up, then archive the group." : "Everyone's settled, so you can archive it."}
+          </span>
+        </p>
+        <div className="flex items-center gap-1">
+          {hasDebts && (
+            <Button size="sm" onClick={onSettle}>
+              Settle up
+            </Button>
+          )}
+          <Button size="sm" variant={hasDebts ? "ghost" : "default"} onClick={() => void archive()}>
+            <Archive aria-hidden="true" />
+            Archive
           </Button>
-        )}
-        <Button size="sm" variant={hasDebts ? "ghost" : "default"} onClick={() => void archive()}>
-          <Archive aria-hidden="true" />
-          Archive
-        </Button>
-        <Button variant="ghost" size="icon" className="-mr-2 h-9 w-9 text-muted-foreground" onClick={dismiss} aria-label="Not yet">
-          <X aria-hidden="true" />
-        </Button>
+          <Button variant="ghost" size="icon" className="-mr-2 h-9 w-9 text-muted-foreground" onClick={dismiss} aria-label="Not yet">
+            <X aria-hidden="true" />
+          </Button>
+        </div>
       </div>
-    </section>
+    </LitPanel>
   );
 }
 
@@ -363,12 +394,17 @@ export const GroupDetailView = ({ group }: GroupDetailViewProps) => {
       />
 
       {group.isArchived && (
-        <div className="mb-6 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-owes/40 bg-owes/10 p-4 text-sm">
-          <span>This group is archived. Its history is kept; restore it to add expenses again.</span>
-          <Button size="sm" variant="outline" onClick={() => unarchiveGroup(group.id)}>
-            Restore group
-          </Button>
-        </div>
+        <LitPanel tone="owes" light="top-left" className="mb-6">
+          <div className="flex flex-wrap items-center gap-3 px-4 py-3 text-sm">
+            <span className={cn("grid h-9 w-9 shrink-0 place-items-center rounded-xl text-owes", glass)} aria-hidden="true">
+              <Archive className="h-4 w-4" />
+            </span>
+            <span className="min-w-0 flex-1">This group is archived. Its history is kept; restore it to add expenses again.</span>
+            <Button size="sm" variant="outline" className="h-8 rounded-full px-3.5" onClick={() => unarchiveGroup(group.id)}>
+              Restore group
+            </Button>
+          </div>
+        </LitPanel>
       )}
 
       <YourBalance debts={debts} userId={user?.uid} currency={currency} onSettleAll={() => setTab("balances")} />
@@ -420,7 +456,7 @@ export const GroupDetailView = ({ group }: GroupDetailViewProps) => {
               <SpendingInsights expenses={expenses} groupId={group.id} />
             </Suspense>
           ) : (
-            <Card>
+            <LitPanel light="top-right">
               <CardContent className="p-4 sm:p-6">
                 <ExpenseList
                   expenses={expenses}
@@ -436,7 +472,7 @@ export const GroupDetailView = ({ group }: GroupDetailViewProps) => {
                   }
                 />
               </CardContent>
-            </Card>
+            </LitPanel>
           )}
         </TabsContent>
 
@@ -465,7 +501,7 @@ export const GroupDetailView = ({ group }: GroupDetailViewProps) => {
           </section>
 
           <section id="group-budgets" className="scroll-mt-24">
-            <Card>
+            <LitPanel light="top-right">
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-4">
                 <CardTitle className="text-xl">Budgets</CardTitle>
                 <Button variant="link" size="sm" className="px-0" asChild>
@@ -475,7 +511,7 @@ export const GroupDetailView = ({ group }: GroupDetailViewProps) => {
               <CardContent>
                 <GroupBudgetsPanel group={group} />
               </CardContent>
-            </Card>
+            </LitPanel>
           </section>
 
           {isAdmin ? (
@@ -484,14 +520,14 @@ export const GroupDetailView = ({ group }: GroupDetailViewProps) => {
             <p className="text-sm text-muted-foreground">Only admins can change the group's name, currency and invite link.</p>
           )}
 
-          <Card>
+          <LitPanel light="top-left">
             <CardHeader className="pb-2">
               <CardTitle className="text-xl">{group.isArchived ? "Restore or delete" : "Archive or delete"}</CardTitle>
             </CardHeader>
             <CardContent className="grid gap-2 sm:max-w-xs">
               <GroupLifecycleActions group={group} isAdmin={isAdmin} />
             </CardContent>
-          </Card>
+          </LitPanel>
         </TabsContent>
       </Tabs>
     </>
