@@ -1,6 +1,6 @@
 import { lazy, Suspense, useEffect, useMemo, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
-import { BarChart3, Download, MoreHorizontal, Plus, UserPlus } from "lucide-react";
+import { Archive, BarChart3, Bell, BellOff, Download, Image as ImageIcon, MoreHorizontal, Plus, UserPlus, X } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -23,14 +23,19 @@ import { useAuth } from "@/contexts/AuthContext";
 import { useMemberPhotos } from "@/hooks/useMemberPhotos";
 import { ensureInviteLink, subscribeToGroupActivities, type GroupActivityRecord } from "@/services/firebaseService";
 import { useBudgetStore } from "@/stores/budgetStore";
-import { useExpenseStore, type Group } from "@/stores/expenseStore";
+import { useNotificationStore } from "@/stores/notificationStore";
+import { useToast } from "@/hooks/use-toast";
+import { useExpenseStore, type Expense, type Group } from "@/stores/expenseStore";
 import { useGroupLedger, type DebtView } from "@/stores/useLedger";
 import { formatMoney, toCents, toCurrencyCode } from "@/lib/money";
-import { toDate } from "@/lib/dates";
+import { expenseMoment, toDate } from "@/lib/dates";
+import { doneWithUndo } from "@/lib/undo";
+import { differenceInCalendarDays } from "date-fns";
 import { useHidden } from "@/lib/undo";
 
 // Charts and chat are the heaviest parts; they load when opened.
 const SpendingInsights = lazy(() => import("./SpendingInsights"));
+const RecapDialog = lazy(() => import("./RecapDialog"));
 const GroupCommunicationHub = lazy(() => import("./GroupCommunicationHub").then((m) => ({ default: m.GroupCommunicationHub })));
 
 type TabKey = "expenses" | "balances" | "chat" | "settings";
@@ -57,45 +62,113 @@ const initials = (name: string) =>
     .slice(0, 2)
     .toUpperCase() || "?";
 
-/** Your own position in the group, said to you, with the action next to it. */
-function YourBalance({ debts, userId, currency }: { debts: DebtView[]; userId?: string; currency: string }) {
+/** "Popy and Rahim", "Popy, Rahim and 2 others". */
+const nameList = (names: string[]) =>
+  names.length <= 2 ? names.join(" and ") : `${names.slice(0, 2).join(", ")} and ${names.length - 2} ${names.length === 3 ? "other" : "others"}`;
+
+/**
+ * Your own position in the group as one line ("Popy and Rahim owe you $840.98"), so five debts
+ * don't push the expenses off the screen. One debt: Mark as paid opens its sheet; several: Settle
+ * opens the Balances tab, where each has its own button.
+ */
+function YourBalance({ debts, userId, currency, onSettleAll }: { debts: DebtView[]; userId?: string; currency: string; onSettleAll: () => void }) {
   const { openSettle } = useAppActions();
   const mine = debts.filter((d) => d.from === userId || d.to === userId);
   if (mine.length === 0) {
     return <p className="mb-6 text-sm text-muted-foreground">You're all square in this group.</p>;
   }
+  const owedToYou = mine.filter((d) => d.to === userId);
+  const youOwe = mine.filter((d) => d.from === userId);
+  const total = (list: DebtView[]) => formatMoney(list.reduce((sum, d) => sum + d.cents, 0), currency);
+  const only = mine.length === 1 && !(mine[0].to === userId ? mine[0].fromPerson : mine[0].toPerson).isFormer ? mine[0] : null;
   return (
-    <section aria-label="Your balance" className="mb-6 space-y-2">
-      {mine.map((d) => {
-        const owedToYou = d.to === userId;
-        const other = owedToYou ? d.fromPerson : d.toPerson;
-        const first = firstName(other.name);
-        return (
-          <div
-            key={`${d.from}-${d.to}`}
-            className={`flex flex-wrap items-center justify-between gap-3 rounded-xl border-2 px-4 py-3 ${owedToYou ? "border-settled/30 bg-settled/5" : "border-owes/30 bg-owes/5"}`}
-          >
-            <p className="text-[15px]">
-              {owedToYou ? (
-                <>
-                  <span className="font-medium">{first}</span> owes you{" "}
-                  <span className="money font-medium text-settled">{formatMoney(d.cents, currency)}</span>
-                </>
-              ) : (
-                <>
-                  You owe <span className="font-medium">{first}</span>{" "}
-                  <span className="money font-medium text-owes">{formatMoney(d.cents, currency)}</span>
-                </>
-              )}
-            </p>
-            {!other.isFormer && (
-              <Button size="sm" variant="outline" onClick={() => openSettle(d)}>
-                Mark as paid
-              </Button>
-            )}
-          </div>
-        );
-      })}
+    <section
+      aria-label="Your balance"
+      className={`mb-6 flex flex-wrap items-center justify-between gap-3 rounded-xl border px-4 py-3 ${youOwe.length ? "border-owes/30 bg-owes/5" : "border-settled/30 bg-settled/5"}`}
+    >
+      <p className="text-[15px]">
+        {owedToYou.length > 0 && (
+          <>
+            <span className="font-medium">{nameList(owedToYou.map((d) => firstName(d.fromPerson.name)))}</span>{" "}
+            {owedToYou.length === 1 ? "owes" : "owe"} you <span className="money font-medium text-settled">{total(owedToYou)}</span>
+          </>
+        )}
+        {owedToYou.length > 0 && youOwe.length > 0 && <span className="text-muted-foreground"> · </span>}
+        {youOwe.length > 0 && (
+          <>
+            You owe <span className="font-medium">{nameList(youOwe.map((d) => firstName(d.toPerson.name)))}</span>{" "}
+            <span className="money font-medium text-owes">{total(youOwe)}</span>
+          </>
+        )}
+      </p>
+      {only ? (
+        <Button size="sm" variant="outline" onClick={() => openSettle(only)}>
+          Mark as paid
+        </Button>
+      ) : (
+        <Button size="sm" variant="outline" onClick={onSettleAll}>
+          Settle
+        </Button>
+      )}
+    </section>
+  );
+}
+
+const quietKey = (groupId: string) => `splitwize:trip-finished-dismissed:${groupId}`;
+
+/**
+ * "Trip finished?": after 7 days without a new expense, suggest settling up (while anything is
+ * open) and archiving. Dismissing it lasts until the next expense.
+ */
+function TripFinished({ group, expenses, hasDebts, canWrite, onSettle }: { group: Group; expenses: Expense[]; hasDebts: boolean; canWrite: boolean; onSettle: () => void }) {
+  const archiveGroup = useExpenseStore((s) => s.archiveGroup);
+  const unarchiveGroup = useExpenseStore((s) => s.unarchiveGroup);
+  const last = expenses.reduce((max, e) => Math.max(max, expenseMoment(e.date, e.createdAt).getTime()), 0);
+  const [dismissedAt, setDismissedAt] = useState(() => {
+    try {
+      return Number(localStorage.getItem(quietKey(group.id)) || 0);
+    } catch {
+      return 0;
+    }
+  });
+  const days = last ? differenceInCalendarDays(new Date(), new Date(last)) : 0;
+  if (!canWrite || group.isArchived || !last || days < 7 || dismissedAt >= last) return null;
+
+  const dismiss = () => {
+    try {
+      localStorage.setItem(quietKey(group.id), String(last));
+    } catch {
+      /* it shows again next time */
+    }
+    setDismissedAt(last);
+  };
+  const archive = async () => {
+    await archiveGroup(group.id);
+    doneWithUndo({ title: `Archived ${group.name}`, description: "It moved to Archived. Nothing was deleted.", undo: () => unarchiveGroup(group.id) });
+  };
+
+  return (
+    <section aria-label="Trip finished?" className="mb-6 flex flex-wrap items-center gap-x-3 gap-y-2 rounded-xl border px-4 py-3 text-sm">
+      <p className="min-w-0 flex-1">
+        <span className="font-medium">Trip finished?</span>{" "}
+        <span className="text-muted-foreground">
+          Nothing new for {days} days. {hasDebts ? "Settle up, then archive the group." : "Everyone's settled, so you can archive it."}
+        </span>
+      </p>
+      <div className="flex items-center gap-1">
+        {hasDebts && (
+          <Button size="sm" onClick={onSettle}>
+            Settle up
+          </Button>
+        )}
+        <Button size="sm" variant={hasDebts ? "ghost" : "default"} onClick={() => void archive()}>
+          <Archive aria-hidden="true" />
+          Archive
+        </Button>
+        <Button variant="ghost" size="icon" className="-mr-2 h-9 w-9 text-muted-foreground" onClick={dismiss} aria-label="Not yet">
+          <X aria-hidden="true" />
+        </Button>
+      </div>
     </section>
   );
 }
@@ -106,6 +179,19 @@ interface GroupDetailViewProps {
 
 export const GroupDetailView = ({ group }: GroupDetailViewProps) => {
   const { user } = useAuth();
+  const { toast } = useToast();
+  const muted = useNotificationStore((s) => s.mutedGroups.includes(group.id));
+  const setGroupMuted = useNotificationStore((s) => s.setGroupMuted);
+  const toggleMute = () => {
+    if (!user) return;
+    setGroupMuted(user.uid, group.id, !muted).catch(() =>
+      toast({ title: "Couldn't change notifications", description: "Please try again.", variant: "destructive" })
+    );
+    toast({
+      title: muted ? `Notifications on for ${group.name}` : `Muted ${group.name}`,
+      description: muted ? undefined : "You won't see its notifications. Unmute from this menu or the notification settings.",
+    });
+  };
   const { openAddExpense } = useAppActions();
   const unarchiveGroup = useExpenseStore((s) => s.unarchiveGroup);
   const allExpenses = useExpenseStore((s) => s.expenses);
@@ -122,6 +208,7 @@ export const GroupDetailView = ({ group }: GroupDetailViewProps) => {
   const [params, setParams] = useSearchParams();
   // ?invite=1 (from the command bar) opens the invite dialog once.
   const [inviteOpen, setInviteOpen] = useState(false);
+  const [recapOpen, setRecapOpen] = useState(false);
   useEffect(() => {
     if (params.get("invite") !== "1") return;
     setInviteOpen(true);
@@ -259,6 +346,16 @@ export const GroupDetailView = ({ group }: GroupDetailViewProps) => {
                     Export expenses
                   </DropdownMenuItem>
                 </ExportDialog>
+                {expenses.length > 0 && (
+                  <DropdownMenuItem onSelect={() => setRecapOpen(true)}>
+                    <ImageIcon aria-hidden="true" />
+                    Share a recap
+                  </DropdownMenuItem>
+                )}
+                <DropdownMenuItem onSelect={toggleMute}>
+                  {muted ? <Bell aria-hidden="true" /> : <BellOff aria-hidden="true" />}
+                  {muted ? "Unmute notifications" : "Mute notifications"}
+                </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
           </>
@@ -274,10 +371,17 @@ export const GroupDetailView = ({ group }: GroupDetailViewProps) => {
         </div>
       )}
 
-      <YourBalance debts={debts} userId={user?.uid} currency={currency} />
+      <YourBalance debts={debts} userId={user?.uid} currency={currency} onSettleAll={() => setTab("balances")} />
+      <TripFinished group={group} expenses={expenses} hasDebts={debts.length > 0} canWrite={canWrite} onSettle={() => setTab("balances")} />
+      {recapOpen && (
+        <Suspense fallback={null}>
+          <RecapDialog group={group} expenses={expenses} open={recapOpen} onOpenChange={setRecapOpen} />
+        </Suspense>
+      )}
 
       <Tabs value={tab} onValueChange={setTab}>
-        <TabsList>
+        {/* Four equal tabs across a phone (320px and up) instead of a row that runs off the screen. */}
+        <TabsList className="grid w-full grid-cols-4 sm:inline-flex sm:w-auto [&>button]:max-sm:px-1 [&>button]:max-sm:text-[13px]">
           <TabsTrigger value="expenses">Expenses</TabsTrigger>
           <TabsTrigger value="balances">Balances</TabsTrigger>
           <TabsTrigger value="chat">Chat</TabsTrigger>
@@ -289,10 +393,13 @@ export const GroupDetailView = ({ group }: GroupDetailViewProps) => {
             <p className="money text-sm text-muted-foreground">
               {expenses.length} {expenses.length === 1 ? "expense" : "expenses"} · {formatMoney(totalCents, currency)} in total
             </p>
-            <Button variant={showCharts ? "default" : "outline"} size="sm" aria-pressed={showCharts} onClick={() => setShowCharts(!showCharts)}>
-              <BarChart3 aria-hidden="true" />
-              Charts
-            </Button>
+            {/* Charts with nothing to chart help nobody. */}
+            {expenses.length > 0 && (
+              <Button variant={showCharts ? "default" : "outline"} size="sm" aria-pressed={showCharts} onClick={() => setShowCharts(!showCharts)}>
+                <BarChart3 aria-hidden="true" />
+                Charts
+              </Button>
+            )}
           </div>
           {budgetAlerts.map(({ budget, spent }) => (
             <p key={budget.id} className="flex flex-wrap items-center gap-x-2 text-sm">
@@ -308,14 +415,26 @@ export const GroupDetailView = ({ group }: GroupDetailViewProps) => {
               </button>
             </p>
           ))}
-          {showCharts ? (
+          {showCharts && expenses.length > 0 ? (
             <Suspense fallback={<Skeleton className="h-96" />}>
-              <SpendingInsights expenses={expenses} currencyOf={() => currency} />
+              <SpendingInsights expenses={expenses} groupId={group.id} />
             </Suspense>
           ) : (
             <Card>
               <CardContent className="p-4 sm:p-6">
-                <ExpenseList expenses={expenses} events={events} emptyText="No expenses yet. Add the first one." />
+                <ExpenseList
+                  expenses={expenses}
+                  events={events}
+                  emptyText="No expenses yet."
+                  emptyAction={
+                    !addDisabledReason && (
+                      <Button onClick={() => openAddExpense(group.id, "group-empty")}>
+                        <Plus aria-hidden="true" />
+                        Add the first expense
+                      </Button>
+                    )
+                  }
+                />
               </CardContent>
             </Card>
           )}

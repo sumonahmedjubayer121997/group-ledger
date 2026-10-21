@@ -7,12 +7,14 @@ import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Label } from '@/components/ui/label';
 import { useExpenseStore, Group, Member } from '@/stores/expenseStore';
-import { Users, Crown, Eye, User, UserPlus, UserMinus, MoreVertical, Mail } from 'lucide-react';
+import { Users, Crown, Eye, User, UserPlus, UserMinus, Mail, Send } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/contexts/AuthContext';
 import { deferWithUndo, useHidden } from '@/lib/undo';
+import { ensureInviteLink, setLinkJoining } from '@/services/firebaseService';
 
 import { formatDate } from "@/lib/dates";
 interface GroupMemberManagementProps {
@@ -34,6 +36,8 @@ export const GroupMemberManagement: React.FC<GroupMemberManagementProps> = ({ gr
   const canAdd = myRole === 'admin' || myRole === 'member';
   const [busy, setBusy] = useState(false);
   const adminCount = group.members.filter(m => m.role === 'admin').length;
+  // Someone who deleted their account stays as "Name (left)" so balances add up.
+  const hasLeft = (m: Member) => !!m.isTemporary && /\(left\)$/.test(m.name ?? '');
 
   const getRoleIcon = (role?: string) => {
     switch (role) {
@@ -103,6 +107,36 @@ export const GroupMemberManagement: React.FC<GroupMemberManagementProps> = ({ gr
       description: "Their past expenses stay in the group.",
       run: () => removeMemberFromGroup(group.id, member.id),
     });
+  };
+
+  /**
+   * Shares the group's link. For a name added without an email it's a personal link (`?as=`), so
+   * they land on "I'm {name}" and take over that name's expenses. Turns on joining by link if needed.
+   */
+  const sendInvite = async (member: Member) => {
+    try {
+      const linkOn = group.groupType === 'public' && (group.inviteCode?.length ?? 0) >= 16;
+      const code = linkOn ? await ensureInviteLink(group) : await setLinkJoining(group, true);
+      const url = `${window.location.origin}/join/${code}${member.email ? '' : `?as=${encodeURIComponent(member.id)}`}`;
+      const text = member.email
+        ? `Join "${group.name}" on SplitWize. Sign up with ${member.email} and you'll see what you owe.`
+        : `Join "${group.name}" on SplitWize. You're already in it as ${member.name}.`;
+      if (navigator.share) {
+        try {
+          await navigator.share({ title: `Join ${group.name}`, text, url });
+          return;
+        } catch (error) {
+          if ((error as Error)?.name === 'AbortError') return;
+        }
+      }
+      await navigator.clipboard.writeText(`${text} ${url}`);
+      toast({
+        title: 'Invite link copied',
+        description: linkOn ? `Send it to ${member.name}.` : `Send it to ${member.name}. Joining by link is now on for this group.`,
+      });
+    } catch {
+      toast({ title: "Couldn't make the invite link", description: 'Please try again.', variant: 'destructive' });
+    }
   };
 
   const handleRoleChange = async (member: Member, newRole: Member['role']) => {
@@ -225,21 +259,34 @@ export const GroupMemberManagement: React.FC<GroupMemberManagementProps> = ({ gr
                     <div className="flex items-center space-x-2">
                       <span className="font-medium text-sm sm:text-base truncate">{member.name}</span>
                       {getRoleIcon(member.role)}
+                      {member.isTemporary && !hasLeft(member) && (
+                        <Badge variant="outline" className="shrink-0 border-dashed text-xs font-normal text-muted-foreground">
+                          Not joined yet
+                        </Badge>
+                      )}
                     </div>
-                    <div className="flex items-center space-x-2 text-xs sm:text-sm text-muted-foreground">
-                      <Mail className="w-3 h-3 flex-shrink-0" />
-                      <span className="truncate">{member.email}</span>
-                    </div>
-                    {member.joinedAt && (
+                    {member.email && (
+                      <div className="flex items-center space-x-2 text-xs sm:text-sm text-muted-foreground">
+                        <Mail className="w-3 h-3 flex-shrink-0" />
+                        <span className="truncate">{member.email}</span>
+                      </div>
+                    )}
+                    {member.joinedAt && !hasLeft(member) && (
                       <div className="text-xs text-muted-foreground mt-1">
-                        Joined {formatDate(member.joinedAt)}
+                        {member.isTemporary ? 'Added' : 'Joined'} {formatDate(member.joinedAt)}
                       </div>
                     )}
                   </div>
                 </div>
 
-                <div className="flex items-center justify-between sm:justify-end space-x-2 sm:space-x-3">
-                  <div className="flex items-center space-x-2">
+                <div className="flex flex-wrap items-center justify-between gap-2 sm:justify-end sm:gap-3">
+                  {canAdd && member.isTemporary && !hasLeft(member) && (
+                    <Button variant="outline" size="sm" className="h-8" onClick={() => sendInvite(member)}>
+                      <Send className="mr-1.5 h-3.5 w-3.5" aria-hidden="true" />
+                      Send invite
+                    </Button>
+                  )}
+                  <div className="ml-auto flex items-center gap-2">
                     {!isAdmin && getRoleBadge(member.role)}
 
                     {isAdmin && (
@@ -276,27 +323,31 @@ export const GroupMemberManagement: React.FC<GroupMemberManagementProps> = ({ gr
             ))}
           </div>
 
-          {/* Role Descriptions */}
-          <div className="mt-4 sm:mt-6 p-3 sm:p-4 bg-muted/50 rounded-lg">
-            <h3 className="font-medium mb-2 sm:mb-3 text-sm sm:text-base">Role permissions</h3>
-            <div className="space-y-1 sm:space-y-2 text-xs sm:text-sm">
-              <div className="flex items-center space-x-2">
-                <Crown className="w-3 h-3 sm:w-4 sm:h-4 text-owes flex-shrink-0" />
-                <span className="font-medium">Admin:</span>
-                <span className="text-muted-foreground">Full access, can manage members and settings</span>
-              </div>
-              <div className="flex items-center space-x-2">
-                <User className="w-3 h-3 sm:w-4 sm:h-4 text-muted-foreground flex-shrink-0" />
-                <span className="font-medium">Member:</span>
-                <span className="text-muted-foreground">Can add expenses and settle debts</span>
-              </div>
-              <div className="flex items-center space-x-2">
-                <Eye className="w-3 h-3 sm:w-4 sm:h-4 text-muted-foreground flex-shrink-0" />
-                <span className="font-medium">Viewer:</span>
-                <span className="text-muted-foreground">Read-only access, cannot add expenses</span>
-              </div>
-            </div>
-          </div>
+          {/* Most people never change a role, so the explanation waits behind a link. */}
+          <Popover>
+            <PopoverTrigger asChild>
+              <button
+                type="button"
+                className="mt-4 rounded-sm text-sm text-muted-foreground underline-offset-4 hover:text-foreground hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+              >
+                What can each role do?
+              </button>
+            </PopoverTrigger>
+            <PopoverContent align="start" className="w-80 max-w-[calc(100vw-2rem)] space-y-3 text-sm">
+              {[
+                { Icon: Crown, role: 'Admin', what: 'Everything, including people, roles and settings.', tone: 'text-owes' },
+                { Icon: User, role: 'Member', what: 'Adds expenses, records payments, adds people.', tone: 'text-muted-foreground' },
+                { Icon: Eye, role: 'Viewer', what: 'Sees everything, changes nothing.', tone: 'text-muted-foreground' },
+              ].map(({ Icon, role, what, tone }) => (
+                <p key={role} className="flex gap-2">
+                  <Icon className={`mt-0.5 h-4 w-4 shrink-0 ${tone}`} aria-hidden="true" />
+                  <span>
+                    <span className="font-medium">{role}:</span> <span className="text-muted-foreground">{what}</span>
+                  </span>
+                </p>
+              ))}
+            </PopoverContent>
+          </Popover>
         </CardContent>
       </Card>
     </div>

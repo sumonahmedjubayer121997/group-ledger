@@ -40,8 +40,16 @@ export default function PersonPage() {
     const set = new Set([personId]);
     const email = person?.email?.trim().toLowerCase();
     if (email) for (const g of groups) for (const m of g.members) if (m.email?.trim().toLowerCase() === email && m.id !== me) set.add(m.id);
+    // Names they claimed when they joined.
+    for (const g of groups) for (const [placeholder, claimer] of Object.entries(g.aliases ?? {})) if (set.has(claimer)) set.add(placeholder);
     return set;
   }, [groups, person, personId, me]);
+  // You, plus any names you claimed when you joined.
+  const myIds = useMemo(() => {
+    const set = new Set([me]);
+    for (const g of groups) for (const [placeholder, claimer] of Object.entries(g.aliases ?? {})) if (claimer === me) set.add(placeholder);
+    return set;
+  }, [groups, me]);
   const shared = useMemo(
     () => groups.filter((g) => g.members.some((m) => ids.has(m.id)) && g.members.some((m) => m.id === me)),
     [groups, ids, me]
@@ -63,8 +71,8 @@ export default function PersonPage() {
 
   const sharedIds = useMemo(() => new Set(shared.map((g) => g.id)), [shared]);
   const between = useMemo(
-    () => expenses.filter((e) => sharedIds.has(e.groupId) && involves(e, new Set([me])) && involves(e, ids)),
-    [expenses, sharedIds, me, ids]
+    () => expenses.filter((e) => sharedIds.has(e.groupId) && involves(e, myIds) && involves(e, ids)),
+    [expenses, sharedIds, myIds, ids]
   );
 
   if (!groupsLoaded) return <PageSkeleton />;

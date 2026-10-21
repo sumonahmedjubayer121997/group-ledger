@@ -48,7 +48,8 @@ export const EditExpenseForm: React.FC<EditExpenseFormProps> = ({ expense, isOpe
 
   const [description, setDescription] = useState(expense.description);
   const [amount, setAmount] = useState(String(expense.amount));
-  const [paidBy, setPaidBy] = useState(expense.paidBy?.id ?? '');
+  // A payer whose name was claimed later shows as the person who claimed it.
+  const [paidBy, setPaidBy] = useState(group?.aliases?.[expense.paidBy?.id ?? ''] ?? expense.paidBy?.id ?? '');
   const [category, setCategory] = useState(expense.category || 'Other');
   const [date, setDate] = useState(isoDay(expense.date));
   const [splitType, setSplitType] = useState<SplitType>((expense.splitType as SplitType) || 'equal');
@@ -60,7 +61,10 @@ export const EditExpenseForm: React.FC<EditExpenseFormProps> = ({ expense, isOpe
   const [saving, setSaving] = useState(false);
   const [manageCategories, setManageCategories] = useState(false);
 
-  const nameOf = (id: string, name: string) => (id === user?.uid ? 'You' : name);
+  const nameOf = (id: string, name: string) => {
+    const realId = group?.aliases?.[id] ?? id;
+    return realId === user?.uid ? 'You' : members.find((m) => m.id === realId)?.name ?? name;
+  };
   const amountCents = toCents(amount);
   const assigned =
     splitType === 'percentage'

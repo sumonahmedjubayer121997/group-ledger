@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   checkSplit,
   expenseShares,
+  openSince,
   formatMoney,
   formatTotals,
   groupLedger,
@@ -181,18 +182,52 @@ describe("group ledger", () => {
   });
 });
 
+describe("claimed names", () => {
+  // "Rahim" was added by name; later Bob joined by link and said "I'm Rahim".
+  const R = { id: "temp-rahim", name: "Rahim", email: "" };
+  const B = { id: "bob", name: "Bob", email: "bob@example.com" };
+  const aliases = { "temp-rahim": "bob" };
+
+  it("counts the placeholder's expenses and payments as the claimer's", () => {
+    const ledger = groupLedger({
+      members: [S, B],
+      aliases,
+      expenses: [
+        { amount: 100, paidBy: S, splitAmong: [S, R], splitType: "equal" }, // Rahim owes 50
+        { amount: 40, paidBy: R, splitAmong: [S, R], splitType: "equal" }, // Sumon owes Rahim 20
+      ],
+      settlements: [{ fromMemberId: "temp-rahim", toMemberId: "s", amount: 10 }],
+    });
+    expect(ledger.nets.get("bob")).toBe(-2000);
+    expect(ledger.nets.get("s")).toBe(2000);
+    expect(ledger.nets.has("temp-rahim")).toBe(false);
+    expect(ledger.formerMembers).toEqual([]);
+    expect(ledger.ignoredSettlements).toEqual([]);
+  });
+
+  it("keeps exact splits keyed by the placeholder", () => {
+    const resolve = makeResolver([S, B], aliases);
+    const shares = expenseShares(
+      { amount: 30, paidBy: S, splitAmong: [S, R], splitType: "exact", splitData: { s: 10, "temp-rahim": 20 } },
+      resolve
+    );
+    expect(shares.get("bob")).toBe(2000);
+    expect(shares.get("s")).toBe(1000);
+  });
+});
+
 describe("simplify", () => {
   it("settles the landing page's six debts in three payments", () => {
     const nets = new Map([
-      ["tara", 345000],
-      ["rafi", -15000],
+      ["laili", 345000],
+      ["happy", -15000],
       ["sumon", -75000],
-      ["nadia", -255000],
+      ["popy", -255000],
     ]);
     expect(simplifyDebts(nets)).toEqual([
-      { from: "nadia", to: "tara", cents: 255000 },
-      { from: "sumon", to: "tara", cents: 75000 },
-      { from: "rafi", to: "tara", cents: 15000 },
+      { from: "popy", to: "laili", cents: 255000 },
+      { from: "sumon", to: "laili", cents: 75000 },
+      { from: "happy", to: "laili", cents: 15000 },
     ]);
   });
 });
@@ -225,5 +260,28 @@ describe("expense form checks", () => {
     expect(saved.splitPercentages).toEqual({ a: 33.34, s: 33.33, t: 33.33 });
     const shares = expenseShares({ amount: 100, paidBy: S, splitAmong: [A, S, T], splitType: "percentage", ...saved });
     expect(sum(shares)).toBe(10000);
+  });
+});
+
+describe("openSince", () => {
+  const day = (n: number) => new Date(2026, 9, n, 12);
+  const members = [{ id: "a" }, { id: "b" }];
+  const dinner = (n: number) => ({ amount: 100, paidBy: { id: "a" }, splitAmong: [{ id: "a" }, { id: "b" }], splitType: "equal", on: day(n) });
+  const paid = (n: number, amount: number) => ({ fromMemberId: "b", toMemberId: "a", amount, status: "confirmed", on: day(n) });
+  const when = (item: object) => ("on" in item ? (item as { on: Date }).on : null);
+
+  it("dates a debt from when it started, through part payments", () => {
+    const input = { members, expenses: [dinner(1)], settlements: [paid(3, 20)] };
+    expect(openSince(input, "b", when)).toEqual(day(1));
+    expect(openSince(input, "a", when)).toEqual(day(1));
+  });
+
+  it("starts again after being square", () => {
+    const input = { members, expenses: [dinner(1), dinner(7)], settlements: [paid(5, 50)] };
+    expect(openSince(input, "b", when)).toEqual(day(7));
+  });
+
+  it("is null when square", () => {
+    expect(openSince({ members, expenses: [dinner(1)], settlements: [paid(2, 50)] }, "b", when)).toBeNull();
   });
 });

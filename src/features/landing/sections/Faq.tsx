@@ -8,7 +8,7 @@ const questions = [
   },
   {
     q: "Do my friends need an account?",
-    a: "No. Add them to a group by email and their share is tracked straight away. When they sign up with that email, the group is waiting for them.",
+    a: "Only to see the group. You can add them by name and track their share straight away. When they join with the group's link or QR code (a free account takes a minute), they pick their name and everything's waiting for them.",
   },
   {
     q: "How can I split an expense?",
@@ -19,8 +19,12 @@ const questions = [
     a: "Each group has its own currency: Bangladeshi taka, US dollar, euro, British pound, Canadian dollar, Australian dollar or Japanese yen.",
   },
   {
+    q: "Does it work on my phone?",
+    a: "Yes. Install it from your browser and it opens like an app, works offline, and syncs when you're back online.",
+  },
+  {
     q: "Can I get my numbers out?",
-    a: "Yes. Every group's analytics can be downloaded as a PDF report, and expenses can be imported from a CSV file.",
+    a: "Yes. Export any group, or a selection of expenses, as a PDF report or a CSV file. You can also download all your data from your profile.",
   },
 ];
 

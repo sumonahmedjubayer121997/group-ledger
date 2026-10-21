@@ -1,6 +1,7 @@
 import type { User } from "firebase/auth";
 import { collection, deleteDoc, doc, getDocs, query, where } from "firebase/firestore";
 import { db } from "@/lib/firebase";
+import { guessCurrency } from "@/lib/money/regionCurrency";
 import {
   createUserProfile,
   getUserProfile,
@@ -54,7 +55,8 @@ export async function ensureUserProfileExists(
       email: firebaseUser.email,
       photoURL: firebaseUser.photoURL || null,
       verified: firebaseUser.emailVerified,
-      preferences: { currency: "USD", theme: "system", language: "en" },
+      // From the phone's region; the first-run checklist shows it with a Change link.
+      preferences: { currency: guessCurrency(), theme: "system", language: "en" },
       ...additionalData,
     });
   }

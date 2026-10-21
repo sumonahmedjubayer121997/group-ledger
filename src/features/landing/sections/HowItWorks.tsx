@@ -6,15 +6,15 @@ import { Eyebrow, Reveal, SectionHeading, container } from "../ui";
 
 const taka = (amount: number) => formatMoney(amount * 100, "BDT", 0);
 
-const members = ["Tara", "Rafi", "Sumon", "Nadia"];
+const members = ["Laili", "Happy", "Sumon", "Popy"];
 const expenses = [
-  { what: "Hotel, 2 nights", paidBy: "Tara", amount: 6000 },
-  { what: "Bus tickets", paidBy: "Rafi", amount: 2400 },
+  { what: "Hotel, 2 nights", paidBy: "Laili", amount: 6000 },
+  { what: "Bus tickets", paidBy: "Happy", amount: 2400 },
   { what: "Dinner", paidBy: "Sumon", amount: 1800 },
 ];
 const total = expenses.reduce((sum, e) => sum + e.amount, 0);
 const share = total / members.length;
-// Everyone's net position, then who pays Tara back (the only person owed money in this trip).
+// Everyone's net position, then who pays Laili back (the only person owed money in this trip).
 const debts = members
   .map((name) => ({
     name,
@@ -22,12 +22,12 @@ const debts = members
   }))
   .filter((m) => m.net < 0)
   .sort((a, b) => a.net - b.net)
-  .map((m) => ({ from: m.name, to: "Tara", amount: -m.net }));
+  .map((m) => ({ from: m.name, to: "Laili", amount: -m.net }));
 
 const steps = [
   {
     title: "Create a group",
-    body: "Name it, pick a currency and add people by email. They can join later; their share is kept for them.",
+    body: "Name it, pick a currency and add people by name, link or QR code. Whoever hasn't joined yet keeps their share until they do.",
   },
   {
     title: "Add expenses",
@@ -35,7 +35,7 @@ const steps = [
   },
   {
     title: "Settle up",
-    body: "SplitWize shows who owes whom at a glance. Record a payment when someone pays back, and the balance clears.",
+    body: "SplitWize shows who owes whom at a glance. Tap Mark as paid when someone pays you back, and the balance clears.",
   },
 ];
 
@@ -61,7 +61,7 @@ function Preview({ step }: { step: number }) {
             <li key={name} className="flex items-center gap-3 py-3">
               <Avatar name={name} />
               <span className="text-sm text-lp-ink">{name}</span>
-              <span className="ml-auto text-[13px] text-lp-muted">{i === 0 ? "Admin" : i === 3 ? "Invited" : "Member"}</span>
+              <span className="ml-auto text-[13px] text-lp-muted">{i === 0 ? "Admin" : i === 3 ? "Not joined yet" : "Member"}</span>
             </li>
           ))}
         </ul>

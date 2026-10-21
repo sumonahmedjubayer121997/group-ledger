@@ -5,7 +5,7 @@ import { EASE_OUT, Eyebrow, Reveal, SectionHeading, container } from "../ui";
 
 type Mode = "equal" | "percent" | "exact";
 
-const people = ["You", "Rafi", "Nadia"];
+const people = ["You", "Happy", "Popy"];
 const modes: { id: Mode; label: string }[] = [
   { id: "equal", label: "Equal" },
   { id: "percent", label: "Percent" },

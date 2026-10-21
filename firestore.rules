@@ -78,6 +78,11 @@ service cloud.firestore {
         allow read, write: if signedIn() && request.auth.uid == uid;
       }
 
+      // Private settings, e.g. settings/notifications -> { mutedGroups: [...] }.
+      match /settings/{settingId} {
+        allow read, write: if signedIn() && request.auth.uid == uid;
+      }
+
       // Personal loans are private: only their owner can see or change them.
       match /loans/{loanId} {
         allow read, delete: if signedIn() && request.auth.uid == uid;
@@ -197,6 +202,29 @@ service cloud.firestore {
           && !(get(invitePath).data.tempId in request.resource.data.users);
       }
 
+      // A member may claim a name that was added for them without an account ("I'm Rahim"): they
+      // set its `claimedBy` to themselves and `lastClaim` to its key, and change nothing else. Only
+      // unclaimed names without an email, and never a "(left)" entry of someone who deleted their account.
+      function isClaimingName() {
+        let key = request.resource.data.lastClaim;
+        let before = resource.data.users[key];
+        let after = request.resource.data.users[key];
+        return isMemberOf(resource.data)
+          && key is string
+          && key != request.auth.uid
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['users', 'lastClaim'])
+          && request.resource.data.users.diff(resource.data.users).affectedKeys().hasOnly([key])
+          && key in resource.data.users
+          && before != null
+          && before.get('isTemporary', false) == true
+          && before.get('email', '') == ''
+          && before.get('claimedBy', null) == null
+          && before.get('left', false) != true
+          && !before.get('name', '').matches('.*[(]left[)]')
+          && after.diff(before).affectedKeys().hasOnly(['claimedBy'])
+          && after.claimedBy == request.auth.uid;
+      }
+
       allow get: if isMemberOf(resource.data);
       // The app queries `where users.<uid>.role in [...]`.
       allow list: if signedIn() && resource.data.users[request.auth.uid].role in ['admin', 'member', 'viewer'];
@@ -208,6 +236,7 @@ service cloud.firestore {
         || isJoiningByInvite()
         || isDroppingOwnPlaceholder()
         || isJoiningByCode()
+        || isClaimingName()
         || isLeaving();
       allow delete: if isMemberOf(resource.data) && resource.data.users[request.auth.uid].role == 'admin';
 
@@ -229,12 +258,44 @@ service cloud.firestore {
 
     // ---------- notifications (top level, addressed with `to`) ----------
     match /notifications/{notificationId} {
+      // A reminder only goes out with a fresh nudge written in the same batch (see /nudges).
+      function remindedNow(n) {
+        let path = /databases/$(database)/documents/nudges/$(n.groupId + '_' + n.from + '_' + n.to);
+        return existsAfter(path) && getAfter(path).data.at == request.time;
+      }
+
       allow read: if signedIn() && resource.data.to == request.auth.uid;
-      allow create: if signedIn();
+      // `from` is optional (older versions of the app don't set it), but can't name someone else.
+      allow create: if signedIn()
+        && request.resource.data.get('from', request.auth.uid) == request.auth.uid
+        && (request.resource.data.get('type', '') != 'payment_reminder' || remindedNow(request.resource.data));
       allow update: if signedIn()
         && resource.data.to == request.auth.uid
         && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['isRead']);
-      allow delete: if signedIn() && resource.data.to == request.auth.uid;
+      // The recipient clears it; the sender may take it back (Undo right after recording a payment).
+      allow delete: if signedIn()
+        && (resource.data.to == request.auth.uid || resource.data.get('from', '') == request.auth.uid);
+    }
+
+    // ---------- polite reminders ----------
+    // nudges/{groupId}_{from}_{to} -> { groupId, from, to, at }: the last time `from` reminded `to`
+    // in that group. Both must be in the group, and a new one needs the last to be a week old.
+    match /nudges/{nudgeId} {
+      function validNudge() {
+        let d = request.resource.data;
+        return signedIn()
+          && d.keys().hasOnly(['groupId', 'from', 'to', 'at'])
+          && nudgeId == d.groupId + '_' + d.from + '_' + d.to
+          && d.from == request.auth.uid
+          && d.to != d.from
+          && d.at == request.time
+          && isMember(d.groupId)
+          && d.to in groupData(d.groupId).users;
+      }
+
+      allow get: if signedIn() && (resource == null || resource.data.from == request.auth.uid);
+      allow create: if validNudge();
+      allow update: if validNudge() && request.time > resource.data.at + duration.value(7, 'd');
     }
 
     // ---------- anonymous usage events (counts and timings only) ----------

@@ -7,6 +7,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { BalanceCard } from "@/components/BalanceCard";
 import { FirstRunChecklist } from "@/components/FirstRunChecklist";
+import { VerifyEmailLine } from "@/components/VerifyEmailLine";
 import { LoansSummary } from "@/components/loans/LoansSummary";
 import { InstallBanner } from "@/components/InstallBanner";
 import { PageHeader } from "@/components/PageHeader";
@@ -16,7 +17,10 @@ import { useAppActions } from "@/app/appActions";
 import { useExpenseStore, type Group } from "@/stores/expenseStore";
 import { useCurrencyOf, useUserBalances } from "@/stores/useLedger";
 import { formatAmount, formatMoney, formatTotals } from "@/lib/money";
-import { formatDate, toDate } from "@/lib/dates";
+import { expenseMoment, formatDate, toDate } from "@/lib/dates";
+import { memberFor } from "@/lib/claims";
+import { changeWords, comparisonSpan, periodSpan, sumIn } from "@/lib/insights";
+import { mainCurrencyOf, useSpendRows } from "@/stores/useSpending";
 
 const greeting = (hour: number) => (hour < 12 ? "Good morning" : hour < 18 ? "Good afternoon" : "Good evening");
 
@@ -28,34 +32,6 @@ const initials = (name: string) =>
     .join("")
     .slice(0, 2)
     .toUpperCase();
-
-/** "You're owed" / "You owe": one line per currency, never added together. */
-function BalanceStrip({ owedToYou, youOwe }: { owedToYou: Map<string, number>; youOwe: Map<string, number> }) {
-  const tile = (label: string, totals: Map<string, number>, tone: "settled" | "owes", empty: string) => (
-    <Card>
-      <CardContent className="p-5 sm:p-6">
-        <p className="text-sm text-muted-foreground">{label}</p>
-        {totals.size === 0 ? (
-          <p className="mt-2 font-display text-[28px] leading-tight text-muted-foreground">{empty}</p>
-        ) : (
-          <ul className="mt-2 space-y-1">
-            {[...totals].map(([currency, cents]) => (
-              <li key={currency} className={`money font-display text-[32px] leading-tight sm:text-[36px] ${tone === "settled" ? "text-settled" : "text-owes"}`}>
-                {formatMoney(cents, currency)}
-              </li>
-            ))}
-          </ul>
-        )}
-      </CardContent>
-    </Card>
-  );
-  return (
-    <section aria-label="Your balance" className="grid gap-4 sm:grid-cols-2">
-      {tile("You're owed", owedToYou, "settled", "Nothing")}
-      {tile("You owe", youOwe, "owes", "Nothing")}
-    </section>
-  );
-}
 
 function GroupRow({ group, net, currency }: { group: Group; net: number; currency: string }) {
   const expenseCount = useExpenseStore((s) => s.expenses.filter((e) => e.groupId === group.id).length);
@@ -139,6 +115,19 @@ const Dashboard = () => {
   const currencyOf = useCurrencyOf();
   const balances = useUserBalances(user?.uid);
 
+  // One line about this month, not a second dashboard: your share in your main currency, against
+  // last month up to the same day. Insights has the rest.
+  const spendRows = useSpendRows();
+  const thisMonth = useMemo(() => {
+    const now = new Date();
+    const currency = mainCurrencyOf(spendRows);
+    const rows = spendRows.filter((r) => r.currency === currency);
+    const spent = sumIn(rows, periodSpan("month", now), "mine");
+    const cmp = comparisonSpan("month", now)!;
+    const before = sumIn(rows, cmp, "mine");
+    return spent > 0 ? { currency, spent, change: changeWords(spent, before), label: cmp.label } : null;
+  }, [spendRows]);
+
   const netByGroup = useMemo(() => new Map(balances.perGroup.map((p) => [p.group.id, p])), [balances.perGroup]);
   const active = groups.filter((g) => !g.isArchived);
   const archived = groups.filter((g) => g.isArchived);
@@ -146,25 +135,27 @@ const Dashboard = () => {
   const activity = useMemo<ActivityItem[]>(() => {
     const groupName = new Map(groups.map((g) => [g.id, g.name]));
     const first = (name: string) => name.trim().split(/\s+/)[0] || name;
-    const nameIn = (groupId: string, memberId: string) =>
-      memberId === user?.uid
-        ? "you"
-        : first(groups.find((g) => g.id === groupId)?.members.find((m) => m.id === memberId)?.name ?? "Someone");
+    const groupOf = (groupId: string) => groups.find((g) => g.id === groupId);
+    // "you" or a first name; a claimed name counts as the person who claimed it.
+    const nameIn = (groupId: string, person: { id?: string; name?: string } | undefined, fallback = "Someone") => {
+      const member = memberFor(groupOf(groupId), person);
+      return member.id && member.id === user?.uid ? "you" : first(member.name || fallback);
+    };
     const cap = (text: string) => text.charAt(0).toUpperCase() + text.slice(1);
     const items: ActivityItem[] = expenses.map((e) => ({
       id: `e-${e.id}`,
       kind: "expense",
       title: e.description || "Expense",
-      detail: `${groupName.get(e.groupId) ?? "A group"} · ${e.paidBy?.id === user?.uid ? "you paid" : `${first(e.paidBy?.name ?? "someone")} paid`}`,
+      detail: `${groupName.get(e.groupId) ?? "A group"} · ${nameIn(e.groupId, e.paidBy, "someone")} paid`,
       amount: formatAmount(e.amount, currencyOf(e.groupId)),
-      at: toDate(e.date) ?? new Date(0),
+      at: expenseMoment(e.date, e.createdAt),
     }));
     for (const [groupId, list] of Object.entries(groupSettlements)) {
       for (const s of list ?? []) {
         items.push({
           id: `s-${s.id}`,
           kind: "payment",
-          title: `${cap(nameIn(groupId, s.fromMemberId))} paid ${nameIn(groupId, s.toMemberId)}`,
+          title: `${cap(nameIn(groupId, { id: s.fromMemberId }))} paid ${nameIn(groupId, { id: s.toMemberId })}`,
           detail: groupName.get(groupId) ?? "A group",
           amount: formatAmount(s.amount, currencyOf(groupId)),
           at: toDate(s.date) ?? new Date(0),
@@ -179,6 +170,7 @@ const Dashboard = () => {
   const firstName = (userProfile?.name || user?.displayName || "").trim().split(/\s+/)[0];
   const hasDebts = balances.debts.length > 0;
   const owedText = balances.owedToYou.size ? formatTotals(balances.owedToYou) : null;
+  const oweText = balances.youOwe.size ? formatTotals(balances.youOwe) : null;
   const openBalances = balances.perGroup.filter((p) => p.net !== 0).length;
 
   return (
@@ -186,21 +178,33 @@ const Dashboard = () => {
       <PageHeader
         title={`${greeting(new Date().getHours())}${firstName ? `, ${firstName}` : ""}`}
         description={
-          active.length === 0
-            ? "Three quick steps and you're splitting."
-            : owedText
-              ? `You're owed ${owedText} in ${openBalances} ${openBalances === 1 ? "group" : "groups"}.`
-              : `Here's where things stand across your ${active.length} ${active.length === 1 ? "group" : "groups"}.`
+          active.length === 0 ? (
+            "Three quick steps and you're splitting."
+          ) : owedText || oweText ? (
+            // The one place the totals are said; To settle below lists who.
+            <>
+              {owedText && (
+                <>
+                  You're owed <span className="money font-medium text-settled">{owedText}</span>
+                </>
+              )}
+              {owedText && oweText && " and you owe "}
+              {!owedText && oweText && "You owe "}
+              {oweText && <span className="money font-medium text-owes">{oweText}</span>}
+              {` across ${openBalances} ${openBalances === 1 ? "group" : "groups"}.`}
+            </>
+          ) : (
+            `You're all settled up across your ${active.length} ${active.length === 1 ? "group" : "groups"}.`
+          )
         }
       />
 
       <div className="space-y-6">
+        <VerifyEmailLine />
         <InstallBanner />
         <FirstRunChecklist />
         {groups.length > 0 && (
         <>
-        <BalanceStrip owedToYou={balances.owedToYou} youOwe={balances.youOwe} />
-
         <section aria-label="Quick actions" className="flex flex-wrap gap-2">
           <Button onClick={() => openAddExpense(undefined, "dashboard")}>
             <Plus aria-hidden="true" />
@@ -217,6 +221,16 @@ const Dashboard = () => {
         </section>
 
         {hasDebts && <BalanceCard debts={balances.debts} showGroupName title="To settle" />}
+
+        {thisMonth && (
+          <p className="text-sm text-muted-foreground">
+            You've spent <span className="money font-medium text-foreground">{formatMoney(thisMonth.spent, thisMonth.currency)}</span> this month
+            {thisMonth.change ? `, ${thisMonth.change} ${thisMonth.label}` : ""}.{" "}
+            <Link to="/expenses?tab=insights" className="rounded-sm font-medium text-foreground underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+              See insights
+            </Link>
+          </p>
+        )}
 
         <LoansSummary />
 

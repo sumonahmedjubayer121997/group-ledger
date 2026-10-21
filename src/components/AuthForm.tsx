@@ -8,13 +8,8 @@ import { PrimaryButton, fieldClass, textLink } from "@/features/landing/ui";
 
 type Mode = "login" | "register";
 
-const passwordRules = [
-  { label: "8 or more characters", test: (p: string) => p.length >= 8 },
-  { label: "An uppercase letter", test: (p: string) => /[A-Z]/.test(p) },
-  { label: "A lowercase letter", test: (p: string) => /[a-z]/.test(p) },
-  { label: "A number", test: (p: string) => /[0-9]/.test(p) },
-  { label: "A symbol", test: (p: string) => /[^A-Za-z0-9]/.test(p) },
-];
+// Length is what makes a password strong; mixed-case and symbol rules mostly make people write them down.
+const passwordRules = [{ label: "8 or more characters", test: (p: string) => p.length >= 8 }];
 
 const looksLikeEmail = (value: string) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
 
@@ -95,7 +90,7 @@ export const AuthForm: React.FC<{ onProgressChange?: (progress: number) => void 
   const reduce = useReducedMotion();
   const [mode, setMode] = useState<Mode>("login");
   const [loading, setLoading] = useState<"email" | "google" | null>(null);
-  const [formData, setFormData] = useState({ email: "", password: "", confirmPassword: "", displayName: "" });
+  const [formData, setFormData] = useState({ email: "", password: "", displayName: "" });
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const rulesId = useId();
@@ -104,16 +99,15 @@ export const AuthForm: React.FC<{ onProgressChange?: (progress: number) => void 
   const { toast } = useToast();
 
   const rulesMet = passwordRules.map((rule) => rule.test(formData.password));
-  const passwordsMatch = formData.confirmPassword.length > 0 && formData.password === formData.confirmPassword;
 
   // How "complete" the form is, from 0 to 1; drives the balance scale beside the form.
   useEffect(() => {
     const checks =
       mode === "login"
         ? [looksLikeEmail(formData.email), formData.password.length > 0]
-        : [formData.displayName.trim().length > 0, looksLikeEmail(formData.email), ...rulesMet, passwordsMatch];
+        : [formData.displayName.trim().length > 0, looksLikeEmail(formData.email), ...rulesMet];
     onProgressChange?.(checks.filter(Boolean).length / checks.length);
-  }, [mode, formData, passwordsMatch, onProgressChange]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [mode, formData, onProgressChange]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const update = (field: keyof typeof formData, value: string) => {
     setFormData((prev) => ({ ...prev, [field]: value }));
@@ -133,8 +127,7 @@ export const AuthForm: React.FC<{ onProgressChange?: (progress: number) => void 
 
     if (mode === "register") {
       if (!formData.displayName.trim()) return setError("Add your name so friends recognise you.");
-      if (!rulesMet.every(Boolean)) return setError("Your password needs everything on the checklist.");
-      if (!passwordsMatch) return setError("The two passwords don't match.");
+      if (!rulesMet.every(Boolean)) return setError("Use 8 or more characters for your password.");
     }
 
     setLoading("email");
@@ -294,7 +287,7 @@ export const AuthForm: React.FC<{ onProgressChange?: (progress: number) => void 
 
         {!isLogin && (
           <>
-            <ul id={rulesId} className="grid grid-cols-2 gap-x-4 gap-y-1.5" aria-label="Password checklist">
+            <ul id={rulesId} className="grid gap-y-1.5" aria-label="Password checklist">
               {passwordRules.map((rule, i) => (
                 <li
                   key={rule.label}
@@ -308,17 +301,6 @@ export const AuthForm: React.FC<{ onProgressChange?: (progress: number) => void 
                 </li>
               ))}
             </ul>
-
-            <Field label="Confirm password">
-              {(id) => (
-                <PasswordInput
-                  id={id}
-                  value={formData.confirmPassword}
-                  onChange={(v) => update("confirmPassword", v)}
-                  autoComplete="new-password"
-                />
-              )}
-            </Field>
           </>
         )}
 

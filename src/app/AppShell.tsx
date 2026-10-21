@@ -179,6 +179,14 @@ export function AppShell({ children }: { children: ReactNode }) {
   const onHelp = useCallback(() => setShortcutsOpen(true), []);
   useShortcuts({ onAdd, onSearch, onHelp });
 
+  // Messages (toasts) sit just above the phone's bottom bar (h-16) instead of covering it.
+  useEffect(() => {
+    document.documentElement.style.setProperty("--app-bottom-bar", "4rem");
+    return () => {
+      document.documentElement.style.removeProperty("--app-bottom-bar");
+    };
+  }, []);
+
   // The installed app's icon shortcuts open /?action=add-expense or /?action=join.
   const [params, setParams] = useSearchParams();
   useEffect(() => {

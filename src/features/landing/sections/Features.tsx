@@ -1,32 +1,56 @@
-import { ReactNode } from "react";
-import { formatMoney } from "../money";
+import type { ReactNode } from "react";
+import { TiltCard, type CardTone, type LightFrom } from "@/components/fx/TiltCard";
 import { Eyebrow, Reveal, SectionHeading, container } from "../ui";
+import { CommandArt, DialArt, InboxArt, LoanArt, PaidArt, QrArt } from "./featureArt";
 
-const taka = (amount: number) => formatMoney(amount * 100, "BDT", 0);
+type Feature = { title: string; body: string; tone: CardTone; light: LightFrom; art: ReactNode };
 
-const categories = [
-  { name: "Stay", amount: 6000 },
-  { name: "Travel", amount: 2400 },
-  { name: "Food", amount: 1800 },
+// Each card shows a piece of the app itself. Green light for money that's settled or saved,
+// amber for what's owed or due, white for everything else.
+const features: Feature[] = [
+  {
+    title: "See where it went",
+    body: "Insights compare each month with the last and your usual one. Budgets warn you before you overspend.",
+    tone: "settled",
+    light: "top-right",
+    art: <DialArt />,
+  },
+  {
+    title: "Mark as paid, in one tap",
+    body: "The amount and your usual method are filled in, and both of you get a note when it's recorded.",
+    tone: "settled",
+    light: "top-left",
+    art: <PaidArt />,
+  },
+  {
+    title: "Notifications that say what changed",
+    body: "“Laili changed Dinner from ৳500 to ৳600”, not “expense updated”. Several at once fold into one, and any group can be muted.",
+    tone: "plain",
+    light: "top-left",
+    art: <InboxArt />,
+  },
+  {
+    title: "Everything from one bar",
+    body: "Press Ctrl+K to add an expense, mark a debt as paid or jump to a group, without leaving the keyboard.",
+    tone: "owes",
+    light: "top",
+    art: <CommandArt />,
+  },
+  {
+    title: "Join with a QR code",
+    body: "Friends scan the group's code, pick their name, and everything they owe or are owed is waiting.",
+    tone: "plain",
+    light: "top-right",
+    art: <QrArt />,
+  },
+  {
+    title: "Loans, outside any group",
+    body: "Lent a friend money? Track part payments and due dates, privately.",
+    tone: "owes",
+    light: "top-left",
+    art: <LoanArt />,
+  },
 ];
-const largest = Math.max(...categories.map((c) => c.amount));
-
-const currencies = ["৳ BDT", "$ USD", "€ EUR", "£ GBP", "$ CAD", "$ AUD", "¥ JPY"];
-
-function Tile({ title, body, children, className = "" }: { title: string; body: string; children: ReactNode; className?: string }) {
-  return (
-    <article
-      className={`group flex flex-col rounded-2xl border border-lp-rule bg-lp-surface p-6 transition-colors duration-150 hover:border-lp-ink ${className}`}
-    >
-      <div className="flex-1">{children}</div>
-      <h3 className="mt-6 text-lg font-semibold text-lp-ink">{title}</h3>
-      <p className="mt-1.5 text-[15px] leading-6 text-lp-muted">{body}</p>
-    </article>
-  );
-}
-
-const grow =
-  "origin-left scale-x-[0.88] transition-transform duration-500 ease-out group-hover:scale-x-100 motion-reduce:scale-x-100 motion-reduce:transition-none";
 
 export function Features() {
   return (
@@ -37,69 +61,17 @@ export function Features() {
           <SectionHeading className="mt-3 max-w-xl">Everything a shared wallet needs. Nothing it doesn't.</SectionHeading>
         </Reveal>
 
-        <div className="mt-10 grid gap-4 md:mt-16 md:grid-cols-12">
-          <Reveal className="md:col-span-6 md:row-span-2">
-            <Tile
-              className="h-full"
-              title="See where the money goes"
-              body="Charts by category and by person show where a trip's money went, and every group exports to a PDF report."
-            >
-              <p className="text-[13px] text-lp-muted">Sylhet trip · by category</p>
-              <ul className="mt-5 space-y-4">
-                {categories.map((c) => (
-                  <li key={c.name}>
-                    <div className="flex justify-between text-sm">
-                      <span className="text-lp-ink">{c.name}</span>
-                      <span className="tabular-nums text-lp-muted">{taka(c.amount)}</span>
-                    </div>
-                    <div className="mt-2 h-2 rounded-full bg-lp-rule">
-                      <div className={`h-full rounded-full bg-lp-ink ${grow}`} style={{ width: `${(c.amount / largest) * 100}%` }} />
-                    </div>
-                  </li>
-                ))}
-              </ul>
-            </Tile>
-          </Reveal>
-
-          <Reveal className="md:col-span-6" delay={0.06}>
-            <Tile className="h-full" title="Every currency you travel with" body="Each group keeps its own currency, from taka to yen.">
-              <ul className="flex flex-wrap gap-2">
-                {currencies.map((c) => (
-                  <li
-                    key={c}
-                    className="rounded-[8px] border border-lp-rule px-2.5 py-1 text-[13px] text-lp-ink transition-colors duration-150 group-hover:border-lp-muted"
-                  >
-                    {c}
-                  </li>
-                ))}
-              </ul>
-            </Tile>
-          </Reveal>
-
-          <Reveal className="md:col-span-3" delay={0.12}>
-            <Tile className="h-full" title="Budgets that speak up" body="Get a warning before a group overspends.">
-              <div className="flex justify-between text-[13px]">
-                <span className="text-lp-muted">Food</span>
-                <span className="tabular-nums text-lp-owes">82%</span>
-              </div>
-              <div className="mt-2 h-2 rounded-full bg-lp-rule">
-                <div className={`h-full w-[82%] rounded-full bg-lp-owes ${grow}`} />
-              </div>
-            </Tile>
-          </Reveal>
-
-          <Reveal className="md:col-span-3" delay={0.18}>
-            <Tile className="h-full" title="Plan it together" body="Chat, polls, tasks and pinned notes sit next to the expenses.">
-              <div className="space-y-2 text-[13px]">
-                <p className="w-fit max-w-[85%] rounded-[10px] rounded-bl-[4px] border border-lp-rule px-3 py-1.5 text-lp-ink">
-                  Who's booking the bus?
-                </p>
-                <p className="ml-auto w-fit max-w-[85%] rounded-[10px] rounded-br-[4px] bg-lp-ink px-3 py-1.5 text-lp-paper transition-transform duration-300 group-hover:-translate-y-0.5 motion-reduce:transition-none">
-                  On it, added to tasks
-                </p>
-              </div>
-            </Tile>
-          </Reveal>
+        {/* One raised frame around the set, so the cards read as one object. */}
+        <div className="mt-10 rounded-[28px] border border-lp-rule bg-[var(--fx-frame)] p-2 shadow-[inset_0_1px_0_var(--fx-rim-hi)] md:mt-16 md:p-3">
+          <div className="grid gap-2 md:grid-cols-2 md:gap-3">
+            {features.map((f, i) => (
+              <Reveal key={f.title} delay={(i % 2) * 0.06} className="h-full min-w-0">
+                <TiltCard tone={f.tone} light={f.light} art={f.art} artClassName="h-48 md:h-52" title={f.title}>
+                  <p className="mt-1.5 text-[15px] leading-6 text-lp-muted">{f.body}</p>
+                </TiltCard>
+              </Reveal>
+            ))}
+          </div>
         </div>
       </div>
     </section>

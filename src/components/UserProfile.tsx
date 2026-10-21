@@ -1,5 +1,4 @@
 import React, { useState } from "react";
-import { Link } from "react-router-dom";
 import { CheckCircle } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -57,9 +56,6 @@ export const UserProfile: React.FC = () => {
                 Verified
               </span>
             )}
-            <Link to="/personal" className="rounded-sm underline-offset-4 hover:text-foreground hover:underline">
-              Loans and budgets
-            </Link>
           </p>
         </div>
       </div>

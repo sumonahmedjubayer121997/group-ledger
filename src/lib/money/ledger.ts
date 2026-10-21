@@ -31,16 +31,19 @@ export type Debt = { from: string; to: string; cents: number };
 export type LedgerMember = { id: string; email?: string | null; name?: string | null };
 
 /**
- * Maps the people an expense refers to onto current members: by id, or by email for placeholders
- * that were later merged into a real account. Unknown people keep their id ("former member").
+ * Maps the people an expense refers to onto current members: by id, by a claimed name (`aliases`:
+ * a name added without an account, later claimed by the person who joined), or by email for
+ * placeholders merged into a real account. Unknown people keep their id ("former member").
  */
-export function makeResolver(members: LedgerMember[]) {
+export function makeResolver(members: LedgerMember[], aliases: Record<string, string> = {}) {
   const ids = new Set(members.map((m) => m.id));
   const byEmail = new Map(
     members.filter((m) => m.email).map((m) => [String(m.email).trim().toLowerCase(), m.id]),
   );
   return (person: PersonRef | null | undefined): string | null => {
     if (!person?.id) return null;
+    const claimedBy = aliases[person.id];
+    if (claimedBy && ids.has(claimedBy)) return claimedBy;
     if (ids.has(person.id)) return person.id;
     const viaEmail = person.email ? byEmail.get(person.email.trim().toLowerCase()) : undefined;
     return viaEmail ?? person.id;
@@ -133,6 +136,8 @@ export type GroupLedgerInput = {
   members: LedgerMember[];
   expenses: LedgerExpense[];
   settlements: LedgerSettlement[];
+  /** Claimed names: placeholder id -> the member who claimed it. */
+  aliases?: Record<string, string>;
 };
 
 export type GroupLedger = {
@@ -148,8 +153,9 @@ export type GroupLedger = {
   formerMembers: string[];
 };
 
-export function groupLedger({ members, expenses, settlements }: GroupLedgerInput): GroupLedger {
-  const resolve = makeResolver(members);
+export function groupLedger({ members, expenses, settlements, aliases = {} }: GroupLedgerInput): GroupLedger {
+  const resolve = makeResolver(members, aliases);
+  const asMember = (id: string) => (aliases[id] && members.some((m) => m.id === aliases[id]) ? aliases[id] : id);
   const memberIds = new Set(members.map((m) => m.id));
   const nets = new Map<string, number>(members.map((m) => [m.id, 0]));
   const pairs = new PairBook();
@@ -172,15 +178,17 @@ export function groupLedger({ members, expenses, settlements }: GroupLedgerInput
   const ignoredSettlements: LedgerSettlement[] = [];
   for (const s of settlements) {
     if (s.status && s.status !== "confirmed") continue;
-    if (!memberIds.has(s.fromMemberId) || !memberIds.has(s.toMemberId)) {
+    const from = asMember(s.fromMemberId);
+    const to = asMember(s.toMemberId);
+    if (!memberIds.has(from) || !memberIds.has(to)) {
       ignoredSettlements.push(s);
       continue;
     }
     const cents = toCents(s.amount);
     // "from" paid "to": from's debt shrinks.
-    bump(s.fromMemberId, cents);
-    bump(s.toMemberId, -cents);
-    pairs.add(s.fromMemberId, s.toMemberId, -cents);
+    bump(from, cents);
+    bump(to, -cents);
+    pairs.add(from, to, -cents);
   }
 
   return {
@@ -190,6 +198,56 @@ export function groupLedger({ members, expenses, settlements }: GroupLedgerInput
     ignoredSettlements,
     formerMembers: [...former],
   };
+}
+
+/**
+ * Since when `memberId` has owed money (or been owed) without a break: replays the group's expenses
+ * and confirmed payments in date order, the same way `groupLedger` counts them, and returns when
+ * their balance last turned from square (or the other way) to what it is now. Null when they're
+ * square. A debt has been open since the later of its two people's dates.
+ */
+export function openSince(
+  { members, expenses, settlements, aliases = {} }: GroupLedgerInput,
+  memberId: string,
+  when: (item: LedgerExpense | LedgerSettlement) => Date | null
+): Date | null {
+  const resolve = makeResolver(members, aliases);
+  const asMember = (id: string) => (aliases[id] && members.some((m) => m.id === aliases[id]) ? aliases[id] : id);
+  const memberIds = new Set(members.map((m) => m.id));
+  const events: { at: number; delta: number }[] = [];
+
+  for (const expense of expenses) {
+    const payer = resolve(expense.paidBy);
+    if (!payer) continue;
+    let delta = 0;
+    for (const [id, share] of expenseShares(expense, resolve)) {
+      if (id === payer || share === 0) continue;
+      if (id === memberId) delta -= share;
+      if (payer === memberId) delta += share;
+    }
+    if (delta) events.push({ at: when(expense)?.getTime() ?? 0, delta });
+  }
+  for (const s of settlements) {
+    if (s.status && s.status !== "confirmed") continue;
+    const from = asMember(s.fromMemberId);
+    const to = asMember(s.toMemberId);
+    if (!memberIds.has(from) || !memberIds.has(to)) continue;
+    const cents = toCents(s.amount);
+    const delta = from === memberId ? cents : to === memberId ? -cents : 0;
+    if (delta) events.push({ at: when(s)?.getTime() ?? 0, delta });
+  }
+
+  events.sort((a, b) => a.at - b.at);
+  let net = 0;
+  let since: number | null = null;
+  for (const { at, delta } of events) {
+    const before = Math.sign(net);
+    net += delta;
+    const after = Math.sign(net);
+    if (after === 0) since = null;
+    else if (after !== before) since = at;
+  }
+  return net !== 0 && since !== null ? new Date(since) : null;
 }
 
 /**

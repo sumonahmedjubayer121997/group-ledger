@@ -196,6 +196,57 @@ export const normalizeEmail = (email: string) => email.trim().toLowerCase();
 const memberField = (memberId: string, ...rest: string[]) => new FieldPath("users", memberId, ...rest);
 
 /**
+ * A group's members from its `users` map. A name added without an account (`isTemporary`) that
+ * someone claimed when they joined (`claimedBy`) is left out of the list and returned as an alias,
+ * so its expenses and payments count as the claimer's.
+ */
+export const membersFromUsers = (users: Record<string, any> | undefined) => {
+  const members: Member[] = [];
+  const aliases: Record<string, string> = {};
+  for (const [uid, entry] of Object.entries(users || {})) {
+    if (!entry) continue;
+    if (entry.claimedBy) {
+      aliases[uid] = entry.claimedBy;
+      continue;
+    }
+    members.push({
+      userId: uid,
+      id: uid,
+      name: entry.name || "Unknown",
+      email: entry.email || "",
+      role: entry.role as "admin" | "member",
+      joinedAt: entry.joinedAt?.toDate?.() || new Date(),
+      isTemporary: !!entry.isTemporary,
+    });
+  }
+  return { members, aliases };
+};
+
+/** Names in a group that were added without an account and nobody has claimed yet. */
+export const unclaimedNames = async (groupId: string) => {
+  const snap = await getDoc(doc(db, "groups", groupId));
+  const users = (snap.data()?.users ?? {}) as Record<string, any>;
+  return Object.entries(users)
+    .filter(([, entry]) => entry && entry.isTemporary && !entry.claimedBy && !entry.email && !entry.left && !/\(left\)$/.test(entry.name || ""))
+    .map(([id, entry]) => ({ id, name: String(entry.name || "Someone") }));
+};
+
+/**
+ * "I'm Rahim": after joining, take over a name someone added for you, with its expenses and
+ * payments. The rules allow this once per name, only for yourself.
+ */
+export const claimName = async (groupId: string, placeholderId: string, user: User, placeholderName: string) => {
+  await updateDoc(doc(db, "groups", groupId), memberField(placeholderId, "claimedBy"), user.uid, "lastClaim", placeholderId);
+  const profile = await getUserProfile(user.uid).catch(() => null);
+  await logGroupActivity(groupId, {
+    type: "member_added",
+    actorId: user.uid,
+    actorName: profile?.name || user.displayName || "A member",
+    description: `joined as ${placeholderName}`,
+  }).catch((error) => console.error("Error logging activity:", error));
+};
+
+/**
  * Exact-email lookup through `emailIndex/{email}`. The security rules only allow reading a single
  * entry, so nobody can list every user. People appear here once they sign in with a verified email.
  */
@@ -619,19 +670,8 @@ export const fetchGroupById = async (
     // Debug: log the raw Firestore data
     console.log("Firestore group data:", data);
 
-    // Transform users/members object to members array
-    const membersArray = Object.entries(data.users || {}).map(
-      ([uid, userData]: [string, any]) => ({
-        userId: uid,
-        id: uid,
-        name: userData.name || "Unknown",
-        email: userData.email || "",
-        role: userData.role as "admin" | "member",
-        joinedAt: userData.joinedAt?.toDate
-          ? userData.joinedAt.toDate()
-          : new Date(),
-      })
-    );
+    // Members from the users map; claimed names become aliases (see membersFromUsers).
+    const { members: membersArray, aliases } = membersFromUsers(data.users);
 
     console.log("Transformed members array:", membersArray);
     const group: Group = {
@@ -641,6 +681,7 @@ export const fetchGroupById = async (
       photo: data.photo || "",
       coverImage: data.coverImage || "",
       members: membersArray,
+      aliases,
       createdBy: data.createdBy || "",
       createdAt: data.createdAt?.toDate ? data.createdAt.toDate() : new Date(),
       groupType: data.groupType || "private",
@@ -686,24 +727,17 @@ export const getUserGroups = async (userId: string) => {
       const data = doc.data();
       console.log("Processing group:", doc.id, data);
 
-      // Transform users object to members array
-      const membersArray = Object.entries(data.users || {})
-        .filter(([, userData]) => userData)
-        .map(([uid, userData]: [string, any]) => ({
-          userId: uid,
-          id: uid,
-          name: userData.name || "Unknown",
-          email: userData.email || "",
-          role: userData.role as "admin" | "member",
-          joinedAt: userData.joinedAt?.toDate() || new Date(),
-        })
-      );
+      // Members from the users map; names someone has claimed become aliases instead (see membersFromUsers).
+
+
+      const { members: membersArray, aliases } = membersFromUsers(data.users);
 
       const group: Group = {
         id: doc.id,
         name: data.name || "Unnamed Group",
         description: data.description || "",
         members: membersArray,
+        aliases,
         createdAt: data.createdAt?.toDate() || new Date(),
         createdBy: data.createdBy || "",
         groupType: data.groupType || "private",
@@ -866,24 +900,17 @@ export const subscribeToUserGroups = (
         );
         console.log("👥 Group users structure:", data.users);
 
-        // Transform users object to members array
-        const membersArray = Object.entries(data.users || {})
-          .filter(([, userData]) => userData)
-          .map(([uid, userData]: [string, any]) => ({
-            userId: uid,
-            id: uid,
-            name: userData.name || "Unknown",
-            email: userData.email || "",
-            role: userData.role as "admin" | "member",
-            joinedAt: userData.joinedAt?.toDate() || new Date(),
-          })
-        );
+        // Members from the users map; names someone has claimed become aliases instead (see membersFromUsers).
+
+
+        const { members: membersArray, aliases } = membersFromUsers(data.users);
 
         const group: Group = {
           id: doc.id,
           name: data.name || "Unnamed Group",
           description: data.description || "",
           members: membersArray,
+          aliases,
           createdAt: data.createdAt?.toDate() || new Date(),
           createdBy: data.createdBy || "",
           groupType: data.groupType || "private",
@@ -1543,6 +1570,8 @@ export const deleteMyAccount = async (user: User) => {
       email: "",
       role: me.role === "admin" ? "member" : me.role,
       isTemporary: true,
+      // Nobody can claim this name later (see isClaimingName in the rules).
+      left: true,
       joinedAt: me.joinedAt ?? serverTimestamp(),
     });
     if (me.role !== "viewer") {
@@ -1550,7 +1579,7 @@ export const deleteMyAccount = async (user: User) => {
     }
   }
 
-  const ownCollections = ["groups", "budgets", "loans"];
+  const ownCollections = ["groups", "budgets", "loans", "settings"];
   for (const name of ownCollections) {
     const docs = await getDocs(collection(db, "users", uid, name));
     await Promise.all(docs.docs.map((d) => deleteDoc(d.ref)));
@@ -1559,6 +1588,13 @@ export const deleteMyAccount = async (user: User) => {
   await Promise.all(notifications.docs.map((d) => deleteDoc(d.ref)));
   if (user.email) {
     await deleteDoc(doc(db, "emailIndex", normalizeEmail(user.email))).catch(() => undefined);
+  }
+  // The profile photo they uploaded, if any (Storage lets people delete their own files).
+  const photoURL = (await getUserProfile(uid).catch(() => null))?.photoURL;
+  if (photoURL?.includes("firebasestorage")) {
+    const { deleteObject, ref } = await import("firebase/storage");
+    const { storage } = await import("@/lib/firebase");
+    await deleteObject(ref(storage, photoURL)).catch(() => undefined);
   }
   await deleteDoc(doc(db, "users", uid)).catch(() => undefined);
 

@@ -20,6 +20,7 @@ import {
   type GroupActivityType,
 } from '@/services/firebaseService';
 import { notificationFirebaseService } from '@/services/notificationFirebaseService';
+import { notifyExpenseAdded, notifyExpenseDeleted, notifyExpenseEdited, notifyPaymentRecorded, notifyPaymentRemoved } from './groupNotifications';
 import { useOfflineStore } from '@/stores/offlineStore';
 
 export interface Member {
@@ -30,6 +31,8 @@ export interface Member {
   photoURL?: string;
   role?: 'admin' | 'member' | 'viewer';
   joinedAt?: Date;
+  /** Added by name or email and hasn't signed in to the group yet. */
+  isTemporary?: boolean;
 }
 
 export interface GroupSettings {
@@ -67,6 +70,8 @@ export interface Group {
   name: string;
   description: string;
   members: Member[];
+  /** Names that someone claimed when they joined: placeholder id -> the claimer's id. */
+  aliases?: Record<string, string>;
   createdAt: Date;
   createdBy: string;
   photo?: string;
@@ -89,6 +94,8 @@ export interface Expense {
   category: string;
   date: Date;
   splitType: 'equal' | 'exact' | 'percentage';
+  /** When it was added (a Firestore timestamp; null until the server has it). */
+  createdAt?: { toDate: () => Date } | Date | null;
   /** exact: amount per person. percentage: amount per person when splitVersion >= 2, else percent per person. */
   splitData?: { [memberId: string]: number };
   /** Percent per person, kept for display (splitVersion 2+). */
@@ -144,7 +151,8 @@ interface ExpenseStore {
   updateMemberRole: (groupId: string, memberId: string, role: Member['role']) => Promise<void>;
   /** Records a payment and returns it (so it can be undone). */
   addSettlement: (settlement: Omit<Settlement, 'id' | 'status'>, groupId: string, userId: string) => Promise<Settlement>;
-  removeSettlement: (settlementId: string) => Promise<void>;
+  /** undo: taken back right after recording it, so its notifications are withdrawn instead of sending more. */
+  removeSettlement: (settlementId: string, opts?: { undo?: boolean }) => Promise<void>;
   addActivity: (activity: Omit<GroupActivity, 'id' | 'timestamp'>) => void;
   addRecurringExpense: (recurring: Omit<RecurringExpense, 'id'>) => void;
   processRecurringExpenses: () => void;
@@ -189,6 +197,9 @@ function withRetry(start: (onError: (error: Error) => void) => () => void, attem
     stop();
   };
 }
+
+/** Notifications sent for payments recorded in this session, so an Undo can take them back. */
+const paymentNotices = new Map<string, { ids: string[]; groupId: string }>();
 
 export const useExpenseStore = create<ExpenseStore>()(
   persist(
@@ -372,26 +383,8 @@ export const useExpenseStore = create<ExpenseStore>()(
             const createdExpense = await createExpenseFirebase(expense, userId);
             console.log('Expense added successfully to Firebase');
             
-            // Add notification for new expense
-            const groups = get().groups;
-            const group = groups.find(g => g.id === expense.groupId);
-            const currentUser = groups.flatMap(g => g.members).find(m => m.id === userId);
-            
-            // The group's "Notifications" setting turns these off.
-            if (group && currentUser && group.settings?.notifications !== false) {
-              // Notify all group members except the person who added the expense
-              const membersToNotify = group.members.filter(m => m.id !== userId);
-              
-              for (const member of membersToNotify) {
-                await notificationFirebaseService.notifyExpenseAdded(
-                  member.id,
-                  expense.groupId,
-                  group.name,
-                  expense.description,
-                  createdExpense.id
-                );
-              }
-            }
+            const group = get().groups.find(g => g.id === expense.groupId);
+            if (group) await notifyExpenseAdded(group, userId, createdExpense);
             
             set({ loading: false });
             // Real-time listener will update the state
@@ -562,24 +555,9 @@ export const useExpenseStore = create<ExpenseStore>()(
             if (expense) {
               await updateExpenseFirebase(expense.groupId, id, updatedExpense);
               
-              // Add notification for expense edit
-              const groups = get().groups;
-              const group = groups.find(g => g.id === expense.groupId);
-              
-              if (group && group.settings?.notifications !== false && !opts?.quiet) {
-                // Notify all group members except the one who updated the expense 
-                const membersToNotify = group.members.filter(m => m.id !== get().currentUserId);
-                
-                for (const member of membersToNotify) {
-                  await notificationFirebaseService.notifyExpenseAdded(
-                    member.id,
-                    expense.groupId,
-                    group.name,
-                    `${expense.description} (updated)`,
-                    expense.id
-                  );
-                }
-              }
+              const group = get().groups.find(g => g.id === expense.groupId);
+              const actorId = get().currentUserId;
+              if (group && actorId && !opts?.quiet) await notifyExpenseEdited(group, actorId, expense, updatedExpense);
               
               set({ loading: false });
               // Firebase listener will update the state
@@ -616,25 +594,10 @@ export const useExpenseStore = create<ExpenseStore>()(
             
             await deleteExpenseFirebase(groupId, id);
             
-            // Add notification for expense deletion
             if (expense) {
-              const groups = get().groups;
-              const group = groups.find(g => g.id === expense.groupId);
-              
-              if (group && group.settings?.notifications !== false && !opts?.quiet) {
-                // Notify all group members except the one who deleted the expense
-                const membersToNotify = group.members.filter(m => m.id !== get().currentUserId);
-                
-                for (const member of membersToNotify) {
-                  await notificationFirebaseService.notifyExpenseAdded(
-                    member.id,
-                    expense.groupId,
-                    group.name,
-                    `${expense.description} (deleted)`,
-                    expense.id
-                  );
-                }
-              }
+              const group = get().groups.find(g => g.id === expense.groupId);
+              const actorId = get().currentUserId;
+              if (group && actorId && !opts?.quiet) await notifyExpenseDeleted(group, actorId, expense);
               
               if (!opts?.quiet) record(groupId, 'expense_deleted', `deleted "${expense.description}"`);
             }
@@ -668,9 +631,25 @@ export const useExpenseStore = create<ExpenseStore>()(
           }));
         },
 
-        removeSettlement: async (settlementId) => {
+        removeSettlement: async (settlementId, opts) => {
+          const sent = paymentNotices.get(settlementId);
+          let groupId = sent?.groupId;
+          let settlement = get().settlements.find((s) => s.id === settlementId);
+          for (const [id, list] of Object.entries(get().groupSettlements)) {
+            const found = list?.find((s) => s.id === settlementId);
+            if (found) [groupId, settlement] = [id, found];
+          }
           await deleteSettlementFirebase(settlementId);
           set((state) => ({ settlements: state.settlements.filter((s) => s.id !== settlementId) }));
+
+          paymentNotices.delete(settlementId);
+          if (opts?.undo && sent) {
+            await notificationFirebaseService.deleteNotifications(sent.ids);
+            return;
+          }
+          const group = get().groups.find((g) => g.id === groupId);
+          const actorId = get().currentUserId;
+          if (group && actorId && settlement) await notifyPaymentRemoved(group, actorId, settlement);
         },
 
         addSettlement: async (settlement, groupId, userId) => {
@@ -686,6 +665,12 @@ export const useExpenseStore = create<ExpenseStore>()(
               settlements: [...state.settlements, createdSettlement],
               loading: false
             }));
+
+            const group = get().groups.find((g) => g.id === groupId);
+            if (group) {
+              const ids = await notifyPaymentRecorded(group, userId, createdSettlement);
+              paymentNotices.set(createdSettlement.id, { ids, groupId });
+            }
             
             return createdSettlement;
           } catch (error) {

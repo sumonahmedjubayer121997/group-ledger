@@ -11,7 +11,7 @@ import { useExpenseStore, Group } from '@/stores/expenseStore';
 import { Upload, Save, Copy, RefreshCw, ChevronDown } from 'lucide-react';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { regenerateInviteLink, setLinkJoining } from '@/services/firebaseService';
-import { toast } from "sonner";
+import { toast } from "@/hooks/use-toast";
 import { GroupPictureUpload } from '@/components/GroupPictureUpload';
 
 interface GroupSettingsProps {
@@ -66,9 +66,9 @@ export const GroupSettings: React.FC<GroupSettingsProps> = ({ group }) => {
     setLinkBusy(true);
     try {
       await setLinkJoining(group, enabled);
-      toast.success(enabled ? 'Invite link turned on' : 'Invite link turned off. Old links no longer work.');
+      toast({ title: enabled ? 'Invite link turned on' : 'Invite link turned off. Old links no longer work.' });
     } catch {
-      toast.error("Couldn't change the invite link.");
+      toast({ title: "Couldn't change the invite link.", variant: "destructive" });
     } finally {
       setLinkBusy(false);
     }
@@ -78,9 +78,9 @@ export const GroupSettings: React.FC<GroupSettingsProps> = ({ group }) => {
     setLinkBusy(true);
     try {
       await regenerateInviteLink(group);
-      toast.success('New invite link created. The old one no longer works.');
+      toast({ title: 'New invite link created. The old one no longer works.' });
     } catch {
-      toast.error("Couldn't create a new link.");
+      toast({ title: "Couldn't create a new link.", variant: "destructive" });
     } finally {
       setLinkBusy(false);
     }
@@ -119,10 +119,10 @@ export const GroupSettings: React.FC<GroupSettingsProps> = ({ group }) => {
   coverImage,
 });
 
-    toast.success("Saved your changes");
+    toast({ title: "Saved your changes" });
   } catch (err) {
     console.error("Failed to update group settings:", err);
-    toast.error("Couldn't save your changes", { description: "Please try again." });
+    toast({ title: "Couldn't save your changes", description: "Please try again.", variant: "destructive" });
   }
 };
 
@@ -198,7 +198,7 @@ export const GroupSettings: React.FC<GroupSettingsProps> = ({ group }) => {
                   size="sm"
                   aria-label="Copy invite link"
                   disabled={!inviteLink}
-                  onClick={() => navigator.clipboard.writeText(inviteLink).then(() => toast.success('Link copied'))}
+                  onClick={() => navigator.clipboard.writeText(inviteLink).then(() => toast({ title: 'Link copied' }))}
                 >
                   <Copy aria-hidden="true" />
                 </Button>

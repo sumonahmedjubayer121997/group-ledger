@@ -10,22 +10,11 @@ import { deferWithUndo, useHidden } from "@/lib/undo";
 import { useToast } from "@/hooks/use-toast";
 import { useBudgetStore, type Budget } from "@/stores/budgetStore";
 import { useExpenseStore } from "@/stores/expenseStore";
-import { useCurrencyOf } from "@/stores/useLedger";
-import { SUPPORTED_CURRENCIES, expenseShares, makeResolver, toCurrencyCode } from "@/lib/money";
-import { toDate } from "@/lib/dates";
+import { usePersonalBudgetSpend } from "@/stores/useSpending";
+import { SUPPORTED_CURRENCIES, toCurrencyCode } from "@/lib/money";
 import { BudgetCard } from "./BudgetCard";
 
 type Period = Budget["period"];
-
-const periodStart = (period: Period, now = new Date()) => {
-  if (period === "weekly") {
-    const d = new Date(now);
-    d.setDate(now.getDate() - 7);
-    return d;
-  }
-  if (period === "yearly") return new Date(now.getFullYear(), 0, 1);
-  return new Date(now.getFullYear(), now.getMonth(), 1);
-};
 
 const emptyForm = { name: "", limit: "", currency: "", period: "monthly" as Period, alertThreshold: "80" };
 
@@ -37,9 +26,6 @@ export function PersonalBudgetsPanel() {
   const addBudget = useBudgetStore((s) => s.addBudget);
   const updateBudget = useBudgetStore((s) => s.updateBudget);
   const deleteBudget = useBudgetStore((s) => s.deleteBudget);
-  const groups = useExpenseStore((s) => s.groups);
-  const expenses = useExpenseStore((s) => s.expenses);
-  const currencyOf = useCurrencyOf();
 
   const [form, setForm] = useState(emptyForm);
   const [editing, setEditing] = useState<Budget | null>(null);
@@ -50,31 +36,8 @@ export function PersonalBudgetsPanel() {
 
   const mine = budgets.filter((b) => b.type === "individual" && b.isActive && (!b.userId || b.userId === user?.uid) && !hidden.has(`budget-${b.id}`));
 
-  // Older budgets have no currency: use the one most of your expenses are in.
-  const mainCurrency = useMemo(() => {
-    const counts = new Map<string, number>();
-    for (const e of expenses) counts.set(currencyOf(e.groupId), (counts.get(currencyOf(e.groupId)) ?? 0) + 1);
-    return [...counts].sort((a, b) => b[1] - a[1])[0]?.[0] ?? "USD";
-  }, [expenses, currencyOf]);
-
-  const spentFor = useMemo(() => {
-    const resolvers = new Map(groups.map((g) => [g.id, makeResolver(g.members)]));
-    return (budget: Budget) => {
-      const currency = toCurrencyCode(budget.currency || mainCurrency);
-      const start = periodStart(budget.period);
-      let cents = 0;
-      for (const e of expenses) {
-        if (currencyOf(e.groupId) !== currency) continue;
-        const date = toDate(e.date);
-        if (!date || date < start) continue;
-        const resolve = resolvers.get(e.groupId);
-        if (!resolve || !user) continue;
-        const me = resolve({ id: user.uid, email: user.email });
-        cents += (me && expenseShares(e, resolve).get(me)) || 0;
-      }
-      return cents;
-    };
-  }, [groups, expenses, currencyOf, mainCurrency, user]);
+  // Older budgets have no currency: they count the one most of your expenses are in.
+  const { mainCurrency, spentFor } = usePersonalBudgetSpend();
 
   const startNew = () => {
     setEditing(null);

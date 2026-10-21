@@ -45,7 +45,7 @@ export default defineConfig(({ mode }) => ({
         // The app itself is stored for offline use; big optional parts (the 3D landing scene, the PDF
         // and QR libraries) are cached the first time they're used instead.
         globPatterns: ["**/*.{js,css,html,ico,png,svg,woff2}"],
-        globIgnores: ["**/DebtWeb-*.js", "**/jspdf*.js", "**/html2canvas*.js", "**/index.es-*.js", "**/purify*.js", "**/jsQR-*.js", "**/pdfReport-*.js"],
+        globIgnores: ["**/jspdf*.js", "**/html2canvas*.js", "**/index.es-*.js", "**/purify*.js", "**/jsQR-*.js", "**/pdfReport-*.js"],
         navigateFallback: "/index.html",
         // Firebase's own pages (sign-in helpers) must always come from the server.
         navigateFallbackDenylist: [/^\/__\//],

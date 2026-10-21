@@ -97,7 +97,7 @@ All colors MUST be HSL.
 }
 
 /* Landing page "ledger" tokens. Hex on purpose: used as plain CSS colours and
-   read by the three.js hero scene, so they are kept separate from the HSL shadcn set. */
+   used inside SVG drawings, so they are kept separate from the HSL shadcn set. */
 @layer base {
   :root {
     --lp-paper: #FAFAF7;
@@ -117,6 +117,51 @@ All colors MUST be HSL.
     --lp-rule: #2A2A25;
     --lp-settled: #4CC38A;
     --lp-owes: #F79009;
+  }
+}
+
+/* Money flowing along the hero's debt lines, while the card is hovered. */
+@keyframes fx-flow {
+  to { stroke-dashoffset: -24; }
+}
+
+/* The scan line on the QR feature card, while it's hovered. */
+@keyframes fx-scan {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(118px); }
+}
+
+/* Lit cards (TiltCard): surfaces, rims and the green / amber / white light they cast.
+   On paper the light becomes a soft tint; on near-black it glows. */
+@layer base {
+  :root {
+    --fx-frame: #F1F0EB;
+    --fx-surface: #FFFFFF;
+    --fx-panel: #F6F5F1;
+    --fx-rim: rgba(17, 17, 17, 0.08);
+    --fx-rim-hi: rgba(255, 255, 255, 0.9);
+    --fx-dot: rgba(17, 17, 17, 0.09);
+    --fx-spot: rgba(17, 17, 17, 0.045);
+    --fx-shadow: rgba(17, 17, 17, 0.14);
+    --fx-glow-settled: rgba(31, 122, 90, 0.2);
+    --fx-glow-owes: rgba(181, 71, 8, 0.2);
+    --fx-glow-plain: rgba(17, 17, 17, 0.06);
+    --fx-glass: rgba(255, 255, 255, 0.72);
+  }
+
+  .dark {
+    --fx-frame: #0A0A09;
+    --fx-surface: #121210;
+    --fx-panel: #0C0C0B;
+    --fx-rim: rgba(255, 255, 255, 0.08);
+    --fx-rim-hi: rgba(255, 255, 255, 0.16);
+    --fx-dot: rgba(255, 255, 255, 0.07);
+    --fx-spot: rgba(255, 255, 255, 0.07);
+    --fx-shadow: rgba(0, 0, 0, 0.6);
+    --fx-glow-settled: rgba(76, 195, 138, 0.3);
+    --fx-glow-owes: rgba(247, 144, 9, 0.3);
+    --fx-glow-plain: rgba(255, 255, 255, 0.12);
+    --fx-glass: rgba(24, 24, 21, 0.72);
   }
 }
 

@@ -9,8 +9,8 @@ import { Button } from '@/components/ui/button';
 import { useAuth } from '@/contexts/AuthContext';
 import { formatDate } from "@/lib/dates";
 import { deferWithUndo, useHidden } from '@/lib/undo';
+import { methodLabel } from '@/lib/paymentMethods';
 
-const methodLabel: Record<string, string> = { cash: 'Cash', bank_transfer: 'Bank transfer', paypal: 'PayPal', other: 'Other' };
 interface SettlementSummaryProps {
   groupId: string;
 }
@@ -88,7 +88,7 @@ export const SettlementSummary: React.FC<SettlementSummaryProps> = ({ groupId })
                         </div>
                         <div className="flex items-center space-x-1 text-xs text-muted-foreground">
                           <CreditCard className="w-3 h-3" />
-                          <span>{methodLabel[settlement.paymentMethod] ?? settlement.paymentMethod}</span>
+                          <span>{methodLabel(settlement.paymentMethod)}</span>
                         </div>
                       </div>
                     </div>

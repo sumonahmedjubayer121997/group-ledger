@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { useAppActions } from "@/app/appActions";
 import { useAuth } from "@/contexts/AuthContext";
 import { formatMoney } from "@/lib/money";
+import { debtAge, isOldDebt } from "@/lib/dates";
 import type { DebtView } from "@/stores/useLedger";
 
 interface BalanceCardProps {
@@ -64,7 +65,14 @@ export const BalanceCard: React.FC<BalanceCardProps> = ({ debts, showGroupName =
                   </>
                 )}
               </p>
-              {showGroupName && <p className="truncate text-xs text-muted-foreground">{debt.groupName}</p>}
+              {/* Which group, and how long it has been open; a month or more is called out. */}
+              {(showGroupName || debt.since) && (
+                <p className="truncate text-xs text-muted-foreground">
+                  {showGroupName && debt.groupName}
+                  {showGroupName && debt.since && " · "}
+                  {debt.since && <span className={isOldDebt(debt.since) ? "text-owes" : undefined}>{debtAge(debt.since)}</span>}
+                </p>
+              )}
             </div>
             <div className="flex shrink-0 items-center gap-3">
               <span className={`money font-medium ${tone(debt)}`}>{formatMoney(debt.cents, debt.currency)}</span>

@@ -8,6 +8,8 @@ import { useLoanSync } from "@/stores/loanStore";
 import { PageSkeleton } from "@/components/PageSkeleton";
 import { AppActionsProvider } from "./appActions";
 import { AppShell } from "./AppShell";
+import { trackAppOpened } from "@/lib/usage";
+import { useWeeklySummary } from "@/stores/useWeeklySummary";
 
 // Each page loads when first opened.
 const Dashboard = lazy(() => import("@/pages/Dashboard"));
@@ -18,6 +20,8 @@ const PersonPage = lazy(() => import("@/pages/PersonPage"));
 const ProfilePage = lazy(() => import("@/pages/ProfilePage"));
 const JoinPage = lazy(() => import("@/pages/JoinPage"));
 const NotFound = lazy(() => import("@/pages/NotFound"));
+const PrivacyPage = lazy(() => import("@/pages/LegalPage").then((m) => ({ default: m.PrivacyPage })));
+const TermsPage = lazy(() => import("@/pages/LegalPage").then((m) => ({ default: m.TermsPage })));
 
 /** Keeps groups, expenses, payments, budgets and loans in sync with Firestore while signed in. */
 function useDataSync(userId: string) {
@@ -29,6 +33,9 @@ function useDataSync(userId: string) {
   }, [userId, initializeFirebaseSync, cleanup]);
   useBudgetFirebaseSync();
   useLoanSync(userId);
+  // Anonymous return-rate count (see trackAppOpened).
+  useEffect(() => trackAppOpened(), []);
+  useWeeklySummary(userId);
 }
 
 /** Applies the theme saved to the profile once, when it was chosen on another device. */
@@ -69,6 +76,8 @@ export default function SignedInApp() {
             <Route path="/profile" element={<ProfilePage />} />
             <Route path="/join/:code" element={<JoinPage />} />
             <Route path="/signin" element={<Navigate to="/" replace />} />
+            <Route path="/privacy" element={<PrivacyPage inApp />} />
+            <Route path="/terms" element={<TermsPage inApp />} />
             <Route path="*" element={<NotFound />} />
           </Routes>
         </Suspense>
