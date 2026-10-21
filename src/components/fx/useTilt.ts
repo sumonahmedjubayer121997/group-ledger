@@ -21,8 +21,10 @@ const SPRING = { stiffness: 150, damping: 20, mass: 0.6 };
  *
  * Everything runs on motion values, so pointer movement never re-renders React.
  * Returns the handlers and style for the card, plus `shadowX` / `shadowY` for its shadow.
+ * `max` is the most it tilts and `lift` how far it rises, in degrees and pixels; large panels
+ * pass 0 for both and keep just the light.
  */
-export function useTilt(max = 6) {
+export function useTilt(max = 6, lift = 4) {
   const reduce = useReducedMotion();
   const ref = useRef<HTMLElement>(null);
   const coarse = useMemo(() => typeof window !== "undefined" && window.matchMedia?.("(pointer: coarse)").matches, []);
@@ -38,7 +40,7 @@ export function useTilt(max = 6) {
 
   const rotateY = useTransform([x, lit], ([vx, a]: number[]) => (vx - 0.5) * 2 * max * a);
   const rotateX = useTransform([y, lit], ([vy, a]: number[]) => -(vy - 0.5) * 2 * max * a);
-  const lift = useTransform(lit, (a) => -4 * a);
+  const rise = useTransform(lit, (a) => -lift * a);
   const shadowX = useTransform(rotateY, (v) => -v * 1.4);
   const shadowY = useTransform(rotateX, (v) => v * 1.4 + 8);
   const mx = useMotionTemplate`${useTransform(x, (v) => v * 100)}%`;
@@ -87,7 +89,7 @@ export function useTilt(max = 6) {
   return {
     ref,
     handlers,
-    style: reduce ? {} : { rotateX, rotateY, y: lift, "--mx": mx, "--my": my, "--lit": lit },
+    style: reduce ? {} : { rotateX, rotateY, y: rise, "--mx": mx, "--my": my, "--lit": lit },
     shadowX,
     shadowY,
     reduce: !!reduce,

@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { motion, useReducedMotion } from "framer-motion";
 import { Check, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/contexts/AuthContext";
@@ -10,6 +11,8 @@ import { SUPPORTED_CURRENCIES, toCurrencyCode } from "@/lib/money";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { SAMPLE_FRIENDS, SAMPLE_GROUP_DESCRIPTION, SAMPLE_GROUP_NAME, sampleTripExpenses } from "@/lib/sampleTrip";
 import { cn } from "@/lib/utils";
+import { LitPanel } from "@/components/fx/LitPanel";
+import { glassRow } from "@/components/fx/glass";
 
 const hiddenKey = (uid: string) => `splitwize:checklist-hidden:${uid}`;
 export const sampleKey = (uid: string) => `splitwize:sample-group:${uid}`;
@@ -21,6 +24,31 @@ const read = (key: string) => {
     return null;
   }
 };
+
+/** How many of the three steps are done, as a ring that fills in green. */
+function ProgressRing({ done, of }: { done: number; of: number }) {
+  const reduce = useReducedMotion();
+  const r = 19;
+  const c = 2 * Math.PI * r;
+  return (
+    <svg viewBox="0 0 48 48" className="h-12 w-12 shrink-0 -rotate-90" aria-hidden="true">
+      <circle cx="24" cy="24" r={r} fill="none" stroke="var(--fx-rim)" strokeWidth="5" />
+      <motion.circle
+        cx="24"
+        cy="24"
+        r={r}
+        fill="none"
+        stroke="hsl(var(--settled))"
+        strokeWidth="5"
+        strokeLinecap="round"
+        strokeDasharray={c}
+        initial={reduce ? false : { strokeDashoffset: c }}
+        animate={{ strokeDashoffset: c * (1 - Math.max(done, 0.15) / of) }}
+        transition={{ type: "spring", stiffness: 70, damping: 16, delay: 0.15 }}
+      />
+    </svg>
+  );
+}
 
 /**
  * Three first steps for a new account: create a group, invite someone, add an expense. Each ticks
@@ -132,15 +160,20 @@ export function FirstRunChecklist() {
   };
 
   return (
-    <section aria-labelledby="first-steps-title" className="rounded-xl border p-5 sm:p-6">
+    <LitPanel tone="settled" light="top-left" className="p-5 sm:p-6" aria-labelledby="first-steps-title">
       <div className="flex items-start justify-between gap-3">
-        <div>
-          <h2 id="first-steps-title" className="font-display text-[22px] leading-tight">
-            Get set up
-          </h2>
-          <p className="mt-1 text-sm text-muted-foreground">
-            {doneCount} of 3 done
-          </p>
+        <div className="min-w-0">
+          <div className="flex items-center gap-3">
+            <ProgressRing done={doneCount} of={steps.length} />
+            <div>
+              <h2 id="first-steps-title" className="font-display text-[22px] leading-tight">
+                Get set up
+              </h2>
+              <p className="mt-0.5 text-sm text-muted-foreground">
+                {doneCount} of 3 done
+              </p>
+            </div>
+          </div>
           {/* Guessed from the phone's region when the account was made (see guessCurrency). */}
           {real.length === 0 && userProfile && (
             <div className="mt-2 flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
@@ -165,13 +198,14 @@ export function FirstRunChecklist() {
         </Button>
       </div>
 
-      <ol className="mt-4 space-y-1">
+      <ol className="mt-4 space-y-1.5">
         {steps.map((step, i) => (
-          <li key={step.label} className={cn("flex items-center gap-3 rounded-lg py-2", i === next && "bg-secondary/60 -mx-2 px-2")}>
+          // The next step sits on glass; the others stay flat.
+          <li key={step.label} className={cn("flex items-center gap-3 rounded-xl px-3 py-2.5", i === next ? glassRow : "border border-transparent")}>
             <span
               className={cn(
-                "flex h-6 w-6 shrink-0 items-center justify-center rounded-full border text-xs",
-                step.done ? "border-settled bg-settled/10 text-settled" : "text-muted-foreground"
+                "flex h-7 w-7 shrink-0 items-center justify-center rounded-full border text-xs transition-colors",
+                step.done ? "border-settled bg-settled/10 text-settled" : i === next ? "border-settled/50 text-foreground" : "text-muted-foreground"
               )}
               aria-hidden="true"
             >
@@ -194,7 +228,7 @@ export function FirstRunChecklist() {
       </ol>
 
       {real.length === 0 && (
-        <p className="mt-4 border-t pt-4 text-sm text-muted-foreground">
+        <p className="mt-4 border-t border-[color:var(--fx-rim)] pt-4 text-sm text-muted-foreground">
           Got an invite?{" "}
           <button
             type="button"
@@ -221,6 +255,6 @@ export function FirstRunChecklist() {
           , a made-up group you can delete afterwards.
         </p>
       )}
-    </section>
+    </LitPanel>
   );
 }

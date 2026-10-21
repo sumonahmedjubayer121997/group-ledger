@@ -35,6 +35,48 @@ const rimStyle: CSSProperties = {
   maskComposite: "exclude",
 };
 
+/**
+ * The light on a card: one coloured source, a dot grid, a spot that follows the pointer (--mx/--my)
+ * and brightens with --lit, and the glass edge. Decorative; place it first inside a positioned card.
+ */
+export function CardLight({ tone = "plain", light = "top-right" }: { tone?: CardTone; light?: LightFrom }) {
+  return (
+    <>
+      {/* Clipped to the card (clipping would flatten TiltCard's 3D layers, so the light has its own layer). */}
+      <span
+        aria-hidden="true"
+        className="pointer-events-none absolute inset-0 overflow-hidden rounded-[inherit]"
+        style={{ "--fx-tone": toneGlow[tone] } as CSSProperties}
+      >
+        <span className="absolute inset-0 transition-opacity" style={{ background: source[light], opacity: "calc(0.8 + var(--lit, 0) * 0.2)" }} />
+        <span
+          className="absolute inset-0"
+          style={{
+            backgroundImage: "radial-gradient(var(--fx-dot) 1px, transparent 1px)",
+            backgroundSize: "14px 14px",
+            maskImage: `radial-gradient(70% 70% at ${dotsAt[light]}, #000, transparent 75%)`,
+            WebkitMaskImage: `radial-gradient(70% 70% at ${dotsAt[light]}, #000, transparent 75%)`,
+          }}
+        />
+        <span
+          className="absolute inset-0"
+          style={{
+            background: "radial-gradient(380px circle at var(--mx, 70%) var(--my, 20%), var(--fx-spot), transparent 65%)",
+            opacity: "calc(0.35 + var(--lit, 0) * 0.65)",
+          }}
+        />
+        {light === "top" && (
+          <span
+            className="absolute left-1/2 top-0 h-px w-2/5 -translate-x-1/2"
+            style={{ background: `linear-gradient(90deg, transparent, ${toneLine[tone]}, transparent)` }}
+          />
+        )}
+      </span>
+      <span aria-hidden="true" className="pointer-events-none absolute inset-0 rounded-[inherit]" style={{ ...rimStyle, opacity: "calc(0.3 + var(--lit, 0) * 0.7)" }} />
+    </>
+  );
+}
+
 type TiltCardProps = {
   tone?: CardTone;
   light?: LightFrom;
@@ -72,7 +114,7 @@ export function TiltCard({
   bodyClassName,
 }: TiltCardProps) {
   const { ref, handlers, style, shadowX, shadowY } = useTilt(max);
-  const vars = { "--fx-tone": toneGlow[tone], transformStyle: "preserve-3d" } as CSSProperties;
+  const vars = { transformStyle: "preserve-3d" } as CSSProperties;
   const cardClass = cn(
     "group/fx relative flex h-full touch-pan-y flex-col rounded-2xl border border-[color:var(--fx-rim)] bg-[var(--fx-surface)] text-left",
     "shadow-[inset_0_1px_0_var(--fx-rim-hi)]",
@@ -81,33 +123,7 @@ export function TiltCard({
 
   const inner = (
     <>
-      {/* Light, clipped to the card (clipping would flatten the 3D layers, so they live in their own layer). */}
-      <span aria-hidden="true" className="pointer-events-none absolute inset-0 overflow-hidden rounded-[inherit]">
-        <span className="absolute inset-0 transition-opacity" style={{ background: source[light], opacity: "calc(0.8 + var(--lit, 0) * 0.2)" }} />
-        <span
-          className="absolute inset-0"
-          style={{
-            backgroundImage: "radial-gradient(var(--fx-dot) 1px, transparent 1px)",
-            backgroundSize: "14px 14px",
-            maskImage: `radial-gradient(70% 70% at ${dotsAt[light]}, #000, transparent 75%)`,
-            WebkitMaskImage: `radial-gradient(70% 70% at ${dotsAt[light]}, #000, transparent 75%)`,
-          }}
-        />
-        <span
-          className="absolute inset-0"
-          style={{
-            background: "radial-gradient(380px circle at var(--mx, 70%) var(--my, 20%), var(--fx-spot), transparent 65%)",
-            opacity: "calc(0.35 + var(--lit, 0) * 0.65)",
-          }}
-        />
-        {light === "top" && (
-          <span
-            className="absolute left-1/2 top-0 h-px w-2/5 -translate-x-1/2"
-            style={{ background: `linear-gradient(90deg, transparent, ${toneLine[tone]}, transparent)` }}
-          />
-        )}
-      </span>
-      <span aria-hidden="true" className="pointer-events-none absolute inset-0 rounded-[inherit]" style={{ ...rimStyle, opacity: "calc(0.3 + var(--lit, 0) * 0.7)" }} />
+      <CardLight tone={tone} light={light} />
 
       {art && (
         <div
