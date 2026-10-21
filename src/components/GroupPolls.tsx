@@ -139,7 +139,7 @@ export const GroupPolls: React.FC<GroupPollsProps> = ({ groupId }) => {
   };
 
   return (
-    <Card className="h-full">
+    <Card className="rounded-none border-0 bg-transparent shadow-none h-full">
       <CardHeader className={`${isMobile ? 'p-3' : 'p-4'} border-b`}>
         <div className="flex items-center justify-between">
           <CardTitle className={`${isMobile ? 'text-lg' : 'text-xl'} flex items-center gap-2`}>
