@@ -26,6 +26,7 @@ import { useBudgetStore } from '@/stores/budgetStore';
 import { deleteMyAccount } from '@/services/firebaseService';
 import { popupResolver } from '@/lib/firebaseApp';
 import { Download, Trash2, LogOut, AlertTriangle, Eye, Smartphone } from 'lucide-react';
+import { Link } from "react-router-dom";
 
 interface ProfilePrivacySecurityProps {
   user: User;
@@ -305,6 +306,17 @@ export const ProfilePrivacySecurity: React.FC<ProfilePrivacySecurityProps> = ({ 
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      <p className="text-sm text-muted-foreground">
+        What we keep and who sees it:{" "}
+        <Link to="/privacy" className="rounded-sm font-medium text-foreground underline-offset-4 hover:underline">
+          Privacy
+        </Link>{" "}
+        ·{" "}
+        <Link to="/terms" className="rounded-sm font-medium text-foreground underline-offset-4 hover:underline">
+          Terms
+        </Link>
+      </p>
     </div>
   );
 };

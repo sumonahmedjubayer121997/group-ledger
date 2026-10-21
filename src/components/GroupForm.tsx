@@ -10,7 +10,7 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } f
 import { useAuth } from "@/contexts/AuthContext";
 import { useExpenseStore } from "@/stores/expenseStore";
 import { getUserByEmail } from "@/services/firebaseService";
-import { toast } from "sonner";
+import { toast } from "@/hooks/use-toast";
 import { Plus, X } from "lucide-react";
 import type { Member } from "@/types/index";
 
@@ -113,7 +113,7 @@ export const GroupForm = ({ isOpen, onClose }: GroupFormProps) => {
         user.uid
       );
 
-      toast.success(`Created ${groupName.trim()}`, { description: "Next: invite people or add the first expense." });
+      toast({ title: `Created ${groupName.trim()}`, description: "Next: invite people or add the first expense." });
       setGroupName("");
       setDescription("");
       setPeople([{ name: "", email: "" }]);
@@ -121,7 +121,7 @@ export const GroupForm = ({ isOpen, onClose }: GroupFormProps) => {
       if (groupId) navigate(`/groups/${groupId}`);
     } catch (error) {
       console.error("Error creating group:", error);
-      toast.error("Couldn't create the group", { description: "Please try again." });
+      toast({ title: "Couldn't create the group", description: "Please try again.", variant: "destructive" });
     } finally {
       setIsSubmitting(false);
     }

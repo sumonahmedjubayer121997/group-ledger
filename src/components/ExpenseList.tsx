@@ -20,7 +20,8 @@ import { useCategoryStore } from "@/stores/categoryStore";
 import { useToast } from "@/hooks/use-toast";
 import { useExpenseStore, type Expense } from "@/stores/expenseStore";
 import { expenseShares, formatAmount, formatMoney, makeResolver, toCurrencyCode } from "@/lib/money";
-import { formatCalendarDate, formatDate } from "@/lib/dates";
+import { memberFor } from "@/lib/claims";
+import { expenseMoment, formatCalendarDate, formatDate } from "@/lib/dates";
 import { deferWithUndo, doneWithUndo, useHidden } from "@/lib/undo";
 
 /** Something that happened in a group, shown as a quiet line between the expenses (a payment, an edit…). */
@@ -34,6 +35,8 @@ interface ExpenseListProps {
   showGroup?: boolean;
   pageSize?: number;
   emptyText?: string;
+  /** Shown under the empty text, e.g. an "Add the first expense" button. */
+  emptyAction?: React.ReactNode;
   /** Show checkboxes and a bar to change, export or delete several expenses at once. */
   selecting?: boolean;
   onDoneSelecting?: () => void;
@@ -48,6 +51,7 @@ export function ExpenseList({
   showGroup = false,
   pageSize = 20,
   emptyText = "No expenses yet.",
+  emptyAction,
   selecting = false,
   onDoneSelecting,
 }: ExpenseListProps) {
@@ -94,7 +98,9 @@ export function ExpenseList({
   const sorted = useMemo(
     () =>
       [
-        ...expenses.filter((e) => !hidden.has(`expense-${e.id}`)).map((expense) => ({ kind: "expense" as const, at: new Date(expense.date), expense })),
+        ...expenses
+          .filter((e) => !hidden.has(`expense-${e.id}`))
+          .map((expense) => ({ kind: "expense" as const, at: expenseMoment(expense.date, expense.createdAt), expense })),
         ...events.filter((event) => !hidden.has(event.id)).map((event) => ({ kind: "event" as const, at: event.at, event })),
       ].sort((a, b) => b.at.getTime() - a.at.getTime()),
     [expenses, events, hidden]
@@ -107,11 +113,12 @@ export function ExpenseList({
         const { expense } = item;
         const group = byGroup.get(expense.groupId);
         const currency = toCurrencyCode(group?.settings?.currency);
-        const resolve = makeResolver(group?.members ?? []);
+        const resolve = makeResolver(group?.members ?? [], group?.aliases);
         const me = user ? resolve({ id: user.uid, email: user.email }) : null;
         const share = me ? expenseShares(expense, resolve).get(me) ?? 0 : 0;
+        const youPaid = !!me && resolve(expense.paidBy) === me;
         const role = group?.members.find((m) => m.id === user?.uid)?.role;
-        return { kind: "expense" as const, expense, group, currency, share, canEdit: role === "admin" || role === "member" };
+        return { kind: "expense" as const, expense, group, currency, share, youPaid, canEdit: role === "admin" || role === "member" };
       }),
     [sorted, shown, byGroup, user]
   );
@@ -191,6 +198,7 @@ export function ExpenseList({
       <div className="flex flex-col items-center py-12 text-center">
         <Receipt className="h-8 w-8 text-muted-foreground" aria-hidden="true" />
         <p className="mt-3 text-sm text-muted-foreground">{emptyText}</p>
+        {emptyAction && <div className="mt-4">{emptyAction}</div>}
       </div>
     );
   }
@@ -256,7 +264,7 @@ export function ExpenseList({
               </li>
             );
           }
-          const { expense, group, currency, share, canEdit } = row;
+          const { expense, group, currency, share, youPaid, canEdit } = row;
           return (
           <li key={expense.id} className="flex items-center gap-3 py-3">
             {selecting && (
@@ -271,16 +279,18 @@ export function ExpenseList({
               <p className="truncate font-medium">{expense.description || "Expense"}</p>
               <p className="truncate text-xs text-muted-foreground">
                 {showGroup && group ? `${group.name} · ` : ""}
-                {expense.paidBy?.id === user?.uid ? "You" : expense.paidBy?.name ?? "Someone"} paid ·{" "}
+                {youPaid ? "You" : memberFor(group, expense.paidBy).name || "Someone"} paid ·{" "}
                 <time dateTime={new Date(expense.date).toISOString()} title={formatCalendarDate(expense.date)}>
                   {formatDate(expense.date)}
                 </time>
                 {!canEdit && expense.category ? ` · ${expense.category}` : ""}
               </p>
+              {/* Your share sits on this line, so the amount column stays narrow and descriptions fit. */}
+              <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1">
               {canEdit && (
                 <DropdownMenu>
                   <DropdownMenuTrigger
-                    className="mt-1 inline-flex h-6 items-center gap-1 rounded-full border px-2 text-xs text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                    className="inline-flex h-6 items-center gap-1 rounded-full border px-2 text-xs text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                     aria-label={`Category: ${expense.category || "none"}. Change`}
                   >
                     {expense.category || "No category"}
@@ -297,13 +307,12 @@ export function ExpenseList({
                   </DropdownMenuContent>
                 </DropdownMenu>
               )}
+                <span className="money text-xs text-muted-foreground">
+                  {share > 0 ? `your share ${formatMoney(share, currency)}` : "not involved"}
+                </span>
+              </div>
             </div>
-            <div className="shrink-0 text-right">
-              <p className="money font-medium">{formatAmount(expense.amount, currency)}</p>
-              <p className="money text-xs text-muted-foreground">
-                {share > 0 ? `your share ${formatMoney(share, currency)}` : "not involved"}
-              </p>
-            </div>
+            <p className="money shrink-0 self-start pt-0.5 text-right font-medium">{formatAmount(expense.amount, currency)}</p>
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <Button variant="ghost" size="icon" className="h-8 w-8 shrink-0" aria-label={`More for ${expense.description || "expense"}`}>

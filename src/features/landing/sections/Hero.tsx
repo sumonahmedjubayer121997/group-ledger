@@ -1,5 +1,5 @@
 import { motion, useReducedMotion } from "framer-motion";
-import { HeroScene } from "../three/HeroScene";
+import { HeroCards } from "../hero/HeroCards";
 import { EASE_OUT, Eyebrow, PrimaryButton, container, textLink } from "../ui";
 
 const words: { text: string; italic?: boolean; breakAfter?: boolean }[] = [
@@ -48,8 +48,8 @@ export function Hero({ onGetStarted }: { onGetStarted: () => void }) {
         <p className="mt-6 text-[13px] text-lp-muted">No card needed. Works in your browser.</p>
       </div>
 
-      <div className="md:col-span-6 lg:col-span-6 lg:col-start-7">
-        <HeroScene />
+      <div className="min-w-0 md:col-span-6 lg:col-span-6 lg:col-start-7">
+        <HeroCards />
       </div>
     </section>
   );

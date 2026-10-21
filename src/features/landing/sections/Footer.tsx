@@ -1,3 +1,4 @@
+import { Link } from "react-router-dom";
 import { container } from "../ui";
 import { Wordmark } from "./Nav";
 
@@ -43,7 +44,15 @@ export function Footer({ onGetStarted }: { onGetStarted: () => void }) {
         </nav>
       </div>
       <div className={`${container} border-t border-lp-rule py-6 text-[13px] text-lp-muted`}>
-        © {new Date().getFullYear()} SplitWize · Made by{" "}
+        © {new Date().getFullYear()} SplitWize ·{" "}
+        <Link to="/privacy" className={`${linkClass} text-[13px] underline-offset-4 hover:underline`}>
+          Privacy
+        </Link>{" "}
+        ·{" "}
+        <Link to="/terms" className={`${linkClass} text-[13px] underline-offset-4 hover:underline`}>
+          Terms
+        </Link>{" "}
+        · Made by{" "}
         <a href="https://sumonahmed.info" target="_blank" rel="noopener noreferrer" className={`${linkClass} text-[13px] underline-offset-4 hover:underline`}>
           Sumon Ahmed
         </a>

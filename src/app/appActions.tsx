@@ -6,6 +6,7 @@ import { InstallAppDialog } from "@/components/InstallAppDialog";
 import { promptInstall, useInstallState, type InstallState } from "@/lib/install";
 import { SettlementDialog } from "@/components/SettlementDialog";
 import type { DebtView } from "@/stores/useLedger";
+import { useExpenseStore } from "@/stores/expenseStore";
 
 type AppActions = {
   /** Opens quick add, pre-selecting `groupId` (or the group page you're on); `prefill` repeats an expense. */
@@ -35,11 +36,15 @@ export function AppActionsProvider({ children }: { children: ReactNode }) {
   const installState = useInstallState();
   const [settling, setSettling] = useState<DebtView | null>(null);
   const [currentGroup, setCurrentGroup] = useState<string | null>(null);
+  // With no group yet, "Add expense" would be a dead end ("Pick a group first"), so it starts one instead.
+  const noGroups = useExpenseStore((s) => s.groupsLoaded && !s.groups.some((g) => !g.isArchived));
 
   const value = useMemo<AppActions>(
     () => ({
       openAddExpense: (groupId, source, prefill) =>
-        setExpense((prev) => ({ open: true, groupId: groupId ?? currentGroup ?? undefined, source, prefill, n: prev.n + 1 })),
+        noGroups
+          ? setGroupOpen(true)
+          : setExpense((prev) => ({ open: true, groupId: groupId ?? currentGroup ?? undefined, source, prefill, n: prev.n + 1 })),
       openNewGroup: () => setGroupOpen(true),
       openJoinGroup: () => setJoinOpen(true),
       installState,
@@ -47,7 +52,7 @@ export function AppActionsProvider({ children }: { children: ReactNode }) {
       openSettle: setSettling,
       setCurrentGroup,
     }),
-    [currentGroup, installState]
+    [currentGroup, installState, noGroups]
   );
 
   return (

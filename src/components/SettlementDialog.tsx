@@ -1,4 +1,5 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
+import { addDays } from 'date-fns';
 import { v4 as uuidv4 } from 'uuid';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
@@ -12,6 +13,9 @@ import { formatMoney, toCents, toCurrencyCode } from '@/lib/money';
 import { doneWithUndo } from '@/lib/undo';
 import { track } from '@/lib/usage';
 import { cn } from '@/lib/utils';
+import { lastMethod, methodsFor, rememberMethod } from '@/lib/paymentMethods';
+import { formatCalendarDate } from '@/lib/dates';
+import { REMINDER_GAP_DAYS, lastReminder, sendReminder } from '@/services/reminders';
 
 interface SettlementDialogProps {
   isOpen: boolean;
@@ -23,13 +27,6 @@ interface SettlementDialogProps {
   groupId: string;
 }
 
-const methods = [
-  { value: 'cash', label: 'Cash' },
-  { value: 'bank_transfer', label: 'Bank transfer' },
-  { value: 'paypal', label: 'PayPal' },
-  { value: 'other', label: 'Other' },
-];
-const METHOD_KEY = 'splitwize:last-payment-method';
 const first = (name: string) => name.trim().split(/\s+/)[0] || name;
 
 /** "Mark as paid": the full amount and your usual method are filled in, so it's one more tap. */
@@ -41,11 +38,46 @@ export const SettlementDialog: React.FC<SettlementDialogProps> = ({ isOpen, onCl
   const code = toCurrencyCode(currency);
   const owed = toCents(amount);
   const [paid, setPaid] = useState((owed / 100).toFixed(2));
-  const [method, setMethod] = useState(() => localStorage.getItem(METHOD_KEY) || 'cash');
+  // bKash and Nagad for taka, Venmo and Zelle for dollars, and so on; the last one used comes first.
+  const methods = methodsFor(code);
+  const [method, setMethod] = useState(() => lastMethod(code));
   const [noteOpen, setNoteOpen] = useState(false);
   const [notes, setNotes] = useState('');
   const [error, setError] = useState('');
   const [saving, setSaving] = useState(false);
+
+  // Polite reminders: when you're the one owed, you can remind them once a week (see reminders.ts).
+  const group = useExpenseStore((s) => s.groups.find((g) => g.id === groupId));
+  const debtorHasAccount = !!group?.members.find((m) => m.id === fromMember.id && !m.isTemporary);
+  const canRemind = !!user && toMember.id === user.uid && debtorHasAccount;
+  const [reminded, setReminded] = useState<Date | null>(null);
+  const [reminding, setReminding] = useState(false);
+  useEffect(() => {
+    if (isOpen && canRemind && user) void lastReminder(groupId, user.uid, fromMember.id).then(setReminded);
+  }, [isOpen, canRemind, user, groupId, fromMember.id]);
+  const nextReminder = reminded ? addDays(reminded, REMINDER_GAP_DAYS) : null;
+  const remindLater = !!nextReminder && nextReminder > new Date();
+
+  const remind = async () => {
+    if (!user || !group || reminding) return;
+    setReminding(true);
+    const me = first(group.members.find((m) => m.id === user.uid)?.name ?? 'Someone');
+    try {
+      await sendReminder({
+        groupId,
+        from: user.uid,
+        to: fromMember.id,
+        title: `Reminder from ${me}`,
+        message: `You owe ${me} ${formatMoney(owed, code)} in ${group.name}. Tap to settle up.`,
+      });
+      setReminded(new Date());
+      toast({ title: `Reminder sent to ${first(fromMember.name)}`, description: `You can send another in ${REMINDER_GAP_DAYS} days.` });
+    } catch {
+      toast({ title: "Couldn't send the reminder", description: 'You can send one a week. Please try again later.', variant: 'destructive' });
+    } finally {
+      setReminding(false);
+    }
+  };
 
   const who = (m: Member) => (m.id === user?.uid ? 'you' : first(m.name));
   const sentence = `${who(fromMember) === 'you' ? 'You' : who(fromMember)} paid ${who(toMember)}`;
@@ -63,13 +95,13 @@ export const SettlementDialog: React.FC<SettlementDialogProps> = ({ isOpen, onCl
         groupId,
         user.uid
       );
-      localStorage.setItem(METHOD_KEY, method);
+      rememberMethod(code, method);
       track('payment_confirmed', { source: cents < owed ? 'partial' : 'full' });
       onClose();
       doneWithUndo({
         title: 'Marked as paid',
         description: `${sentence} ${formatMoney(cents, code)}.`,
-        undo: () => removeSettlement(created.id),
+        undo: () => removeSettlement(created.id, { undo: true }),
       });
     } catch {
       toast({ title: "Couldn't record the payment", description: 'Please try again.', variant: 'destructive' });
@@ -141,6 +173,28 @@ export const SettlementDialog: React.FC<SettlementDialogProps> = ({ isOpen, onCl
             <button type="button" onClick={() => setNoteOpen(true)} className="rounded-sm text-sm text-muted-foreground underline-offset-4 hover:text-foreground hover:underline">
               Add a note
             </button>
+          )}
+          {canRemind && (
+            <p className="border-t pt-3 text-sm text-muted-foreground">
+              {remindLater ? (
+                <>
+                  You reminded {first(fromMember.name)} on {formatCalendarDate(reminded)}. You can send another from{' '}
+                  {formatCalendarDate(nextReminder)}.
+                </>
+              ) : (
+                <>
+                  Not paid yet?{' '}
+                  <button
+                    type="button"
+                    onClick={() => void remind()}
+                    disabled={reminding}
+                    className="rounded-sm font-medium text-foreground underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-60"
+                  >
+                    {reminding ? 'Sending…' : `Send ${first(fromMember.name)} a reminder`}
+                  </button>
+                </>
+              )}
+            </p>
           )}
           <DialogFooter className="gap-2 sm:gap-0">
             <Button type="button" variant="outline" onClick={onClose}>

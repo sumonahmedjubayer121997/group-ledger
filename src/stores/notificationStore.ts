@@ -2,12 +2,17 @@ import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import { Notification, NotificationType, NotificationPreferences } from '@/types/notifications';
 import { FirebaseNotification, notificationFirebaseService } from '@/services/notificationFirebaseService';
-import { useAuth } from '@/contexts/AuthContext';
 
 interface NotificationStore {
   notifications: Notification[];
   preferences: NotificationPreferences;
   unreadCount: number;
+  /** Groups whose notifications you don't want to see (synced through your private settings). */
+  mutedGroups: string[];
+  /** The weekly "where you stand" summary is on (see useWeeklySummary). */
+  weeklySummary: boolean;
+  /** Your settings doc has loaded, so the two above are yours and not defaults. */
+  settingsLoaded: boolean;
   isListening: boolean;
   unsubscribe: (() => void) | null;
   
@@ -16,7 +21,9 @@ interface NotificationStore {
   markAsRead: (id: string) => void;
   markAllAsRead: (userId?: string) => void;
   removeNotification: (id: string) => void;
-  clearAllNotifications: () => void;
+  clearAllNotifications: (userId?: string) => void;
+  setGroupMuted: (userId: string, groupId: string, muted: boolean) => Promise<void>;
+  setWeeklySummary: (userId: string, on: boolean) => Promise<void>;
   updatePreferences: (preferences: Partial<NotificationPreferences>) => void;
   
   // Firebase actions
@@ -42,6 +49,9 @@ export const useNotificationStore = create<NotificationStore>()(
       notifications: [],
       preferences: defaultPreferences,
       unreadCount: 0,
+      mutedGroups: [],
+      weeklySummary: true,
+      settingsLoaded: false,
       isListening: false,
       unsubscribe: null,
 
@@ -102,6 +112,8 @@ export const useNotificationStore = create<NotificationStore>()(
       },
 
       removeNotification: (id) => {
+        // Deleted in Firestore too, or the next sync would bring it back.
+        void notificationFirebaseService.deleteNotifications([id]);
         set((state) => {
           const updatedNotifications = state.notifications.filter(n => n.id !== id);
           const unreadCount = updatedNotifications.filter(n => !n.read).length;
@@ -113,11 +125,24 @@ export const useNotificationStore = create<NotificationStore>()(
         });
       },
 
-      clearAllNotifications: () => {
+      clearAllNotifications: (userId) => {
+        if (userId) void notificationFirebaseService.clearAll(userId).catch((error) => console.error('Error clearing notifications:', error));
         set({
           notifications: [],
           unreadCount: 0,
         });
+      },
+
+      setGroupMuted: async (userId, groupId, muted) => {
+        set((state) => ({
+          mutedGroups: muted ? [...new Set([...state.mutedGroups, groupId])] : state.mutedGroups.filter((id) => id !== groupId),
+        }));
+        await notificationFirebaseService.setGroupMuted(userId, groupId, muted);
+      },
+
+      setWeeklySummary: async (userId, on) => {
+        set({ weeklySummary: on });
+        await notificationFirebaseService.setWeeklySummary(userId, on);
       },
 
       updatePreferences: (newPreferences) => {
@@ -133,16 +158,22 @@ export const useNotificationStore = create<NotificationStore>()(
           return; // Already listening
         }
 
-        const unsubscribeFn = notificationFirebaseService.subscribeToUserNotifications(
+        const stopNotifications = notificationFirebaseService.subscribeToUserNotifications(
           userId,
           (firebaseNotifications) => {
             get().setNotifications(firebaseNotifications);
           }
         );
+        const stopMuted = notificationFirebaseService.subscribeToSettings(userId, ({ mutedGroups, weeklySummary }) =>
+          set({ mutedGroups, weeklySummary, settingsLoaded: true })
+        );
 
         set({
           isListening: true,
-          unsubscribe: unsubscribeFn,
+          unsubscribe: () => {
+            stopNotifications();
+            stopMuted();
+          },
         });
       },
 
@@ -153,9 +184,14 @@ export const useNotificationStore = create<NotificationStore>()(
           unsubscribe();
         }
 
+        // Nothing of the previous account stays on screen.
         set({
           isListening: false,
           unsubscribe: null,
+          notifications: [],
+          unreadCount: 0,
+          mutedGroups: [],
+          settingsLoaded: false,
         });
       },
 
@@ -196,6 +232,8 @@ export const useNotificationStore = create<NotificationStore>()(
     }),
     {
       name: 'notification-store',
+      // Only the switches stay on the device; notifications and muted groups come from Firestore.
+      partialize: (state) => ({ preferences: state.preferences }),
     }
   )
 );

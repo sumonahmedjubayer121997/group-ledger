@@ -15,6 +15,34 @@ export function toDate(value: DateLike): Date | null {
 }
 
 /**
+ * When an expense happened, for sorting. Its date has no time of day (forms save noon), so one
+ * dated the day it was added sorts by when it was added: the one you just added is on top. One
+ * added later for an earlier day keeps its date. Not saved yet (no `createdAt`) counts as now.
+ */
+export function expenseMoment(date: DateLike, createdAt: DateLike, now: Date = new Date()): Date {
+  const day = toDate(date) ?? new Date(0);
+  const added = createdAt === null ? now : toDate(createdAt);
+  return added && day.toDateString() === added.toDateString() ? added : day;
+}
+
+/** How long a debt has been open: "new today", "open 5 days", "open since 3 Oct". */
+export function debtAge(since: DateLike, now: Date = new Date()): string {
+  const date = toDate(since);
+  if (!date) return "";
+  const days = differenceInCalendarDays(now, date);
+  if (days <= 0) return "new today";
+  if (days === 1) return "open since yesterday";
+  if (days < 14) return `open ${days} days`;
+  return `open since ${format(date, date.getFullYear() === now.getFullYear() ? "d MMM" : "d MMM yyyy")}`;
+}
+
+/** Old enough to deserve a nudge (a month or more). */
+export const isOldDebt = (since: DateLike, now: Date = new Date()) => {
+  const date = toDate(since);
+  return !!date && differenceInCalendarDays(now, date) >= 30;
+};
+
+/**
  * The one way the app shows a date: "Today", "Yesterday" or "3 days ago" within the last week,
  * otherwise "13 Sep 2026".
  */

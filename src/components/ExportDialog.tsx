@@ -8,6 +8,7 @@ import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { useExpenseStore, Expense, Group } from '@/stores/expenseStore';
 import { useAuth } from '@/contexts/AuthContext';
 import { expenseShares, formatTotals, fromCents, makeResolver, toCents, toCurrencyCode } from '@/lib/money';
+import { memberFor } from '@/lib/claims';
 import { Download, FileText, FileSpreadsheet } from 'lucide-react';
 import { format, startOfMonth, startOfYear, subDays } from 'date-fns';
 import { useToast } from '@/hooks/use-toast';
@@ -116,7 +117,7 @@ export const ExportDialog: React.FC<ExportDialogProps> = ({ children, groupId, o
       })
       .map((e) => {
         const group = groupsById.get(e.groupId)!;
-        const resolve = makeResolver(group.members);
+        const resolve = makeResolver(group.members, group.aliases);
         const me = user ? resolve({ id: user.uid, email: user.email }) : null;
         return {
           date: new Date(e.date),
@@ -125,7 +126,7 @@ export const ExportDialog: React.FC<ExportDialogProps> = ({ children, groupId, o
           category: e.category || '',
           amountCents: toCents(e.amount),
           currency: toCurrencyCode(group.settings?.currency),
-          paidBy: e.paidBy?.name ?? '',
+          paidBy: memberFor(group, e.paidBy).name,
           splitBetween: (e.splitAmong ?? []).map((m) => m.name).join('; '),
           yourShareCents: me ? expenseShares(e, resolve).get(me) ?? 0 : 0,
         };

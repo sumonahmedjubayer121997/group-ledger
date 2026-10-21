@@ -6,7 +6,8 @@ import { useAuth } from "@/contexts/AuthContext";
 import { useAppActions } from "@/app/appActions";
 import { useExpenseStore, type Member } from "@/stores/expenseStore";
 import { useToast } from "@/hooks/use-toast";
-import { toCurrencyCode } from "@/lib/money";
+import { SUPPORTED_CURRENCIES, toCurrencyCode } from "@/lib/money";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { SAMPLE_FRIENDS, SAMPLE_GROUP_DESCRIPTION, SAMPLE_GROUP_NAME, sampleTripExpenses } from "@/lib/sampleTrip";
 import { cn } from "@/lib/utils";
 
@@ -27,7 +28,7 @@ const read = (key: string) => {
  * when all three are done or you hide it.
  */
 export function FirstRunChecklist() {
-  const { user, userProfile } = useAuth();
+  const { user, userProfile, updateUserProfile } = useAuth();
   const { openAddExpense, openNewGroup, openJoinGroup } = useAppActions();
   const groups = useExpenseStore((s) => s.groups);
   const expenses = useExpenseStore((s) => s.expenses);
@@ -37,6 +38,15 @@ export function FirstRunChecklist() {
   const { toast } = useToast();
   const [hidden, setHidden] = useState(() => (user ? read(hiddenKey(user.uid)) === "1" : false));
   const [makingSample, setMakingSample] = useState(false);
+  const currency = toCurrencyCode(userProfile?.preferences?.currency);
+  const saveCurrency = async (value: string) => {
+    if (!userProfile || value === currency) return;
+    try {
+      await updateUserProfile({ preferences: { ...userProfile.preferences, currency: value } });
+    } catch {
+      toast({ title: "Couldn't save the currency", description: "Please try again.", variant: "destructive" });
+    }
+  };
 
   if (!user || hidden) return null;
   const sampleId = read(sampleKey(user.uid));
@@ -131,6 +141,24 @@ export function FirstRunChecklist() {
           <p className="mt-1 text-sm text-muted-foreground">
             {doneCount} of 3 done
           </p>
+          {/* Guessed from the phone's region when the account was made (see guessCurrency). */}
+          {real.length === 0 && userProfile && (
+            <div className="mt-2 flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
+              <span id="checklist-currency">New groups start in</span>
+              <Select value={currency} onValueChange={saveCurrency}>
+                <SelectTrigger className="h-8 w-auto gap-1 px-2 text-foreground" aria-labelledby="checklist-currency">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {SUPPORTED_CURRENCIES.map((c) => (
+                    <SelectItem key={c.code} value={c.code}>
+                      {c.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          )}
         </div>
         <Button variant="ghost" size="icon" className="-mr-2 -mt-2 text-muted-foreground" onClick={hide} aria-label="Hide these steps">
           <X aria-hidden="true" />

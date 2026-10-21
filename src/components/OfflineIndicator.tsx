@@ -4,7 +4,7 @@ import { useOnlineStatus } from '@/hooks/useOnlineStatus';
 import { useOfflineStore } from '@/stores/offlineStore';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { toast } from 'sonner';
+import { toast } from "@/hooks/use-toast";
 
 export const OfflineIndicator = () => {
   const isOnline = useOnlineStatus();
@@ -18,9 +18,9 @@ export const OfflineIndicator = () => {
 
   const handleManualSync = async () => {
     if (isOnline && queueCount > 0) {
-      toast.info('Syncing offline changes...');
+      toast({ title: 'Syncing your offline changes…' });
       await syncPendingActions();
-      toast.success('Sync completed!');
+      toast({ title: 'All changes synced' });
     }
   };
 

@@ -72,7 +72,7 @@ export const ProfileAccountSettings: React.FC<ProfileAccountSettingsProps> = ({ 
   const handleUpdatePassword = async () => {
     const problems: typeof pwErrors = {};
     if (!currentPassword) problems.current = 'Enter your current password.';
-    if (newPassword.length < 6) problems.next = 'Use at least 6 characters.';
+    if (newPassword.length < 8) problems.next = 'Use 8 or more characters.';
     else if (newPassword !== confirmPassword) problems.confirm = "This doesn't match the new password.";
     setPwErrors(problems);
     if (problems.current || problems.next || problems.confirm) return;
@@ -220,7 +220,7 @@ export const ProfileAccountSettings: React.FC<ProfileAccountSettingsProps> = ({ 
           </div>
           
           <div className="space-y-2">
-            <Label className="text-sm">Profile Photo</Label>
+            <Label className="text-sm">Profile photo</Label>
             <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4">
               <div className="text-sm text-muted-foreground">
                 Upload a custom photo or choose from our collection

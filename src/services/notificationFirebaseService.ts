@@ -9,14 +9,36 @@ import {
   doc, 
   writeBatch,
   Timestamp,
-  getDocs
+  getDocs,
+  deleteDoc,
+  setDoc,
+  arrayUnion,
+  arrayRemove,
+  getDoc,
+  runTransaction,
 } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 
 export interface FirebaseNotification {
   id?: string;
   to: string; // uid of the user receiving the notification
-  type: 'expense' | 'group-invite' | 'chat' | 'task' | 'poll' | 'member-joined' | 'member-left';
+  /** Who sent it; they may take it back (an Undo right after recording a payment). */
+  from?: string;
+  type:
+    | 'expense'
+    | 'expense_added'
+    | 'expense_edited'
+    | 'expense_deleted'
+    | 'settlement_made'
+    | 'settlement_removed'
+    | 'payment_reminder'
+    | 'weekly_summary'
+    | 'group-invite'
+    | 'chat'
+    | 'task'
+    | 'poll'
+    | 'member-joined'
+    | 'member-left';
   title: string;
   message: string;
   groupId?: string;
@@ -74,6 +96,65 @@ export class NotificationFirebaseService {
       });
       callback(notifications);
     });
+  }
+
+  /** Sends one notification and never throws: a failed notification mustn't fail the change it's about. */
+  async send(notification: Omit<FirebaseNotification, 'id' | 'createdAt' | 'isRead'>): Promise<string | null> {
+    try {
+      return await this.createNotification({ ...notification, isRead: false });
+    } catch {
+      return null;
+    }
+  }
+
+  /** Removes notifications: your own, or ones you sent (see `from`). */
+  async deleteNotifications(ids: string[]) {
+    await Promise.all(ids.map((id) => deleteDoc(doc(db, 'notifications', id)).catch(() => undefined)));
+  }
+
+  /** Clears everything sent to you, for good (clearing only on screen brought it all back on the next sync). */
+  async clearAll(userId: string) {
+    const snapshot = await getDocs(query(collection(db, 'notifications'), where('to', '==', userId)));
+    for (let i = 0; i < snapshot.docs.length; i += 400) {
+      const batch = writeBatch(db);
+      for (const d of snapshot.docs.slice(i, i + 400)) batch.delete(d.ref);
+      await batch.commit();
+    }
+  }
+
+  /**
+   * Your notification settings, kept in a private doc so they follow you to every device: groups
+   * you muted, and whether you want the weekly summary (on unless switched off).
+   */
+  subscribeToSettings(userId: string, callback: (settings: { mutedGroups: string[]; weeklySummary: boolean }) => void) {
+    return onSnapshot(
+      doc(db, 'users', userId, 'settings', 'notifications'),
+      (snap) => callback({ mutedGroups: (snap.data()?.mutedGroups as string[] | undefined) ?? [], weeklySummary: snap.data()?.weeklySummary !== false }),
+      () => callback({ mutedGroups: [], weeklySummary: true })
+    );
+  }
+
+  async setWeeklySummary(userId: string, on: boolean) {
+    await setDoc(doc(db, 'users', userId, 'settings', 'notifications'), { weeklySummary: on }, { merge: true });
+  }
+
+  /** Marks this week's summary as sent; false when another device of yours already sent it. */
+  async claimSummaryWeek(userId: string, week: string): Promise<boolean> {
+    const ref = doc(db, 'users', userId, 'settings', 'notifications');
+    return runTransaction(db, async (tx) => {
+      const snap = await tx.get(ref);
+      if (snap.data()?.lastSummaryWeek === week) return false;
+      tx.set(ref, { lastSummaryWeek: week }, { merge: true });
+      return true;
+    });
+  }
+
+  async setGroupMuted(userId: string, groupId: string, muted: boolean) {
+    await setDoc(
+      doc(db, 'users', userId, 'settings', 'notifications'),
+      { mutedGroups: muted ? arrayUnion(groupId) : arrayRemove(groupId) },
+      { merge: true }
+    );
   }
 
   // Mark a notification as read

@@ -1,7 +1,6 @@
 import { lazy, Suspense, type ReactNode } from "react";
 import { BrowserRouter, useLocation } from "react-router-dom";
 import { Toaster } from "@/components/ui/toaster";
-import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { AuthProvider, useAuth } from "@/contexts/AuthContext";
 import { ThemeProvider } from "@/components/theme-provider";
@@ -37,7 +36,6 @@ const App = () => (
       <AuthProvider>
         <TooltipProvider>
           <Toaster />
-          <Sonner />
           <Suspense fallback={null}>
             <PwaUpdatePrompt />
           </Suspense>

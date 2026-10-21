@@ -20,6 +20,7 @@ import {
   setDoc,
   updateDoc,
   where,
+  writeBatch,
 } from "firebase/firestore";
 
 // Fake accounts. `token` mirrors what Firebase Auth puts in request.auth.token.
@@ -179,6 +180,49 @@ describe("leaving when deleting an account", () => {
   });
 });
 
+describe("claiming a name when joining", () => {
+  const claim = (key: string, uid: string) => [new FieldPath("users", key, "claimedBy"), uid, "lastClaim", key] as const;
+
+  beforeEach(async () => {
+    await env.withSecurityRulesDisabled(async (ctx) => {
+      await setDoc(doc(ctx.firestore(), "groups/trip"), {
+        name: "Trip",
+        createdBy: "alice",
+        users: {
+          alice: { name: "Alice", email: "alice@example.com", role: "admin" },
+          bob: { name: "Bob", email: "bob@example.com", role: "member" },
+          rahim: { name: "Rahim", email: "", role: "member", isTemporary: true },
+          karim: { name: "Karim", email: "", role: "member", isTemporary: true, claimedBy: "alice" },
+          emailed: { name: "Emailed", email: "emailed@example.com", role: "member", isTemporary: true },
+          gone: { name: "Gone (left)", email: "", role: "member", isTemporary: true },
+          gone2: { name: "Gone", email: "", role: "member", isTemporary: true, left: true },
+        },
+      });
+    });
+  });
+
+  it("lets a member claim an unclaimed name for themselves", async () => {
+    const [field, value, ...rest] = claim("rahim", "bob");
+    await assertSucceeds(updateDoc(doc(as(BOB), "groups/trip"), field, value, ...rest));
+  });
+
+  it("refuses claims for someone else, by outsiders, or that change anything else", async () => {
+    const [field, , ...rest] = claim("rahim", "bob");
+    await assertFails(updateDoc(doc(as(BOB), "groups/trip"), field, "alice", ...rest));
+    await assertFails(updateDoc(doc(as(CAROL), "groups/trip"), field, "carol", ...rest));
+    await assertFails(updateDoc(doc(as(BOB), "groups/trip"), field, "bob", "lastClaim", "karim"));
+    await assertFails(updateDoc(doc(as(BOB), "groups/trip"), field, "bob", ...rest, "name", "Renamed"));
+    await assertFails(updateDoc(doc(as(BOB), "groups/trip"), field, "bob", ...rest, new FieldPath("users", "rahim", "role"), "admin"));
+  });
+
+  it("refuses names already claimed, with an email, or left by a deleted account", async () => {
+    for (const key of ["karim", "emailed", "gone", "gone2"]) {
+      const [field, value, ...rest] = claim(key, "bob");
+      await assertFails(updateDoc(doc(as(BOB), "groups/trip"), field, value, ...rest));
+    }
+  });
+});
+
 describe("group contents (expenses, chat, budgets, members)", () => {
   it("lets members read and write, viewers only read, outsiders nothing", async () => {
     await assertSucceeds(getDoc(doc(as(BOB), "groups/g1/expenses/e1")));
@@ -216,6 +260,55 @@ describe("notifications", () => {
     await assertSucceeds(updateDoc(doc(as(BOB), "notifications/n1"), { isRead: true }));
     await assertFails(updateDoc(doc(as(BOB), "notifications/n1"), { title: "Changed" }));
     await assertSucceeds(setDoc(doc(as(ALICE), "notifications/n2"), { to: "bob", title: "Hi", isRead: false }));
+  });
+
+  it("lets senders sign only as themselves and take back what they sent", async () => {
+    await assertSucceeds(setDoc(doc(as(ALICE), "notifications/n3"), { to: "bob", from: "alice", title: "Paid", isRead: false }));
+    await assertFails(setDoc(doc(as(ALICE), "notifications/n4"), { to: "bob", from: "vic", title: "Paid", isRead: false }));
+    await assertFails(deleteDoc(doc(as(VIC), "notifications/n3")));
+    await assertSucceeds(deleteDoc(doc(as(ALICE), "notifications/n3")));
+    await assertSucceeds(deleteDoc(doc(as(BOB), "notifications/n1")));
+  });
+});
+
+describe("polite reminders", () => {
+  const remind = (who: typeof ALICE, to = "bob", group = "g1") => {
+    const db = as(who);
+    const batch = writeBatch(db);
+    batch.set(doc(db, `nudges/${group}_${who.uid}_${to}`), { groupId: group, from: who.uid, to, at: serverTimestamp() });
+    batch.set(doc(collection(db, "notifications")), { to, from: who.uid, type: "payment_reminder", groupId: group, title: "Reminder", isRead: false });
+    return batch.commit();
+  };
+
+  it("lets a member remind another member once a week", async () => {
+    await assertSucceeds(remind(ALICE));
+    await assertFails(remind(ALICE));
+    await env.withSecurityRulesDisabled(async (ctx) => {
+      await setDoc(doc(ctx.firestore(), "nudges/g1_alice_bob"), {
+        groupId: "g1",
+        from: "alice",
+        to: "bob",
+        at: new Date(Date.now() - 8 * 24 * 60 * 60 * 1000),
+      });
+    });
+    await assertSucceeds(remind(ALICE));
+  });
+
+  it("refuses reminders without a nudge, to outsiders, or from outsiders", async () => {
+    await assertFails(
+      setDoc(doc(as(ALICE), "notifications/sneaky"), { to: "bob", from: "alice", type: "payment_reminder", groupId: "g1", title: "Pay up", isRead: false })
+    );
+    await assertFails(remind(ALICE, "carol"));
+    await assertFails(remind(CAROL, "alice"));
+  });
+});
+
+describe("private settings", () => {
+  it("are read and written only by their owner", async () => {
+    await assertSucceeds(setDoc(doc(as(BOB), "users/bob/settings/notifications"), { mutedGroups: ["g1"] }));
+    await assertSucceeds(getDoc(doc(as(BOB), "users/bob/settings/notifications")));
+    await assertFails(getDoc(doc(as(ALICE), "users/bob/settings/notifications")));
+    await assertFails(setDoc(doc(as(ALICE), "users/bob/settings/notifications"), { mutedGroups: [] }));
   });
 });
 

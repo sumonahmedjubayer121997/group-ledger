@@ -56,6 +56,8 @@ export interface Member {
   photoURL?: string;
   role?: 'admin' | 'member' | 'viewer';
   joinedAt?: Date;
+  /** Added by name or email and hasn't signed in to the group yet. */
+  isTemporary?: boolean;
 }
 
 export interface GroupSettings {
@@ -70,6 +72,8 @@ export interface Group {
   name: string;
   description: string;
   members: Member[];
+  /** Names that someone claimed when they joined: placeholder id -> the claimer's id. */
+  aliases?: Record<string, string>;
   createdAt: Date;
   createdBy: string;
   photo: string;
