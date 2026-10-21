@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, type KeyboardEvent, type ReactNode } from "react";
-import { AnimatePresence, motion, useReducedMotion, type PanInfo } from "framer-motion";
+import { AnimatePresence, motion, useReducedMotion, useSpring, useTransform, type PanInfo } from "framer-motion";
 import { Check, HandCoins, RotateCcw, Waypoints } from "lucide-react";
 import { TiltCard } from "@/components/fx/TiltCard";
 import { cn } from "@/lib/utils";
@@ -76,7 +76,7 @@ function DebtWebArt({ stage }: { stage: Stage }) {
           return (
             <g key={p.id}>
               <circle cx={p.x} cy={p.y + 3} r={20} fill="var(--fx-shadow)" opacity={0.5} />
-              <motion.circle cx={p.x} cy={p.y} r={19} animate={{ fill }} transition={{ duration: 0.4 }} stroke={owed ? "var(--lp-settled)" : "var(--fx-rim)"} strokeWidth={owed ? 2.5 : 1} />
+              <motion.circle cx={p.x} cy={p.y} r={19} initial={false} animate={{ fill }} transition={{ duration: 0.4 }} stroke={owed ? "var(--lp-settled)" : "var(--fx-rim)"} strokeWidth={owed ? 2.5 : 1} />
               <text x={p.x} y={p.y + 4.5} textAnchor="middle" fontSize="13" fontWeight={600} fill={owed && stage !== "settled" ? "var(--lp-ink)" : "#fff"}>
                 {p.name[0]}
               </text>
@@ -115,6 +115,14 @@ function SpendDial({ pct }: { pct: number }) {
   const angle = angleFor(pct);
   const colour = less ? "var(--lp-settled)" : "var(--lp-owes)";
   const ticks = Array.from({ length: 25 }, (_, i) => -180 + i * 7.5);
+  // One spring drives both the needle and the arc, so they move together (and the arc's path is
+  // always rebuilt whole, never blended between two strings). It sweeps up from zero on first show.
+  const swing = useSpring(reduce ? angle : -180, { stiffness: 70, damping: 12 });
+  useEffect(() => {
+    if (reduce) swing.jump(angle);
+    else swing.set(angle);
+  }, [angle, reduce, swing]);
+  const arc = useTransform(swing, (a) => `M${point(-180)} A${R} ${R} 0 0 1 ${point(Math.max(-179.9, Math.min(0, a)))}`);
   return (
     <div className="relative h-full">
       <div className={cn("absolute left-4 top-4 z-10 rounded-xl px-4 py-3", glass)}>
@@ -131,13 +139,7 @@ function SpendDial({ pct }: { pct: number }) {
       </div>
       <svg viewBox="0 0 300 196" className="absolute -right-4 top-1 h-[112%] w-auto" fill="none">
         <path d={`M${point(-180)} A${R} ${R} 0 0 1 ${point(0)}`} stroke="var(--fx-rim)" strokeWidth="13" strokeLinecap="round" />
-        <motion.path
-          animate={{ d: `M${point(-180)} A${R} ${R} 0 0 1 ${point(angle)}`, stroke: colour }}
-          transition={reduce ? { duration: 0 } : { type: "spring", stiffness: 70, damping: 14 }}
-          strokeWidth="13"
-          strokeLinecap="round"
-          strokeOpacity={0.9}
-        />
+        <motion.path d={arc} stroke={colour} strokeWidth="13" strokeLinecap="round" strokeOpacity={0.9} style={{ transition: "stroke 0.3s" }} />
         {ticks.map((deg) => {
           const rad = (deg * Math.PI) / 180;
           const inner = deg % 30 === 0 ? 116 : 121;
@@ -155,7 +157,7 @@ function SpendDial({ pct }: { pct: number }) {
           );
         })}
         <g transform={`translate(${CX} ${CY})`}>
-          <motion.g animate={{ rotate: angle }} initial={reduce ? false : { rotate: -180 }} transition={reduce ? { duration: 0 } : { type: "spring", stiffness: 70, damping: 11 }}>
+          <motion.g style={{ rotate: swing }}>
             {/* A clear circle centred on the pivot, so the needle turns around it. */}
             <circle r="100" fill="transparent" />
             <line x1="0" y1="0" x2="94" y2="0" stroke="var(--lp-ink)" strokeWidth="3" strokeLinecap="round" />
@@ -187,6 +189,7 @@ function SettleArt({ paidAmount, total }: { paidAmount: number; total: number })
           strokeWidth="9"
           strokeLinecap="round"
           strokeDasharray={c}
+          initial={false}
           animate={{ strokeDashoffset: c * (1 - paidAmount / total) }}
           transition={{ type: "spring", stiffness: 80, damping: 16 }}
         />
